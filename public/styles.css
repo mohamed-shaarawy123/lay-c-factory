@@ -1255,6 +1255,9 @@ header {
   font-size: 22px;
   color: var(--mut);
 }
+.account {
+  pointer-events: auto;
+}
 .acc-card label {
   display: block;
   margin: 0 0 12px;

@@ -1472,15 +1472,36 @@
     const a = accGet();
     return Boolean(a && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email || "") && String(a.address || "").trim().length > 3);
   }
+  function seniorsOpen() {
+    return cur >= 0 && SV[cur] && String(SV[cur].slug).indexOf("seniors") === 0;
+  }
   function paintAcc() {
     const a = accGet();
-    const label = a && a.email ? a.email : "Sign in";
+    const label = a && a.email ? a.email : "Your details";
     const btn = $("#accbtn");
     if (btn) btn.textContent = label;
     const bar = pg.querySelector("#accbar");
     if (bar) bar.textContent = label;
     const out = $("#accout");
     if (out) out.hidden = !a;
+    syncAccPanel();
+  }
+  function syncAccPanel() {
+    const box = $("#account");
+    const btn = $("#accbtn");
+    if (seniorsOpen()) {
+      if (box) box.hidden = true;
+      if (btn) btn.hidden = true;
+      return;
+    }
+    if (btn) btn.hidden = false;
+    const tablet = pg && pg.style.display === "block";
+    if (tablet) {
+      if (box) box.hidden = true;
+      return;
+    }
+    if (box) box.hidden = accOk();
+    fillAccForm();
   }
   function fillAccForm() {
     const a = accGet() || {};
@@ -1515,10 +1536,15 @@
   }
   function barHTML() {
     const a = accGet();
+    const seniors = seniorsOpen();
     return (
-      '<div class="wrap"><div class="bar"><button class="back" id="back">&larr; Back to the machine</button><div class="bar-r"><button class="acc" id="accbar" type="button">' +
-      (a && a.email ? a.email : "Sign in") +
-      '</button><button class="ask" id="askg" type="button"><span class="av" aria-hidden="true"></span>Ask the guide</button></div></div>'
+      '<div class="wrap"><div class="bar"><button class="back" id="back">&larr; Back to the machine</button><div class="bar-r">' +
+      (seniors
+        ? ""
+        : '<button class="acc" id="accbar" type="button">' +
+          (a && a.email ? a.email : "Your details") +
+          "</button>") +
+      '<button class="ask" id="askg" type="button"><span class="av" aria-hidden="true"></span>Ask the guide</button></div></div>'
     );
   }
   function mapsLink(addr) {
@@ -1538,7 +1564,7 @@
     return lines.join("\n");
   }
   function startQuote() {
-    if (!accOk()) {
+    if (!(SV[cur] && SV[cur].slug === "seniors-uniform") && !accOk()) {
       openAcc(startQuote);
       return;
     }
@@ -1594,6 +1620,7 @@
       pg.scrollTop = 0;
       tip.classList.remove("v");
       pg.querySelector(".win").focus({ preventScroll: true });
+      syncAccPanel();
       return;
     }
     pg.innerHTML =
@@ -1709,12 +1736,14 @@
     stp();
     calc();
     pg.querySelector("input,.sb").focus({ preventScroll: true });
+    syncAccPanel();
   }
   function hide() {
     cur = -1;
     pg.style.display = "none";
     pg.innerHTML = "";
     last = performance.now();
+    syncAccPanel();
   }
   function go(i) {
     if (i == null || i !== i || !SV[i]) return;
@@ -2053,7 +2082,7 @@
     $("#accout").addEventListener("click", () => {
       accSet(null);
       fillAccForm();
-      closeAcc();
+      syncAccPanel();
     });
   if (accForm)
     accForm.addEventListener("submit", async (e) => {
@@ -2083,7 +2112,7 @@
           phone: data.customer_phone || body.customer_phone,
           address: data.delivery_address || body.delivery_address,
         });
-        closeAcc();
+        syncAccPanel();
         const next = pendingQuote;
         pendingQuote = null;
         if (next) next();
@@ -2483,6 +2512,7 @@
   const _sh = show;
   show = function (i) {
     _sh(i);
+    syncAccPanel();
     if (SV[i] && SV[i].slug === "seniors") roomWin();
     if (SV[i] && SV[i].slug === "seniors-rooms") {
       roomEntry();

@@ -18,7 +18,7 @@
         <div class="id"><b>LAY C Factory</b></div>
         <div class="hdr-right">
           <div id="status"><i></i><span id="st">Machine running</span></div>
-          <button id="accbtn" type="button">Sign in</button>
+          <button id="accbtn" type="button">Your details</button>
         </div>
       </header>
       <div id="journey">
@@ -49,12 +49,12 @@
       <div id="pins"></div>
       <button id="talk" class="talk" type="button" tabindex="-1" aria-hidden="true"></button>
       <div id="page" role="dialog" aria-label="Quote builder"></div>
-      <section id="account" class="account" role="dialog" aria-label="Sign in" hidden>
+      <section id="account" class="account" role="dialog" aria-label="Your details">
         <form id="accform" class="acc-card">
           <div class="acc-h">
-            <b>Sign in</b>
-            <p>Save your email and delivery address so orders go to the database and the quote email includes your location.</p>
-            <button id="accx" type="button" aria-label="Close sign in">&times;</button>
+            <b>Your details</b>
+            <p>Name, email, phone and delivery address. Fill this in when you open the site.</p>
+            <button id="accx" type="button" aria-label="Close details">&times;</button>
           </div>
           <label>Name<input id="accname" name="name" type="text" maxlength="120" autocomplete="name" /></label>
           <label>Email<input id="accemail" name="email" type="email" maxlength="160" autocomplete="email" required /></label>
@@ -62,8 +62,8 @@
           <label>Delivery address<textarea id="accaddr" name="address" rows="3" maxlength="500" autocomplete="street-address" required placeholder="Street, area, city"></textarea></label>
           <p class="m" id="accerr" hidden></p>
           <div class="acc-actions">
-            <button type="submit">Save and continue</button>
-            <button id="accout" type="button" hidden>Sign out</button>
+            <button type="submit">Save</button>
+            <button id="accout" type="button" hidden>Clear</button>
           </div>
         </form>
       </section>
