@@ -1,0 +1,12 @@
+{
+  "name": "lay-c-factory",
+  "private": true,
+  "description": "LAY C Factory quote site. Orders save to Supabase, then EmailJS notifies Gmail.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3"
+  }
+}
