@@ -1470,7 +1470,7 @@
   }
   function accOk() {
     const a = accGet();
-    return Boolean(a && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email || "") && String(a.address || "").trim().length > 3);
+    return Boolean(a && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email || ""));
   }
   function seniorsOpen() {
     return cur >= 0 && SV[cur] && String(SV[cur].slug).indexOf("seniors") === 0;
@@ -1507,12 +1507,10 @@
     const a = accGet() || {};
     const n = $("#accname"),
       e = $("#accemail"),
-      p = $("#accphone"),
-      d = $("#accaddr");
+      p = $("#accphone");
     if (n) n.value = a.name || "";
     if (e) e.value = a.email || "";
     if (p) p.value = a.phone || "";
-    if (d) d.value = a.address || "";
   }
   function openAcc(then) {
     pendingQuote = then || null;
@@ -1547,20 +1545,13 @@
       '<button class="ask" id="askg" type="button"><span class="av" aria-hidden="true"></span>Ask the guide</button></div></div>'
     );
   }
-  function mapsLink(addr) {
-    return addr ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(addr) : "";
-  }
   function customerBlock(acc) {
     const a = acc || {};
     const email = (a.email || "").trim();
-    const addr = (a.address || "").trim();
     const who = [a.name, a.phone].map((v) => String(v || "").trim()).filter(Boolean).join(" · ");
     const lines = [];
     if (who) lines.push("Customer: " + who);
     if (email) lines.push("Email: " + email);
-    if (addr) lines.push("Delivery address: " + addr);
-    const map = mapsLink(addr);
-    if (map) lines.push("Map: " + map);
     return lines.join("\n");
   }
   function startQuote() {
@@ -2092,7 +2083,6 @@
         customer_name: ($("#accname") && $("#accname").value.trim()) || "",
         customer_email: ($("#accemail") && $("#accemail").value.trim()) || "",
         customer_phone: ($("#accphone") && $("#accphone").value.trim()) || "",
-        delivery_address: ($("#accaddr") && $("#accaddr").value.trim()) || "",
       };
       if (err) {
         err.hidden = true;
@@ -2110,7 +2100,6 @@
           name: data.customer_name || body.customer_name,
           email: data.customer_email || body.customer_email,
           phone: data.customer_phone || body.customer_phone,
-          address: data.delivery_address || body.delivery_address,
         });
         syncAccPanel();
         const next = pendingQuote;
@@ -2313,7 +2302,6 @@
   async function sendQuoteEmail(fields, file, toEmail) {
     const svc = SV[cur] && SV[cur].n ? SV[cur].n : "LAY C";
     const acc = accGet() || {};
-    const addr = (acc.address || "").trim();
     const client = (acc.email || "").trim();
     const details = [acc.name, acc.phone, client].filter(Boolean).join(" · ");
     const textParams = {
@@ -2325,8 +2313,6 @@
       total_price: fields.total_price,
       customer_details: details || svc,
       client_email: client,
-      delivery_address: addr,
-      maps_link: mapsLink(addr),
     };
     const fd = new FormData();
     fd.append("service_id", EMAILJS_SERVICE_ID);
@@ -2417,7 +2403,6 @@
     note.textContent = "Sending your order…";
     box.appendChild(note);
     const acc = accGet() || {};
-    const where = (acc.address || "").trim();
     quotePack.extra = [extra || "", customerBlock(acc)].filter(Boolean).join("\n");
     const fields = formatQuoteFields(quotePack);
     const s = SV[cur] || {};
@@ -2439,7 +2424,7 @@
           customer_name: acc.name || "",
           customer_email: acc.email || "",
           customer_phone: acc.phone || "",
-          delivery_address: where,
+          delivery_address: "",
           email_fields: fields,
         }),
       });

@@ -45,12 +45,7 @@ function supabaseAdmin() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-function mapsLink(addr) {
-  return addr ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(addr) : "";
-}
-
 function customerBlock(payload) {
-  const addr = text(payload.delivery_address, 500);
   const client = text(payload.customer_email, 160);
   const name = text(payload.customer_name, 120);
   const phone = text(payload.customer_phone, 40);
@@ -58,19 +53,14 @@ function customerBlock(payload) {
   const lines = [];
   if (who) lines.push("Customer: " + who);
   if (client) lines.push("Email: " + client);
-  if (addr) lines.push("Delivery address: " + addr);
-  const map = mapsLink(addr);
-  if (map) lines.push("Map: " + map);
   return lines.join("\n");
 }
 
 function notifyParams(priced, payload, to) {
   const email = payload.email_fields || {};
-  const addr = text(payload.delivery_address, 500);
   const client = text(payload.customer_email, 160);
   const name = text(payload.customer_name, 120);
   const phone = text(payload.customer_phone, 40);
-  const map = mapsLink(addr);
   let summary =
     email.order_summary ||
     priced.service +
@@ -79,7 +69,7 @@ function notifyParams(priced, payload, to) {
       "\nTotal: " +
       priced.total +
       " L.E";
-  if (!/Delivery address:|Client email:|^Email:/m.test(summary)) {
+  if (!/Client email:|^Email:/m.test(summary)) {
     const block = customerBlock(payload);
     if (block) summary = summary.replace(/\s+$/, "") + "\n" + block;
   }
@@ -92,8 +82,6 @@ function notifyParams(priced, payload, to) {
     total_price: email.total_price || "Total: " + priced.total + " L.E",
     customer_details: [name, phone, client].filter(Boolean).join(" · "),
     client_email: client,
-    delivery_address: addr,
-    maps_link: map,
   };
 }
 

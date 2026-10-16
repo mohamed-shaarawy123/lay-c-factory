@@ -51,12 +51,8 @@ module.exports = async function handler(req, res) {
   const customer_name = text(payload.customer_name, 120);
   const customer_email = text(payload.customer_email, 160).toLowerCase();
   const customer_phone = text(payload.customer_phone, 40);
-  const delivery_address = text(payload.delivery_address, 500);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer_email)) {
     return json(res, 400, { ok: false, error: "Enter a valid email address." });
-  }
-  if (delivery_address.length < 4) {
-    return json(res, 400, { ok: false, error: "Enter a delivery address so we can see the location." });
   }
 
   let supabase;
@@ -70,7 +66,7 @@ module.exports = async function handler(req, res) {
     customer_name,
     customer_email,
     customer_phone,
-    delivery_address,
+    delivery_address: "",
     items: { type: "account" },
     total: 0,
     status: "account",
@@ -106,7 +102,6 @@ module.exports = async function handler(req, res) {
     customer_name,
     customer_email,
     customer_phone,
-    delivery_address,
   });
   } catch (err) {
     return json(res, err.status || 500, { ok: false, error: err.message || "The account was not saved." });
