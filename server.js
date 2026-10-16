@@ -4,7 +4,7 @@ const path = require("path");
 const quote = require("./api/quote");
 const account = require("./api/account");
 
-const root = path.resolve(__dirname);
+const root = path.join(__dirname, "public");
 const types = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -39,7 +39,11 @@ function handler(req, res) {
   });
 }
 
-const server = http.createServer(handler);
-const port = process.env.PORT || 8765;
-server.listen(port, () => console.log("LAY C Factory http://127.0.0.1:" + port));
-module.exports = server;
+module.exports = handler;
+
+if (!process.env.VERCEL) {
+  const port = process.env.PORT || 8765;
+  http.createServer(handler).listen(port, "127.0.0.1", () =>
+    console.log("LAY C Factory http://127.0.0.1:" + port),
+  );
+}

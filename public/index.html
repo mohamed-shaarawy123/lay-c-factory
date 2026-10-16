@@ -1,0 +1,112 @@
+<!doctype html>
+<html>
+  <head>
+    <title>LAY C Factory</title>
+    <meta charset="utf8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div
+        id="scene"
+        role="img"
+        aria-label="Interactive 3D machine with five stations that makes gray beanies: Orders, Knitter, Dye vat, Pom-pom and Checkout. Drag to rotate, scroll to zoom, tap a station."
+      ></div>
+      <header>
+        <img class="logo" src="logo.png" alt="LAY C logo" />
+        <div class="id"><b>LAY C Factory</b></div>
+        <div class="hdr-right">
+          <div id="status"><i></i><span id="st">Machine running</span></div>
+          <button id="accbtn" type="button">Sign in</button>
+        </div>
+      </header>
+      <div id="journey">
+        <div><b id="jt"></b><small id="jd"></small></div>
+        <div class="track"><i id="jp"></i></div>
+      </div>
+      <div id="tip">
+        <b></b>
+        <p></p>
+      </div>
+      <div id="ctl">
+        <nav id="modes" aria-label="Machine mode">
+          <button data-mode="assembled" aria-pressed="true">Assembled</button
+          ><button data-mode="stations" aria-pressed="false">Stations</button
+          ><button data-mode="order" aria-pressed="false">One beanie</button>
+        </nav>
+        <nav id="cams" aria-label="Camera">
+          <span class="cap">VIEW</span
+          ><button data-cam="overview" aria-pressed="true">Overview</button
+          ><button data-cam="side" aria-pressed="false">Side</button
+          ><button data-cam="top" aria-pressed="false">Top</button
+          ><button data-cam="station" aria-pressed="false">Station</button
+          ><button data-cam="flight" aria-pressed="false">Flight</button
+          ><button id="play" aria-label="Pause the animation">❚❚</button>
+        </nav>
+      </div>
+      <footer><span></span><span>Rotate. Zoom. Tap a station.</span></footer>
+      <div id="pins"></div>
+      <button id="talk" class="talk" type="button" tabindex="-1" aria-hidden="true"></button>
+      <div id="page" role="dialog" aria-label="Quote builder"></div>
+      <section id="account" class="account" role="dialog" aria-label="Sign in" hidden>
+        <form id="accform" class="acc-card">
+          <div class="acc-h">
+            <b>Sign in</b>
+            <p>Save your email and delivery address so orders go to the database and the quote email includes your location.</p>
+            <button id="accx" type="button" aria-label="Close sign in">&times;</button>
+          </div>
+          <label>Name<input id="accname" name="name" type="text" maxlength="120" autocomplete="name" /></label>
+          <label>Email<input id="accemail" name="email" type="email" maxlength="160" autocomplete="email" required /></label>
+          <label>Phone<input id="accphone" name="phone" type="tel" maxlength="40" autocomplete="tel" /></label>
+          <label>Delivery address<textarea id="accaddr" name="address" rows="3" maxlength="500" autocomplete="street-address" required placeholder="Street, area, city"></textarea></label>
+          <p class="m" id="accerr" hidden></p>
+          <div class="acc-actions">
+            <button type="submit">Save and continue</button>
+            <button id="accout" type="button" hidden>Sign out</button>
+          </div>
+        </form>
+      </section>
+      <div id="err" role="alert">
+        <b>Could not start the 3D scene.</b>
+        <p>Check that WebGL is turned on in your browser.</p>
+      </div>
+      <div id="mas" class="mas-note">
+        <b>click on DOD</b
+        ><span>DOD is your personal assistant if you have any questions just ask him</span>
+      </div>
+      <section id="guide" class="guide" role="dialog" aria-label="LAY C guide" hidden>
+        <div class="gh">
+          <span class="av" aria-hidden="true"></span>
+          <div><b>LAY C Guide</b><small>Ask me what you need</small></div>
+          <button id="gx" type="button" aria-label="Close the guide">&times;</button>
+        </div>
+        <div id="glog" class="glog" aria-live="polite"></div>
+        <div id="gchips" class="gchips"></div>
+        <div id="gprev" class="gprev"></div>
+        <form id="gform" class="gform">
+          <button
+            type="button"
+            id="gatt"
+            class="gatt"
+            aria-label="Attach a photo"
+            title="Attach a photo"
+            hidden
+          >
+            &#128247;</button
+          ><input id="gfile" type="file" accept="image/*" multiple hidden /><input
+            id="gin"
+            type="text"
+            maxlength="200"
+            autocomplete="off"
+            placeholder="Type what you need"
+            aria-label="Ask the guide"
+          /><button type="submit">Send</button>
+        </form>
+      </section>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="factory.js"></script>
+  </body>
+</html>
