@@ -1739,7 +1739,8 @@
     tip.classList.remove("v");
     stp();
     calc();
-    pg.querySelector("input,.sb").focus({ preventScroll: true });
+    const focusEl = pg.querySelector("input,.sb");
+    if (focusEl) focusEl.focus({ preventScroll: true });
     syncAccPanel();
   }
   function hide() {
@@ -2145,28 +2146,121 @@
       rstore.db = await window.claude.use("db");
     } catch (e) {}
   })();
-  async function rGet(c) {
+  function rLocal(c) {
     try {
-      return JSON.parse(localStorage.getItem(rkey(c)));
-    } catch (e) {}
-    try {
-      if (rstore.db) {
-        const d = await rstore.db.doc("rooms/" + c).get();
-        return d.exists ? d.data() : null;
-      }
+      const local = JSON.parse(localStorage.getItem(rkey(c)) || "null");
+      if (local && local.items) return local;
     } catch (e) {}
     return null;
   }
-  async function rPut(c, d) {
+  function roomCode(v) {
+    return String(v || "")
+      .replace(/\D/g, "")
+      .slice(0, 6);
+  }
+  async function rGet(c) {
+    c = roomCode(c);
+    if (!/^\d{6}$/.test(c)) return null;
     try {
-      if (rstore.db) {
-        await rstore.db.doc("rooms/" + c).set(d);
-        return;
+      const res = await fetch("/api/room?code=" + encodeURIComponent(c));
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.room && data.room.items) {
+        try {
+          localStorage.setItem(rkey(c), JSON.stringify(data.room));
+        } catch (e) {}
+        return data.room;
       }
     } catch (e) {}
+    return rLocal(c);
+  }
+  async function rPut(c, d) {
     try {
       localStorage.setItem(rkey(c), JSON.stringify(d));
     } catch (e) {}
+    const acc = typeof accGet === "function" ? accGet() || {} : {};
+    try {
+      await fetch("/api/room", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: c,
+          items: d.items,
+          rows: d.rows,
+          customer_email: acc.email || "",
+        }),
+      });
+    } catch (e) {}
+  }
+  function roomCsv(it, rows, rt) {
+    const q = (v) => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+    const h = [
+      "Name",
+      "Phone",
+      ...it.map((x) => x.n + " size"),
+      ...it.map((x) => x.n + " qty"),
+      "Full payment",
+      "Deposit 50%",
+      "Balance",
+    ];
+    const L = [h.map(q).join(",")];
+    rows.forEach((x) => {
+      const v = rt(x);
+      L.push(
+        [x.n, x.p, ...x.l.map((l) => l.s), ...x.l.map((l) => l.q), v, v / 2, v / 2].map(q).join(","),
+      );
+    });
+    const tt = rows.reduce((a, x) => a + rt(x), 0);
+    L.push(["TOTAL", "", ...it.map(() => ""), ...it.map(() => ""), tt, tt / 2, tt / 2].map(q).join(","));
+    return L.join("\r\n");
+  }
+  function saveRoomFile(name, csv) {
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 1500);
+  }
+  async function mailRoomSheet(c, it, rows, rt, csv, note) {
+    if (note) {
+      note.hidden = false;
+      note.textContent = "Sending the Excel…";
+    }
+    const tt = rows.reduce((a, x) => a + rt(x), 0);
+    const filled = rows.filter((x) => (x.n || "").trim() || (x.p || "").trim());
+    const fields = {
+      order_summary:
+        "Seniors class sheet\nRoom password: " +
+        c +
+        "\nOpen Seniors, then Rooms, and enter this password to see the names.\n\n" +
+        csv,
+      products: it.map((x) => "- " + x.n + ": " + money(x.p)).join("\n") || "—",
+      quantities:
+        (filled.length ? filled : rows)
+          .map((x) => "- " + (x.n || "Student") + (x.p ? " · " + x.p : ""))
+          .join("\n") || "—",
+      total_price: "Room " + c + " · " + money(tt),
+    };
+    const file = new File([new Blob(["\ufeff" + csv], { type: "text/csv" })], "room-" + c + ".csv", {
+      type: "text/csv",
+    });
+    try {
+      await rPut(c, { items: it, rows });
+      await sendQuoteEmails(fields, file);
+      if (note) {
+        note.textContent =
+          "Excel sent by email. Password " + c + " opens this sheet again with the same names.";
+      }
+    } catch (err) {
+      if (note) {
+        note.textContent =
+          "The email was not sent. " + ((err && err.message) || "Download the Excel and try again.");
+      }
+    }
   }
   async function roomCheckout() {
     const out = pg.querySelector("#out") || $("#out");
@@ -2207,7 +2301,7 @@
           box.innerHTML =
             "<small>Your room password</small><b>" +
             c +
-            '</b><p class="m">Give this password to your class. Each student opens the sheet from the Rooms page, picks sizes, writes a name and phone number and the quantity of each item. Payment and the 50% deposit are calculated automatically. Items with a price range use the lowest price until we confirm it.</p><button id="ropen" data-c="' +
+            '</b><p class="m">Give this password to your class. Each student opens the same sheet from the Rooms page, writes a name and phone, and picks sizes. Download the Excel or email it. The password opens this sheet again so you can see every name.</p><button id="ropen" data-c="' +
             c +
             '">Open the sheet</button>';
           out.appendChild(box);
@@ -2509,12 +2603,13 @@
     } catch (e) {}
     const go1 = () => {
       d.querySelector("#pwerr").hidden = true;
-      roomSheet(n.value.trim());
+      roomSheet(roomCode(n.value));
     };
     ["click", "input", "change", "keydown"].forEach((v) =>
       d.addEventListener(v, (e) => {
         e.stopPropagation();
-        if (v === "click" && e.target.id === "pwgo") go1();
+        if (v === "input") d.querySelector("#pwerr").hidden = true;
+        if (v === "click" && e.target.closest("#pwgo")) go1();
         if (v === "keydown" && e.key === "Enter") go1();
       }),
     );
@@ -2559,11 +2654,13 @@
     pg.innerHTML =
       '<div class="wrap"><div class="bar"><button class="back" id="rback">&larr; Back</button></div><div class="hd"><span>ROOM ' +
       c +
-      '</span><h1>Class order sheet</h1><p>Write your name and phone, choose a size and the quantity of each item. The minimum is 1 of each item. Your total and 50% deposit are calculated automatically.</p></div><div id="shx"><div class="shw"><table class="sht"><thead><tr><th>#</th><th>Name</th><th>Phone</th>' +
+      '</span><h1>Class order sheet</h1><p>Write each student\'s name and phone, then choose a size and quantity. Download the Excel or email it. Password <b>' +
+      c +
+      '</b> opens this same sheet again.</p></div><div id="shx"><div class="shw"><table class="sht"><thead><tr><th>#</th><th>Name</th><th>Phone</th>' +
       it.map((x) => "<th>" + esc(x.n) + "<small>" + money(x.p) + "</small></th>").join("") +
       '<th>Full payment</th><th>Deposit 50%</th><th>Balance</th><th></th></tr></thead><tbody></tbody><tfoot><tr><td colspan="' +
       (3 + N) +
-      '">All customers</td><td id="tf"></td><td id="td"></td><td id="tb"></td><td></td></tr></tfoot></table></div><div class="shb"><button id="radd" type="button">+ Add customer</button><button id="rdl" type="button">Download for Excel</button></div></div></div>';
+      '">All customers</td><td id="tf"></td><td id="td"></td><td id="tb"></td><td></td></tr></tfoot></table></div><div class="shb"><button id="radd" type="button">+ Add customer</button><button id="rdl" type="button">Download Excel</button><button id="rml" type="button">Email Excel</button></div><p class="m" id="rnote" hidden></p></div></div>';
     const tb = pg.querySelector("tbody"),
       sx = pg.querySelector("#shx");
     let tm;
@@ -2658,39 +2755,18 @@
         if (!rows.length) rows.push(blank());
         draw();
         save();
-      } else if (t.id === "rdl") {
-        const q = (v) => '"' + String(v).replace(/"/g, '""') + '"',
-          h = [
-            "Name",
-            "Phone",
-            ...it.map((x) => x.n + " size"),
-            ...it.map((x) => x.n + " qty"),
-            "Full payment",
-            "Deposit 50%",
-            "Balance",
-          ],
-          L = [h.map(q).join(",")];
-        rows.forEach((x) => {
-          const v = rt(x);
-          L.push(
-            [x.n, x.p, ...x.l.map((l) => l.s), ...x.l.map((l) => l.q), v, v / 2, v / 2]
-              .map(q)
-              .join(","),
-          );
-        });
-        const tt = rows.reduce((a, x) => a + rt(x), 0);
-        L.push(
-          ["TOTAL", "", ...it.map(() => ""), ...it.map(() => ""), tt, tt / 2, tt / 2]
-            .map(q)
-            .join(","),
-        );
-        (async () => {
-          try {
-            const d = await window.claude.use("downloads");
-            if (d)
-              await d.save({ filename: "room-" + c + ".csv", data: "\ufeff" + L.join("\r\n") });
-          } catch (x) {}
-        })();
+      } else if (t.id === "rdl" || t.id === "rml") {
+        const csv = roomCsv(it, rows, rt);
+        const note = pg.querySelector("#rnote");
+        if (t.id === "rdl") {
+          saveRoomFile("room-" + c + ".csv", csv);
+          if (note) {
+            note.hidden = false;
+            note.textContent = "Excel downloaded. Open it in Excel, or use password " + c + " to open this sheet again.";
+          }
+        } else {
+          mailRoomSheet(c, it, rows, rt, csv, note);
+        }
       }
     });
     pg.querySelector("#rback").onclick = (e) => {
@@ -2702,11 +2778,12 @@
   }
   pg.addEventListener("click", (e) => {
     const t = e.target;
-    if (t.id === "ropen") roomSheet(t.dataset.c);
-    else if (t.id === "pwgo") roomSheet(pg.querySelector("#pwin").value.trim());
+    if (t.id === "ropen") roomSheet(roomCode(t.dataset.c));
+    else if (t.id === "pwgo" || t.closest("#pwgo"))
+      roomSheet(roomCode(pg.querySelector("#pwin").value));
   });
   pg.addEventListener("keydown", (e) => {
-    if (e.target.id === "pwin" && e.key === "Enter") roomSheet(e.target.value.trim());
+    if (e.target.id === "pwin" && e.key === "Enter") roomSheet(roomCode(e.target.value));
   });
   {
     const i = SV.findIndex((s) => s.slug === location.hash.slice(1));

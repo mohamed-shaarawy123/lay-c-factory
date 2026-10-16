@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const quote = require("./api/quote");
 const account = require("./api/account");
+const room = require("./api/room");
 
 const root = path.join(__dirname, "public");
 const types = {
@@ -23,6 +24,10 @@ function handler(req, res) {
     account(req, res);
     return;
   }
+  if (urlPath === "/api/room") {
+    room(req, res);
+    return;
+  }
   const rel = urlPath === "/" ? "index.html" : urlPath.replace(/^\/+/, "");
   const file = path.resolve(root, rel);
   if (!file.startsWith(root)) {
@@ -35,6 +40,7 @@ function handler(req, res) {
       return res.end("missing");
     }
     res.setHeader("Content-Type", types[path.extname(file)] || "application/octet-stream");
+    res.setHeader("Cache-Control", "no-store");
     res.end(buf);
   });
 }
