@@ -157,6 +157,7 @@ body {
 #scene {
   position: absolute;
   inset: 0;
+  z-index: 1;
   touch-action: none;
 }
 #scene canvas {
@@ -169,6 +170,7 @@ header {
   top: 22px;
   left: 24px;
   right: 24px;
+  z-index: 41;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1214,18 +1216,21 @@ header {
 }
 .account {
   position: absolute;
-  inset: 0;
-  z-index: 95;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgba(15, 42, 138, 0.28);
+  top: 84px;
+  left: 24px;
+  right: auto;
+  bottom: auto;
+  z-index: 40;
+  display: block;
+  padding: 0;
+  background: none;
+  pointer-events: auto;
 }
 .account[hidden] {
   display: none !important;
 }
 .acc-card {
-  width: min(440px, 100%);
+  width: min(340px, calc(100vw - 48px));
   padding: 22px;
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -1235,7 +1240,6 @@ header {
 .acc-h {
   position: relative;
   margin-bottom: 16px;
-  padding-right: 28px;
 }
 .acc-h b {
   display: block;

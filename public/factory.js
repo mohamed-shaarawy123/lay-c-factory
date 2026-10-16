@@ -1495,12 +1495,13 @@
       return;
     }
     if (btn) btn.hidden = false;
-    const tablet = pg && pg.style.display === "block";
-    if (tablet) {
+    const tab = $("#tabf");
+    const full = Boolean(tab && tab.classList.contains("on") && tab.classList.contains("full"));
+    if (full) {
       if (box) box.hidden = true;
       return;
     }
-    if (box) box.hidden = accOk();
+    if (box) box.hidden = false;
     fillAccForm();
   }
   function fillAccForm() {
@@ -1522,15 +1523,16 @@
     }
     paintAcc();
     const box = $("#account");
-    if (box) {
-      box.hidden = false;
-      const em = $("#accemail");
-      if (em) em.focus();
-    }
+    if (box) box.hidden = false;
+    const em = $("#accemail");
+    if (em) em.focus();
   }
   function closeAcc() {
-    const box = $("#account");
-    if (box) box.hidden = true;
+    const tab = $("#tabf");
+    if (tab && tab.classList.contains("full")) {
+      const box = $("#account");
+      if (box) box.hidden = true;
+    }
   }
   function barHTML() {
     const a = accGet();
@@ -1774,6 +1776,7 @@
     tf.classList.toggle("full", f);
     tz.innerHTML = f ? "&#10530; Shrink" : "&#10529; Zoom in";
     tz.setAttribute("aria-label", f ? "Shrink back to the tablet" : "Zoom in to full screen");
+    syncAccPanel();
   }
   function pinFrom(i) {
     const b = pinB[i];
@@ -2101,7 +2104,10 @@
           email: data.customer_email || body.customer_email,
           phone: data.customer_phone || body.customer_phone,
         });
-        syncAccPanel();
+        if (err) {
+          err.hidden = false;
+          err.textContent = "Saved.";
+        }
         const next = pendingQuote;
         pendingQuote = null;
         if (next) next();
