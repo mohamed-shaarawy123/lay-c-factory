@@ -1495,13 +1495,12 @@
       return;
     }
     if (btn) btn.hidden = false;
-    const tab = $("#tabf");
-    const full = Boolean(tab && tab.classList.contains("on") && tab.classList.contains("full"));
-    if (full) {
+    const tablet = pg && pg.style.display === "block";
+    if (tablet) {
       if (box) box.hidden = true;
       return;
     }
-    if (box) box.hidden = false;
+    if (box) box.hidden = accOk();
     fillAccForm();
   }
   function fillAccForm() {
@@ -1528,11 +1527,8 @@
     if (em) em.focus();
   }
   function closeAcc() {
-    const tab = $("#tabf");
-    if (tab && tab.classList.contains("full")) {
-      const box = $("#account");
-      if (box) box.hidden = true;
-    }
+    const box = $("#account");
+    if (box) box.hidden = true;
   }
   function barHTML() {
     const a = accGet();

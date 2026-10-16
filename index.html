@@ -49,11 +49,12 @@
       <div id="pins"></div>
       <button id="talk" class="talk" type="button" tabindex="-1" aria-hidden="true"></button>
       <div id="page" role="dialog" aria-label="Quote builder"></div>
-      <section id="account" class="account" role="dialog" aria-label="Your details">
+      <section id="account" class="account" role="dialog" aria-label="Your details" hidden>
         <form id="accform" class="acc-card">
           <div class="acc-h">
             <b>Your details</b>
             <p>Name, email and phone. Fill this in when you open the site.</p>
+            <button id="accx" type="button" aria-label="Close">&times;</button>
           </div>
           <label>Name<input id="accname" name="name" type="text" maxlength="120" autocomplete="name" /></label>
           <label>Email<input id="accemail" name="email" type="email" maxlength="160" autocomplete="email" required /></label>

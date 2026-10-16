@@ -157,6 +157,7 @@ body {
 #scene {
   position: absolute;
   inset: 0;
+  z-index: 1;
   touch-action: none;
 }
 #scene canvas {
@@ -169,6 +170,7 @@ header {
   top: 22px;
   left: 24px;
   right: 24px;
+  z-index: 41;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1220,6 +1222,7 @@ header {
   place-items: center;
   padding: 24px;
   background: rgba(15, 42, 138, 0.28);
+  pointer-events: auto;
 }
 .account[hidden] {
   display: none !important;
@@ -1254,9 +1257,6 @@ header {
   height: 32px;
   font-size: 22px;
   color: var(--mut);
-}
-.account {
-  pointer-events: auto;
 }
 .acc-card label {
   display: block;
