@@ -1,6 +1,7 @@
 const { createClient } = require("@supabase/supabase-js");
 const fs = require("fs");
 const path = require("path");
+const { readPayload } = require("../lib/body");
 
 function loadEnv() {
   try {
@@ -40,28 +41,8 @@ function supabaseAdmin() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-async function readPayload(req) {
-  let payload = req.body;
-  if (typeof payload === "string") {
-    try {
-      payload = JSON.parse(payload);
-    } catch (e) {
-      payload = null;
-    }
-  }
-  if (!payload && req.on) {
-    const chunks = [];
-    for await (const chunk of req) chunks.push(chunk);
-    try {
-      payload = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-    } catch (e) {
-      payload = null;
-    }
-  }
-  return payload && typeof payload === "object" ? payload : null;
-}
-
 module.exports = async function handler(req, res) {
+  try {
   loadEnv();
   if (req.method !== "POST") return json(res, 405, { ok: false, error: "Use POST." });
   const payload = await readPayload(req);
@@ -127,4 +108,7 @@ module.exports = async function handler(req, res) {
     customer_phone,
     delivery_address,
   });
+  } catch (err) {
+    return json(res, err.status || 500, { ok: false, error: err.message || "The account was not saved." });
+  }
 };

@@ -2,6 +2,7 @@ const { createClient } = require("@supabase/supabase-js");
 const fs = require("fs");
 const path = require("path");
 const { priceOrder } = require("../lib/catalog");
+const { readPayload } = require("../lib/body");
 
 const TO = "eyadellithy80@gmail.com";
 const recentKeys = new Map();
@@ -42,27 +43,6 @@ function supabaseAdmin() {
     throw err;
   }
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-}
-
-async function readPayload(req) {
-  let payload = req.body;
-  if (typeof payload === "string") {
-    try {
-      payload = JSON.parse(payload);
-    } catch (e) {
-      payload = null;
-    }
-  }
-  if (!payload && req.on) {
-    const chunks = [];
-    for await (const chunk of req) chunks.push(chunk);
-    try {
-      payload = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-    } catch (e) {
-      payload = null;
-    }
-  }
-  return payload && typeof payload === "object" ? payload : null;
 }
 
 function mapsLink(addr) {
@@ -165,6 +145,7 @@ async function findExisting(supabase, key) {
 }
 
 module.exports = async function handler(req, res) {
+  try {
   loadEnv();
   if (req.method !== "POST") return json(res, 405, { ok: false, error: "Use POST." });
   const payload = await readPayload(req);
@@ -248,4 +229,7 @@ module.exports = async function handler(req, res) {
   const ok = { ok: true, order_id: orderId, email_sent, total: priced.total };
   if (key) recentKeys.set(key, ok);
   return json(res, 200, ok);
+  } catch (err) {
+    return json(res, err.status || 500, { ok: false, error: err.message || "The order was not saved." });
+  }
 };
