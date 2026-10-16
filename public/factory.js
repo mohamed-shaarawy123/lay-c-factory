@@ -2161,16 +2161,20 @@
   async function rGet(c) {
     c = roomCode(c);
     if (!/^\d{6}$/.test(c)) return null;
-    try {
-      const res = await fetch("/api/room?code=" + encodeURIComponent(c));
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.room && data.room.items) {
-        try {
-          localStorage.setItem(rkey(c), JSON.stringify(data.room));
-        } catch (e) {}
-        return data.room;
-      }
-    } catch (e) {}
+    const res = await fetch("/api/room?code=" + encodeURIComponent(c), { cache: "no-store" });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.room && data.room.items) {
+      try {
+        localStorage.setItem(rkey(c), JSON.stringify(data.room));
+      } catch (e) {}
+      return data.room;
+    }
+    if (res.status === 404) return rLocal(c);
+    if (data && data.error) {
+      const err = new Error(data.error);
+      err.status = res.status;
+      throw err;
+    }
     return rLocal(c);
   }
   async function rPut(c, d) {
@@ -2178,18 +2182,19 @@
       localStorage.setItem(rkey(c), JSON.stringify(d));
     } catch (e) {}
     const acc = typeof accGet === "function" ? accGet() || {} : {};
-    try {
-      await fetch("/api/room", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: c,
-          items: d.items,
-          rows: d.rows,
-          customer_email: acc.email || "",
-        }),
-      });
-    } catch (e) {}
+    const res = await fetch("/api/room", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: c,
+        items: d.items,
+        rows: d.rows || [],
+        customer_email: acc.email || "",
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error((data && data.error) || "The room was not saved for other people.");
+    return true;
   }
   function roomCsv(it, rows, rt) {
     const q = (v) => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
@@ -2307,7 +2312,15 @@
           out.appendChild(box);
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      extra = "";
+      if (out) {
+        const note = document.createElement("p");
+        note.className = "m";
+        note.textContent = (e && e.message) || "The room password was not saved. Try the order again.";
+        out.appendChild(note);
+      }
+    }
     mailQuote(extra);
   }
   // EmailJS. Paste the three IDs from https://dashboard.emailjs.com (Account → General for Public Key, Email Services for Service ID, Email Templates for Template ID).
@@ -2636,10 +2649,24 @@
     }
   };
   async function roomSheet(c) {
-    const r = await rGet(c);
+    c = roomCode(c);
+    let r = null;
+    try {
+      r = await rGet(c);
+    } catch (ex) {
+      const e = pg.querySelector("#pwerr");
+      if (e) {
+        e.hidden = false;
+        e.textContent = (ex && ex.message) || "The room could not be opened.";
+      }
+      return;
+    }
     if (!r) {
       const e = pg.querySelector("#pwerr");
-      if (e) e.hidden = false;
+      if (e) {
+        e.hidden = false;
+        e.textContent = "No sheet found for that password.";
+      }
       return;
     }
     const it = r.items,

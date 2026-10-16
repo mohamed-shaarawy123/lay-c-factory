@@ -55,29 +55,6 @@ function supabaseAdmin() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-function keyShape() {
-  const { url, key } = supabaseConfig();
-  let role = "";
-  let ref = "";
-  try {
-    const part = key.split(".")[1] || "";
-    const pad = part + "=".repeat((4 - (part.length % 4)) % 4);
-    const payload = JSON.parse(Buffer.from(pad, "base64").toString());
-    role = payload.role || "";
-    ref = payload.ref || "";
-  } catch (e) {
-    if (key.indexOf("sb_secret_") === 0) role = "sb_secret";
-    else if (key.indexOf("sb_publishable_") === 0) role = "sb_publishable";
-    else role = key ? "unparsed" : "missing";
-  }
-  return {
-    urlHost: url.replace(/^https?:\/\//, "").split("/")[0],
-    keyLen: key.length,
-    role,
-    ref,
-  };
-}
-
 function codeFrom(req, payload) {
   const fromBody = payload && payload.code;
   const fromReqQuery = req.query && req.query.code;
@@ -144,13 +121,6 @@ module.exports = async function handler(req, res) {
     loadEnv();
     const payload = req.method === "POST" ? await readPayload(req) : null;
     const code = codeFrom(req, payload);
-    let wantHealth = false;
-    try {
-      wantHealth = new URL(req.url || "", "http://localhost").searchParams.get("health") === "1";
-    } catch (e) {}
-    if (req.query && String(req.query.health) === "1") wantHealth = true;
-    if (req.method === "GET" && wantHealth) return json(res, 200, { ok: true, ...keyShape() });
-
     if (!/^\d{6}$/.test(code)) return json(res, 400, { ok: false, error: "Enter the 6 digit room password." });
 
     let supabase;
