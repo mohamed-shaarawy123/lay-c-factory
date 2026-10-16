@@ -80,7 +80,10 @@ function notifyParams(priced, payload, to) {
     products: email.products || priced.lines.map((l) => "- " + l.name + ": " + l.line_total).join("\n"),
     quantities: email.quantities || priced.lines.map((l) => "- " + l.name + ": x" + l.quantity).join("\n"),
     total_price: email.total_price || "Total: " + priced.total + " L.E",
-    customer_details: [name, phone, client].filter(Boolean).join(" · "),
+    customer_details: customerBlock(payload) || [name, phone, client].filter(Boolean).join(" · "),
+    customer_name: name,
+    customer_phone: phone,
+    customer_email: client,
     client_email: client,
   };
 }

@@ -51,8 +51,14 @@ module.exports = async function handler(req, res) {
   const customer_name = text(payload.customer_name, 120);
   const customer_email = text(payload.customer_email, 160).toLowerCase();
   const customer_phone = text(payload.customer_phone, 40);
+  if (!customer_name) {
+    return json(res, 400, { ok: false, error: "Enter your name." });
+  }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer_email)) {
     return json(res, 400, { ok: false, error: "Enter a valid email address." });
+  }
+  if (customer_phone.length < 6) {
+    return json(res, 400, { ok: false, error: "Enter a phone number." });
   }
 
   let supabase;

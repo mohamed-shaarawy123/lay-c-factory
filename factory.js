@@ -1456,6 +1456,7 @@
   }
   const ACC_KEY = "lcaccount";
   let pendingQuote = null;
+  let accDismissed = false;
   function accGet() {
     try {
       return JSON.parse(localStorage.getItem(ACC_KEY) || "null");
@@ -1470,7 +1471,12 @@
   }
   function accOk() {
     const a = accGet();
-    return Boolean(a && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email || ""));
+    return Boolean(
+      a &&
+        String(a.name || "").trim() &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email || "") &&
+        String(a.phone || "").trim().length >= 6,
+    );
   }
   function seniorsOpen() {
     return cur >= 0 && SV[cur] && String(SV[cur].slug).indexOf("seniors") === 0;
@@ -1489,6 +1495,7 @@
   function syncAccPanel() {
     const box = $("#account");
     const btn = $("#accbtn");
+    const close = $("#accx");
     if (seniorsOpen()) {
       if (box) box.hidden = true;
       if (btn) btn.hidden = true;
@@ -1496,11 +1503,13 @@
     }
     if (btn) btn.hidden = false;
     const tablet = pg && pg.style.display === "block";
-    if (tablet) {
+    if (tablet || accDismissed) {
       if (box) box.hidden = true;
+      fillAccForm();
       return;
     }
-    if (box) box.hidden = accOk();
+    if (box) box.hidden = false;
+    if (close) close.hidden = !accOk();
     fillAccForm();
   }
   function fillAccForm() {
@@ -1514,19 +1523,23 @@
   }
   function openAcc(then) {
     pendingQuote = then || null;
+    accDismissed = false;
     fillAccForm();
     const err = $("#accerr");
     if (err) {
       err.hidden = true;
       err.textContent = "";
     }
-    paintAcc();
     const box = $("#account");
     if (box) box.hidden = false;
+    const close = $("#accx");
+    if (close) close.hidden = !accOk();
     const em = $("#accemail");
     if (em) em.focus();
   }
   function closeAcc() {
+    if (!accOk()) return;
+    accDismissed = true;
     const box = $("#account");
     if (box) box.hidden = true;
   }
@@ -1545,11 +1558,13 @@
   }
   function customerBlock(acc) {
     const a = acc || {};
-    const email = (a.email || "").trim();
-    const who = [a.name, a.phone].map((v) => String(v || "").trim()).filter(Boolean).join(" · ");
+    const name = String(a.name || "").trim();
+    const email = String(a.email || "").trim();
+    const phone = String(a.phone || "").trim();
     const lines = [];
-    if (who) lines.push("Customer: " + who);
+    if (name) lines.push("Name: " + name);
     if (email) lines.push("Email: " + email);
+    if (phone) lines.push("Phone: " + phone);
     return lines.join("\n");
   }
   function startQuote() {
@@ -2070,6 +2085,7 @@
   if ($("#accx")) $("#accx").addEventListener("click", closeAcc);
   if ($("#accout"))
     $("#accout").addEventListener("click", () => {
+      accDismissed = false;
       accSet(null);
       fillAccForm();
       syncAccPanel();
@@ -2087,6 +2103,13 @@
         err.hidden = true;
         err.textContent = "";
       }
+      if (!body.customer_name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.customer_email) || body.customer_phone.length < 6) {
+        if (err) {
+          err.hidden = false;
+          err.textContent = "Enter your name, a valid email and a phone number.";
+        }
+        return;
+      }
       try {
         const res = await fetch("/api/account", {
           method: "POST",
@@ -2095,15 +2118,12 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) throw new Error(data.error || "Could not save your email.");
+        accDismissed = true;
         accSet({
           name: data.customer_name || body.customer_name,
           email: data.customer_email || body.customer_email,
           phone: data.customer_phone || body.customer_phone,
         });
-        if (err) {
-          err.hidden = false;
-          err.textContent = "Saved.";
-        }
         const next = pendingQuote;
         pendingQuote = null;
         if (next) next();
@@ -2305,7 +2325,7 @@
     const svc = SV[cur] && SV[cur].n ? SV[cur].n : "LAY C";
     const acc = accGet() || {};
     const client = (acc.email || "").trim();
-    const details = [acc.name, acc.phone, client].filter(Boolean).join(" · ");
+    const details = customerBlock(acc);
     const textParams = {
       to_email: toEmail || "eyadellithy80@gmail.com",
       service: svc,
@@ -2314,6 +2334,9 @@
       quantities: fields.quantities,
       total_price: fields.total_price,
       customer_details: details || svc,
+      customer_name: (acc.name || "").trim(),
+      customer_phone: (acc.phone || "").trim(),
+      customer_email: client,
       client_email: client,
     };
     const fd = new FormData();
