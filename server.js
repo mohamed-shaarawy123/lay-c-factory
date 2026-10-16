@@ -44,6 +44,6 @@ module.exports = handler;
 if (!process.env.VERCEL) {
   const port = process.env.PORT || 8765;
   http.createServer(handler).listen(port, "127.0.0.1", () =>
-    console.log("LAY C Factory http://127.0.0.1:" + port),
+    console.log("Lithyy Factory http://127.0.0.1:" + port),
   );
 }

@@ -2265,7 +2265,7 @@
     let y = 56;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
-    doc.text("LAY C Factory", x, y);
+    doc.text("Lithyy Factory", x, y);
     y += 22;
     doc.setFontSize(13);
     doc.text(pack.title || "Quote", x, y);
@@ -2295,7 +2295,7 @@
     if (pack.extra) wrap("Notes", pack.extra.trim());
     wrap("Full summary", f.order_summary);
     const blob = doc.output("blob");
-    return new File([blob], "LAY-C-quote.pdf", { type: "application/pdf" });
+    return new File([blob], "Lithyy-quote.pdf", { type: "application/pdf" });
   }
   function offerPdfDownload(file) {
     const out = pg.querySelector("#out") || $("#out");
@@ -2318,11 +2318,11 @@
     const url = URL.createObjectURL(file);
     a.dataset.url = url;
     a.href = url;
-    a.download = file.name || "LAY-C-quote.pdf";
+    a.download = file.name || "Lithyy-quote.pdf";
     a.setAttribute("aria-label", "Download order PDF");
   }
   async function sendQuoteEmail(fields, file, toEmail) {
-    const svc = SV[cur] && SV[cur].n ? SV[cur].n : "LAY C";
+    const svc = SV[cur] && SV[cur].n ? SV[cur].n : "Lithyy";
     const acc = accGet() || {};
     const client = (acc.email || "").trim();
     const details = customerBlock(acc);
@@ -3080,8 +3080,8 @@
       } else
         say(
           AI
-            ? "Hi, I am DOD, the LAY C AI guide. Ask me anything: our services and prices, ideas, advice to improve your work, ask me to draw an image of your product, or send me a photo and I will read it and identify the item. Type below or tap a choice."
-            : "Hi, I am the LAY C guide. Tell me what you are trying to do and I will help you pick the right service and understand your options. Tap a choice below or type your own question.",
+            ? "Hi, I am DOD, the Lithyy AI guide. Ask me anything: our services and prices, ideas, advice to improve your work, ask me to draw an image of your product, or send me a photo and I will read it and identify the item. Type below or tap a choice."
+            : "Hi, I am the Lithyy guide. Tell me what you are trying to do and I will help you pick the right service and understand your options. Tap a choice below or type your own question.",
         );
     } else if (ctx >= 0 && ctx !== gCtx) {
       gCtx = ctx;
@@ -3161,7 +3161,7 @@
         "Draw an image of my product",
         () =>
           aiAsk(
-            "Draw a nice product image for me. If you do not know my product yet, draw a gray beanie mockup in LAY C brand style and ask what I make so you can redraw it.",
+            "Draw a nice product image for me. If you do not know my product yet, draw a gray beanie mockup in Lithyy brand style and ask what I make so you can redraw it.",
           ),
       ],
       [
@@ -3175,7 +3175,7 @@
         "Compare prices and options",
         () =>
           aiAsk(
-            "Compare the LAY C services and their prices and tell me the best value for a small new clothing brand.",
+            "Compare the Lithyy services and their prices and tell me the best value for a small new clothing brand.",
           ),
       ],
     ];
@@ -3218,14 +3218,14 @@
   }
   function aiRules() {
     return (
-      "You are DOD, the friendly and very smart AI guide of LAY C, a creative studio and clothing factory in Egypt. Prices are in Egyptian pounds (L.E). You can answer ANY question (business, design, fashion, marketing, writing, maths, general knowledge, tech, life) with accurate, useful, honest answers. Be especially strong at helping LAY C customers: explain services, help them choose, give concrete advice, and critique their ideas constructively so they can improve their brand, product quality, pricing, photos, website and marketing. When someone describes their work, name what is good, what to fix, and the next 2 or 3 actions.\n" +
-      "RULES: Reply in the same language and dialect the person writes in (English, Arabic, Egyptian Arabic or Franco-Arabic). Be warm, concise (usually under 140 words), plain text with short paragraphs. No markdown headings or bold. For LAY C prices use ONLY the data below; never invent LAY C prices; items marked priced after review are confirmed after the team reviews the order. If unsure, say so. Be honest that you are an AI.\n" +
+      "You are DOD, the friendly and very smart AI guide of Lithyy, a creative studio and clothing factory in Egypt. Prices are in Egyptian pounds (L.E). You can answer ANY question (business, design, fashion, marketing, writing, maths, general knowledge, tech, life) with accurate, useful, honest answers. Be especially strong at helping Lithyy customers: explain services, help them choose, give concrete advice, and critique their ideas constructively so they can improve their brand, product quality, pricing, photos, website and marketing. When someone describes their work, name what is good, what to fix, and the next 2 or 3 actions.\n" +
+      "RULES: Reply in the same language and dialect the person writes in (English, Arabic, Egyptian Arabic or Franco-Arabic). Be warm, concise (usually under 140 words), plain text with short paragraphs. No markdown headings or bold. For Lithyy prices use ONLY the data below; never invent Lithyy prices; items marked priced after review are confirmed after the team reviews the order. If unsure, say so. Be honest that you are an AI.\n" +
       'IMAGES: When the person asks for an image, picture, mockup, logo idea, design or "how it would look", draw it as ONE self-contained SVG inside a fenced block that starts with ```svg and ends with ```. Make it look as REALISTIC and 3D as SVG allows, like a studio product render: (1) Soft studio background with a subtle radial gradient and a floor shadow (blurred ellipse using feGaussianBlur). (2) Volume: build every form from several layers, a base shape plus a light-side highlight and a dark-side shade using linearGradient and radialGradient, with the light coming from the top left, soft inner shadows along folds, seams and edges, and a thin darker outline of the same hue, never black. (3) Fabric texture: use repeating <pattern> ribs or weave lines, or feTurbulence with feDiffuseLighting or feComposite at low opacity, clipped to the product with clipPath. (4) Depth: overlapping parts cast soft shadows (feGaussianBlur plus feOffset) and rounded edges, with no flat single colour fills. (5) Add a small realistic detail layer, such as stitching as dashed strokes, a woven label, folds, a fluffy pom-pom built from many small overlapping circles, and drawstrings with eyelets.\n' +
       'RATIOS: Use correct real-world proportions and a canvas that suits the product. Garments and tall items: viewBox="0 0 600 750" (4:5). Beanies, caps, mugs and bags: viewBox="0 0 600 600" (1:1). Banners, screens and web mockups: viewBox="0 0 800 450" (16:9). Keep the product about 70 to 80 percent of the canvas width and centred. Proportions to respect: a beanie is about as tall as it is wide, with a folded cuff about one quarter of its height and a pom-pom about one third of its width; a t-shirt body is about 1.15 times taller than it is wide, sleeves about 0.3 of the body width, neck opening about 0.3 of the chest width; a hoodie is like a t-shirt with long sleeves, a hood and a front pocket; a cap brim is about one third of the crown width. If the person gives sizes or a ratio, follow them exactly. Keep both sides symmetrical unless the design is asymmetric.\n' +
-      "IMAGE RULES: Use the colours, text and logo they asked for, and LAY C blue (#4169e1) accents when no colours are given; the factory beanie is dark gray. No scripts, no external links, no external fonts (font-family sans-serif), no embedded photos. Keep the SVG under about 9000 characters so it finishes. Write 1 or 2 sentences before or after the block saying what you drew and offer to change colours, text, angle or style. You make vector illustrations rendered in 3D style, not photographs, so say so if they ask for a photo.\n" +
-      "PHOTOS: The person may attach photos. Look carefully and (1) read ALL visible writing exactly as written, in any language including Arabic and handwriting, and say clearly which words are unclear instead of guessing; (2) identify the item: type of product or garment, colours, fabric or material, print or embroidery technique, logo, label, size marks, condition and visible defects; (3) say what LAY C service and options match it and quote prices only from the data below; (4) give honest, specific advice to improve it, such as design, quality, colours, placement, photo quality or presentation; (5) if it is a handwritten or printed order, list, receipt or quote, transcribe it as a tidy list and check the maths. Never identify real people from their faces; describe only what is visible. If the photo is blurry, dark or cropped, say what you could not read and ask for a clearer one.\n" +
-      "ACTIONS: If a LAY C page would help, end your answer with [[open:slug]] using a page slug from the data (at most 2).\n" +
-      "The demo machine on this page makes a dark gray beanie priced 400 L.E.\n\nLAY C DATA:\n" +
+      "IMAGE RULES: Use the colours, text and logo they asked for, and Lithyy blue (#4169e1) accents when no colours are given; the factory beanie is dark gray. No scripts, no external links, no external fonts (font-family sans-serif), no embedded photos. Keep the SVG under about 9000 characters so it finishes. Write 1 or 2 sentences before or after the block saying what you drew and offer to change colours, text, angle or style. You make vector illustrations rendered in 3D style, not photographs, so say so if they ask for a photo.\n" +
+      "PHOTOS: The person may attach photos. Look carefully and (1) read ALL visible writing exactly as written, in any language including Arabic and handwriting, and say clearly which words are unclear instead of guessing; (2) identify the item: type of product or garment, colours, fabric or material, print or embroidery technique, logo, label, size marks, condition and visible defects; (3) say what Lithyy service and options match it and quote prices only from the data below; (4) give honest, specific advice to improve it, such as design, quality, colours, placement, photo quality or presentation; (5) if it is a handwritten or printed order, list, receipt or quote, transcribe it as a tidy list and check the maths. Never identify real people from their faces; describe only what is visible. If the photo is blurry, dark or cropped, say what you could not read and ask for a clearer one.\n" +
+      "ACTIONS: If a Lithyy page would help, end your answer with [[open:slug]] using a page slug from the data (at most 2).\n" +
+      "The demo machine on this page makes a dark gray beanie priced 400 L.E.\n\nLithyy DATA:\n" +
       kbase()
     );
   }
@@ -3267,7 +3267,7 @@
       sv.type = "button";
       sv.textContent = "Save image";
       sv.onclick = () => {
-        DL.save({ filename: "lay-c-image.svg", data: svg }).catch(() => {});
+        DL.save({ filename: "lithyy-image.svg", data: svg }).catch(() => {});
       };
       a.appendChild(sv);
     }
@@ -3561,7 +3561,7 @@
           typed = gin.value.trim(),
           q =
             typed ||
-            "Look at this photo. Read any writing in it exactly, identify the item, tell me how LAY C can help, and how I can improve it.";
+            "Look at this photo. Read any writing in it exactly, identify the item, tell me how Lithyy can help, and how I can improve it.";
         gin.value = "";
         pend = [];
         const urls = await Promise.all(imgs.map(rd));
