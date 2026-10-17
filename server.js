@@ -4,6 +4,7 @@ const path = require("path");
 const quote = require("./api/quote");
 const account = require("./api/account");
 const room = require("./api/room");
+const album = require("./api/album");
 
 const root = path.join(__dirname, "public");
 const types = {
@@ -26,6 +27,10 @@ function handler(req, res) {
   }
   if (urlPath === "/api/room") {
     room(req, res);
+    return;
+  }
+  if (urlPath === "/api/album") {
+    album(req, res);
     return;
   }
   const rel = urlPath === "/" ? "index.html" : urlPath.replace(/^\/+/, "");

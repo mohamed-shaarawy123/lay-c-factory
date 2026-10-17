@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const { createClient } = require("@supabase/supabase-js");
 const fs = require("fs");
 const path = require("path");
@@ -60,6 +61,10 @@ module.exports = async function handler(req, res) {
   if (customer_phone.length < 6) {
     return json(res, 400, { ok: false, error: "Enter a phone number." });
   }
+  const password = String(payload.password || "");
+  if (password.length < 6) {
+    return json(res, 400, { ok: false, error: "Choose a password of at least 6 characters." });
+  }
 
   let supabase;
   try {
@@ -68,26 +73,45 @@ module.exports = async function handler(req, res) {
     return json(res, err.status || 500, { ok: false, error: err.message });
   }
 
-  const row = {
-    customer_name,
-    customer_email,
-    customer_phone,
-    delivery_address: "",
-    items: { type: "account" },
-    total: 0,
-    status: "account",
-    email_sent: false,
-  };
-
   const existing = await supabase
     .from("orders")
-    .select("id")
+    .select("id, items")
     .eq("customer_email", customer_email)
     .eq("status", "account")
     .maybeSingle();
   if (existing.error && !/multiple/i.test(existing.error.message || "")) {
     return json(res, 502, { ok: false, error: existing.error.message || "The account was not saved." });
   }
+
+  const prev = (existing.data && existing.data.items) || {};
+  let token = prev.token || "";
+  let created = false;
+  if (prev.pass && prev.salt) {
+    const check = crypto.scryptSync(password, prev.salt, 32).toString("hex");
+    const a = Buffer.from(check);
+    const b = Buffer.from(String(prev.pass));
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      return json(res, 401, {
+        ok: false,
+        error: "That email already has a password. Enter the password you created with it.",
+      });
+    }
+  } else {
+    created = !existing.data;
+    token = crypto.randomBytes(24).toString("hex");
+  }
+  if (!token) token = crypto.randomBytes(24).toString("hex");
+  const salt = prev.salt || crypto.randomBytes(16).toString("hex");
+  const pass = prev.pass && prev.salt ? prev.pass : crypto.scryptSync(password, salt, 32).toString("hex");
+  const row = {
+    customer_name,
+    customer_email,
+    customer_phone,
+    delivery_address: "",
+    items: { type: "account", salt, pass, token },
+    total: 0,
+    status: "account",
+  };
 
   let saved;
   if (existing.data && existing.data.id) {
@@ -104,6 +128,8 @@ module.exports = async function handler(req, res) {
 
   return json(res, 200, {
     ok: true,
+    created,
+    token,
     account_id: saved.data.id,
     customer_name,
     customer_email,

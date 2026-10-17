@@ -2099,15 +2099,16 @@
         customer_name: ($("#accname") && $("#accname").value.trim()) || "",
         customer_email: ($("#accemail") && $("#accemail").value.trim()) || "",
         customer_phone: ($("#accphone") && $("#accphone").value.trim()) || "",
+        password: ($("#accpass") && $("#accpass").value) || "",
       };
       if (err) {
         err.hidden = true;
         err.textContent = "";
       }
-      if (!body.customer_name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.customer_email) || body.customer_phone.length < 6) {
+      if (!body.customer_name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.customer_email) || body.customer_phone.length < 6 || body.password.length < 6) {
         if (err) {
           err.hidden = false;
-          err.textContent = "Enter your name, a valid email and a phone number.";
+          err.textContent = "Enter your name, a valid email, a phone number and a password of at least 6 characters.";
         }
         return;
       }
@@ -2124,7 +2125,30 @@
           name: data.customer_name || body.customer_name,
           email: data.customer_email || body.customer_email,
           phone: data.customer_phone || body.customer_phone,
+          token: data.token || "",
         });
+        if (data.created) {
+          try {
+            await sendQuoteEmail(
+              {
+                order_summary:
+                  "Someone created an email account.\nName: " +
+                  body.customer_name +
+                  "\nEmail: " +
+                  body.customer_email +
+                  "\nPhone: " +
+                  body.customer_phone +
+                  "\nOrders and photos from this person stay connected to this email.",
+                products: "New account",
+                quantities: body.customer_email,
+                total_price: "Account",
+              },
+              null,
+              "eyadellithy80@gmail.com",
+            );
+          } catch (mailErr) {}
+        }
+        if ($("#accpass")) $("#accpass").value = "";
         const next = pendingQuote;
         pendingQuote = null;
         if (next) next();
@@ -2136,6 +2160,209 @@
       }
     });
   paintAcc();
+
+  // SHARED ALBUM. The camera icon saves pictures to the signed-in email. Everyone can open the icon and see the album.
+  {
+    const appEl = $("#app");
+    const btn = document.createElement("button");
+    btn.id = "cambtn";
+    btn.type = "button";
+    btn.setAttribute("aria-label", "Open the shared photo album");
+    btn.innerHTML =
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/></svg><em hidden>0</em>';
+    appEl.appendChild(btn);
+    const box = document.createElement("div");
+    box.id = "cam";
+    box.className = "cam";
+    box.hidden = true;
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-label", "Shared photo album");
+    appEl.appendChild(box);
+    let tab = "all";
+    let stream = null;
+    const esc = (s) =>
+      String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const stop = () => {
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop());
+        stream = null;
+      }
+    };
+    const shrink = (src, max, q) =>
+      new Promise((ok, no) => {
+        const im = new Image();
+        im.onload = () => {
+          const k = Math.min(1, max / Math.max(im.width, im.height));
+          const c = document.createElement("canvas");
+          c.width = Math.max(1, Math.round(im.width * k));
+          c.height = Math.max(1, Math.round(im.height * k));
+          c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+          ok(c.toDataURL("image/jpeg", q));
+        };
+        im.onerror = no;
+        im.src = src;
+      });
+    async function albumList() {
+      const acc = accGet() || {};
+      const q = tab === "mine" && acc.token ? "?token=" + encodeURIComponent(acc.token) : "";
+      const res = await fetch("/api/album" + q, { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || "The album could not be opened.");
+      return data.photos || [];
+    }
+    async function drawAlbum() {
+      const host = box.querySelector("#agrid");
+      const note = box.querySelector("#anote");
+      if (!host) return;
+      const acc = accGet() || {};
+      if (tab === "mine" && !acc.token) {
+        host.innerHTML = "";
+        if (note) note.textContent = "Sign in with your email and password to see the pictures connected to you.";
+        return;
+      }
+      try {
+        const photos = await albumList();
+        const mark = btn.querySelector("em");
+        if (tab === "all" && mark) {
+          mark.hidden = !photos.length;
+          mark.textContent = photos.length;
+        }
+        if (note) note.textContent = photos.length ? "" : "No pictures yet.";
+        host.innerHTML = photos
+          .map(
+            (p) =>
+              '<figure><button type="button" data-id="' +
+              esc(p.id) +
+              '"><img src="' +
+              esc(p.thumb) +
+              '" alt="Photo from ' +
+              esc(p.email) +
+              '"></button><figcaption>' +
+              esc(p.email) +
+              "</figcaption></figure>",
+          )
+          .join("");
+      } catch (ex) {
+        if (note) note.textContent = (ex && ex.message) || "The album could not be opened.";
+      }
+    }
+    function shell() {
+      const acc = accGet() || {};
+      box.innerHTML =
+        '<div class="cbox"><button type="button" class="cx" data-a="close" aria-label="Close">&times;</button><h2>Photo album</h2><p>' +
+        (acc.email
+          ? "Signed in as " + esc(acc.email) + ". Pictures you add stay connected to this email."
+          : "Sign in first. Anything you add is connected to your email, and you come back with that email and password.") +
+        '</p><div class="tabs"><button type="button" class="cs" data-a="all">Everyone</button><button type="button" class="cs" data-a="mine">My pictures</button>' +
+        (acc.token ? "" : '<button type="button" class="cp" data-a="signin">Sign in</button>') +
+        '</div><p id="anote"></p><div id="agrid" class="grid"></div><div class="row"><button type="button" class="cp" data-a="cam">Take a picture</button><button type="button" class="cs" data-a="file">Choose a photo</button></div><input id="afile" type="file" accept="image/*" hidden></div>';
+      drawAlbum();
+    }
+    async function upload(dataUrl) {
+      const acc = accGet() || {};
+      if (!acc.token) {
+        box.hidden = true;
+        openAcc();
+        return;
+      }
+      const note = box.querySelector("#anote");
+      if (note) note.textContent = "Saving your picture…";
+      const image = await shrink(dataUrl, 900, 0.72);
+      const thumb = await shrink(dataUrl, 280, 0.7);
+      const res = await fetch("/api/album", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: acc.token, image, thumb }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || "The picture was not saved.");
+      tab = "all";
+      shell();
+    }
+    async function openCam() {
+      stop();
+      box.innerHTML =
+        '<div class="cbox"><video id="avid" playsinline muted autoplay></video><p id="anote"></p><div class="row"><button type="button" class="cs" data-a="back">Back</button><button type="button" class="cp" data-a="shot">Take the picture</button></div></div>';
+      const video = box.querySelector("#avid");
+      const note = box.querySelector("#anote");
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+        video.srcObject = stream;
+        await video.play();
+      } catch (e) {
+        if (note) note.textContent = "The camera is not available. Choose a photo instead.";
+      }
+    }
+    btn.onclick = () => {
+      box.hidden = false;
+      shell();
+    };
+    box.addEventListener("click", async (e) => {
+      const t = e.target.closest("[data-a], [data-id], .cx");
+      if (e.target === box) {
+        stop();
+        box.hidden = true;
+        return;
+      }
+      if (!t) return;
+      const a = t.dataset.a;
+      if (a === "close") {
+        stop();
+        box.hidden = true;
+      } else if (a === "all" || a === "mine") {
+        tab = a;
+        shell();
+      } else if (a === "signin") {
+        box.hidden = true;
+        openAcc();
+      } else if (a === "file") box.querySelector("#afile").click();
+      else if (a === "cam") openCam();
+      else if (a === "back") shell();
+      else if (a === "shot") {
+        const video = box.querySelector("#avid");
+        if (!video || !video.videoWidth) return;
+        const c = document.createElement("canvas");
+        c.width = video.videoWidth;
+        c.height = video.videoHeight;
+        c.getContext("2d").drawImage(video, 0, 0);
+        stop();
+        try {
+          await upload(c.toDataURL("image/jpeg", 0.85));
+        } catch (ex) {
+          shell();
+          const note = box.querySelector("#anote");
+          if (note) note.textContent = ex.message || "The picture was not saved.";
+        }
+      } else if (t.dataset.id) {
+        const res = await fetch("/api/album?id=" + encodeURIComponent(t.dataset.id));
+        const data = await res.json().catch(() => ({}));
+        if (data.photo) {
+          box.innerHTML =
+            '<div class="cbox"><button type="button" class="cx" data-a="back" aria-label="Back">&times;</button><div class="ph"><img src="' +
+            esc(data.photo.image) +
+            '" alt="Photo from ' +
+            esc(data.photo.email) +
+            '"></div><p>' +
+            esc(data.photo.email) +
+            '</p><button type="button" class="cs" data-a="back">Back to the album</button></div>';
+        }
+      }
+    });
+    box.addEventListener("change", async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          await upload(reader.result);
+        } catch (ex) {
+          const note = box.querySelector("#anote");
+          if (note) note.textContent = ex.message || "The picture was not saved.";
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
 
   // ROOMS. Checkout makes a 6 digit password. Each password opens its own sheet where students pick sizes, write name and phone and quantities. Totals and the 50% deposit are automatic.
   const RS = ["XS", "S", "M", "L", "XL", "XXL", "3XL"],
