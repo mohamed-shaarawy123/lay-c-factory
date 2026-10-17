@@ -5,6 +5,7 @@ const quote = require("./api/quote");
 const account = require("./api/account");
 const room = require("./api/room");
 const album = require("./api/album");
+const customerAlbum = require("./api/customer-album");
 
 const root = path.join(__dirname, "public");
 const types = {
@@ -33,6 +34,10 @@ function handler(req, res) {
     album(req, res);
     return;
   }
+  if (urlPath === "/api/customer-album") {
+    customerAlbum(req, res);
+    return;
+  }
   const rel = urlPath === "/" ? "index.html" : urlPath.replace(/^\/+/, "");
   const file = path.resolve(root, rel);
   if (!file.startsWith(root)) {
@@ -55,7 +60,7 @@ module.exports = handler;
 if (!process.env.VERCEL) {
   const port = Number(process.env.PORT || 8765);
   const on = http.createServer(handler);
-  on.listen(port, "127.0.0.1", () => console.log("Lithyy Factory http://127.0.0.1:" + port));
+  on.listen(port, "127.0.0.1", () => console.log("Lay C Factory http://127.0.0.1:" + port));
   const on6 = http.createServer(handler);
   on6.on("error", () => {});
   on6.listen(port, "::1");

@@ -1,0 +1,165 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Customer albums — Lay C Factory</title>
+    <meta charset="utf8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="styles.css?v=customer-album" />
+    <style>
+      body { background: #f6f7fb; }
+      main { max-width: 720px; margin: 0 auto; padding: 28px 18px 48px; }
+      main h1 { font-size: 28px; margin: 0 0 8px; }
+      main p { color: #444; }
+      .row { display: flex; gap: 8px; margin: 12px 0; }
+      input, button { font: inherit; }
+      input { flex: 1; padding: 10px 12px; border: 1px solid rgba(65, 105, 225, 0.28); border-radius: 10px; }
+      button { padding: 10px 14px; border: 0; border-radius: 10px; background: #4169e1; color: #fff; font-weight: 600; cursor: pointer; }
+      .order, .album { display: block; width: 100%; text-align: left; margin: 0 0 8px; background: #fff; color: #111; border: 1px solid rgba(65, 105, 225, 0.28); }
+      .order.on, .album.on { border-color: #4169e1; }
+      .note { min-height: 1.2em; font-weight: 600; }
+      a.back { color: #4169e1; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p><a class="back" href="/">← Back to the machine</a></p>
+      <h1>Customer albums</h1>
+      <p id="who">Sign in on the machine with a staff email, then open this page again.</p>
+      <div id="desk" hidden>
+        <div class="row">
+          <input id="q" placeholder="Search name or email" aria-label="Search orders" />
+          <button id="find" type="button">Search</button>
+        </div>
+        <div id="orders"></div>
+        <div class="row">
+          <input id="name" placeholder="Album name" aria-label="Album name" />
+          <button id="make" type="button">Create album and email the link</button>
+        </div>
+        <div id="albums"></div>
+        <div class="row">
+          <input id="file" type="file" accept="image/jpeg,image/png,image/webp" />
+          <button id="up" type="button">Upload photo</button>
+        </div>
+        <p class="note" id="note"></p>
+      </div>
+    </main>
+    <script>
+      const $ = (s) => document.querySelector(s);
+      const esc = (s) =>
+        String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      const acc = JSON.parse(localStorage.getItem("lcaccount") || "null") || {};
+      let orderId = "";
+      let albumId = "";
+      function note(t) {
+        $("#note").textContent = t || "";
+      }
+      async function call(body) {
+        const res = await fetch("/api/customer-album", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.assign({ token: acc.token }, body)),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) throw new Error(data.error || "The album request failed.");
+        return data;
+      }
+      function paintOrders(rows) {
+        $("#orders").innerHTML = rows
+          .map(
+            (o) =>
+              '<button type="button" class="order" data-id="' +
+              esc(o.id) +
+              '"><b>' +
+              esc(o.customer_name || "Customer") +
+              "</b> · " +
+              esc(o.customer_email || "no email") +
+              "<br><small>" +
+              esc(o.status || "") +
+              " · " +
+              new Date(o.created_at).toLocaleDateString() +
+              "</small></button>",
+          )
+          .join("");
+      }
+      async function loadAlbums() {
+        if (!orderId) return;
+        const data = await call({ action: "albums", order_id: orderId });
+        $("#albums").innerHTML = (data.albums || [])
+          .map(
+            (a) =>
+              '<button type="button" class="album" data-album="' +
+              esc(a.id) +
+              '">' +
+              esc(a.album_name || "Album") +
+              "</button>",
+          )
+          .join("");
+      }
+      async function start() {
+        if (!acc.token) return;
+        try {
+          const data = await call({ action: "orders", q: "" });
+          $("#who").textContent = "Signed in as " + (acc.email || "staff") + ". Choose an order, create the album, then upload photos.";
+          $("#desk").hidden = false;
+          paintOrders(data.orders || []);
+        } catch (e) {
+          $("#who").textContent = e.message;
+        }
+      }
+      $("#find").onclick = async () => {
+        try {
+          paintOrders((await call({ action: "orders", q: $("#q").value })).orders || []);
+        } catch (e) {
+          note(e.message);
+        }
+      };
+      $("#orders").onclick = async (e) => {
+        const b = e.target.closest("[data-id]");
+        if (!b) return;
+        orderId = b.getAttribute("data-id");
+        document.querySelectorAll(".order").forEach((el) => el.classList.toggle("on", el === b));
+        albumId = "";
+        try {
+          await loadAlbums();
+        } catch (err) {
+          note(err.message);
+        }
+      };
+      $("#albums").onclick = (e) => {
+        const b = e.target.closest("[data-album]");
+        if (!b) return;
+        albumId = b.getAttribute("data-album");
+        document.querySelectorAll(".album").forEach((el) => el.classList.toggle("on", el === b));
+      };
+      $("#make").onclick = async () => {
+        if (!orderId) return note("Choose an order first.");
+        note("Creating the album…");
+        try {
+          const data = await call({ action: "create", order_id: orderId, album_name: $("#name").value });
+          albumId = data.album_id;
+          note((data.email_sent ? "Email sent. " : "Email was not sent. Copy this link. ") + data.link);
+          await loadAlbums();
+        } catch (e) {
+          note(e.message);
+        }
+      };
+      $("#up").onclick = async () => {
+        const file = $("#file").files && $("#file").files[0];
+        if (!albumId || !file) return note("Choose an album and a photo first.");
+        const reader = new FileReader();
+        reader.onload = async () => {
+          note("Uploading…");
+          try {
+            await call({ action: "upload", album_id: albumId, image: reader.result, caption: file.name });
+            note("Photo saved in the private album.");
+            $("#file").value = "";
+          } catch (e) {
+            note(e.message);
+          }
+        };
+        reader.readAsDataURL(file);
+      };
+      start();
+    </script>
+  </body>
+</html>

@@ -3,6 +3,7 @@ const { createClient } = require("@supabase/supabase-js");
 const fs = require("fs");
 const path = require("path");
 const { readPayload } = require("../lib/body");
+const { isStaffEmail } = require("../lib/staff");
 
 function loadEnv() {
   try {
@@ -124,6 +125,7 @@ module.exports = async function handler(req, res) {
       customer_name: existing.data.customer_name || "",
       customer_email,
       customer_phone: existing.data.customer_phone || "",
+      staff: isStaffEmail(customer_email),
     });
   }
 
@@ -168,6 +170,7 @@ module.exports = async function handler(req, res) {
     customer_name,
     customer_email,
     customer_phone,
+    staff: isStaffEmail(customer_email),
   });
   } catch (err) {
     return json(res, err.status || 500, { ok: false, error: err.message || "The account was not saved." });

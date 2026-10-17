@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Your album — Lay C Factory</title>
+    <meta charset="utf8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="styles.css?v=customer-album" />
+    <style>
+      body { background: #f6f7fb; }
+      main { max-width: 880px; margin: 0 auto; padding: 28px 18px 48px; }
+      h1 { font-size: 28px; margin: 0 0 8px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-top: 18px; }
+      figure { margin: 0; background: #fff; border-radius: 12px; overflow: hidden; border: 1px solid rgba(65, 105, 225, 0.2); }
+      img { display: block; width: 100%; aspect-ratio: 4/3; object-fit: cover; }
+      figcaption { padding: 8px 10px; font-size: 12px; }
+      #msg { font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p><a href="/">Lay C Factory</a></p>
+      <h1 id="title">Your album</h1>
+      <p id="msg">Opening your album…</p>
+      <div class="grid" id="grid"></div>
+    </main>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const access = params.get("t") || "";
+      const title = document.querySelector("#title");
+      const msg = document.querySelector("#msg");
+      const grid = document.querySelector("#grid");
+      fetch("/api/customer-album?access=" + encodeURIComponent(access))
+        .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok || !data.ok) {
+            msg.textContent = data.error || "This album link is not valid.";
+            return;
+          }
+          title.textContent = data.album || "Your album";
+          const who = data.customer_name ? "Photos for " + data.customer_name + ". " : "";
+          msg.textContent = who + (data.photos.length ? data.photos.length + " photo" + (data.photos.length === 1 ? "" : "s") + "." : "No photos yet.");
+          grid.replaceChildren();
+          data.photos.forEach((p) => {
+            const fig = document.createElement("figure");
+            const img = document.createElement("img");
+            img.alt = p.caption || "Album photo";
+            img.src = p.url;
+            const cap = document.createElement("figcaption");
+            cap.textContent = p.caption || "";
+            fig.append(img, cap);
+            grid.append(fig);
+          });
+        })
+        .catch(() => {
+          msg.textContent = "The album could not be opened.";
+        });
+    </script>
+  </body>
+</html>
