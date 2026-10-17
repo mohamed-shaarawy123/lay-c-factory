@@ -53,8 +53,10 @@ function handler(req, res) {
 module.exports = handler;
 
 if (!process.env.VERCEL) {
-  const port = process.env.PORT || 8765;
-  http.createServer(handler).listen(port, "127.0.0.1", () =>
-    console.log("Lithyy Factory http://127.0.0.1:" + port),
-  );
+  const port = Number(process.env.PORT || 8765);
+  const on = http.createServer(handler);
+  on.listen(port, "127.0.0.1", () => console.log("Lithyy Factory http://127.0.0.1:" + port));
+  const on6 = http.createServer(handler);
+  on6.on("error", () => {});
+  on6.listen(port, "::1");
 }

@@ -128,6 +128,117 @@
   box(machine, 13.3, 0.09, 8.6, 0, 0.19, 0, M.body);
   for (const x of [-6, 6])
     for (const z of [-3.6, 3.6]) cyl(machine, 0.36, 0.2, x, -0.33, z, M.dark);
+  // selfie key on the front-right corner of the platform
+  const CAMX = 6.0,
+    CAMZ = 3.6,
+    CAMY = 0.235;
+  const camProp = new THREE.Group();
+  camProp.position.set(CAMX, CAMY, CAMZ);
+  machine.add(camProp);
+  let camDown = false;
+  let camHot = false;
+  let openCamera = null;
+  const camRing = M.light.clone();
+  camRing.emissiveIntensity = 0.6;
+  box(camProp, 0.98, 0.03, 0.72, 0, -0.005, 0, M.dark);
+  box(camProp, 0.9, 0.01, 0.64, 0, 0.012, 0, camRing);
+  for (const z of [-0.34, 0.34]) box(camProp, 0.98, 0.04, 0.04, 0, 0.02, z, M.dark);
+  for (const x of [-0.47, 0.47]) box(camProp, 0.04, 0.04, 0.64, x, 0.02, 0, M.dark);
+  const camKey = new THREE.Group();
+  camKey.position.y = 0.036;
+  camProp.add(camKey);
+  const kcSide = m(0x4169e1, 0.05, 0.5),
+    kcTop = m(0x4169e1, 0.05, 0.4);
+  const kcGeo = new THREE.CylinderGeometry(0.84 / Math.SQRT2, 0.84 / Math.SQRT2, 0.07, 4, 1);
+  kcGeo.rotateY(Math.PI / 4);
+  const kcSkirt = new THREE.Mesh(kcGeo, kcSide);
+  kcSkirt.scale.z = 0.58 / 0.84;
+  kcSkirt.position.y = 0.035;
+  kcSkirt.castShadow = kcSkirt.receiveShadow = true;
+  camKey.add(kcSkirt);
+  box(camKey, 0.84, 0.012, 0.58, 0, 0.076, 0, kcTop);
+  const camDraw = (c, dx, dy, lw, col) => {
+    c.save();
+    c.translate(dx, dy);
+    c.strokeStyle = col;
+    c.fillStyle = col;
+    c.lineWidth = lw;
+    c.lineJoin = "round";
+    c.beginPath();
+    if (c.roundRect) c.roundRect(28, 40, 164, 86, 14);
+    else c.rect(28, 40, 164, 86);
+    c.stroke();
+    c.beginPath();
+    c.rect(70, 22, 40, 22);
+    c.stroke();
+    c.beginPath();
+    c.arc(110, 84, 34, 0, Math.PI * 2);
+    c.stroke();
+    c.beginPath();
+    c.arc(110, 84, 15, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+  };
+  const camIconTex = ctex(220, 150, (c, w, h) => {
+    const kg = c.createLinearGradient(0, 0, 0, h);
+    kg.addColorStop(0, "#5b82ee");
+    kg.addColorStop(1, "#3d62d8");
+    c.fillStyle = kg;
+    c.fillRect(0, 0, w, h);
+    camDraw(c, 3, 3, 10, "#8fa9f5");
+    camDraw(c, -1.5, -1.5, 9, "#14307f");
+    camDraw(c, 0.8, 0.8, 7, "#2a4cc0");
+  });
+  const camBump = ctex(220, 150, (c, w, h) => {
+    c.fillStyle = "#ffffff";
+    c.fillRect(0, 0, w, h);
+    try {
+      c.filter = "blur(1.4px)";
+    } catch (e) {}
+    camDraw(c, 0, 0, 9, "#000000");
+  });
+  const camIcon = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.72, 0.49),
+    new THREE.MeshStandardMaterial({
+      map: camIconTex,
+      bumpMap: camBump,
+      bumpScale: 6,
+      roughness: 0.4,
+      metalness: 0.05,
+    }),
+  );
+  camIcon.rotation.x = -Math.PI / 2;
+  camIcon.position.set(0, 0.0825, 0);
+  camKey.add(camIcon);
+  camProp.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = o.receiveShadow = true;
+      o.userData.cam3d = true;
+    }
+  });
+  camIcon.castShadow = false;
+  camIcon.visible = true;
+  camProp.userData.cam3d = true;
+  scr(
+    machine,
+    0.95,
+    0.34,
+    5.9,
+    -0.09,
+    4.452,
+    ctex(840, 300, (c, w, h) => {
+      c.fillStyle = "#10267a";
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = "#ffffff";
+      c.font = "700 100px system-ui,sans-serif";
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      const tw = c.measureText("TAKE A SELFIE").width,
+        fs = Math.floor(100 * Math.min(1, (w * 0.9) / tw));
+      c.font = "700 " + fs + "px system-ui,sans-serif";
+      c.fillText("TAKE A SELFIE", w / 2, h / 2 + fs * 0.04);
+    }),
+  );
   scr(
     machine,
     6.5,
@@ -694,6 +805,7 @@
     pt.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     rc.setFromCamera(pt, cam);
     if (rc.intersectObject(walk, true).length) return -2;
+    if (camProp && rc.intersectObject(camProp, true).length) return -3;
     const h = rc.intersectObjects(
       ST.map((s) => s.g),
       true,
@@ -711,11 +823,13 @@
     if (dragging) return;
     const i = hit(e);
     hov = i;
-    R.domElement.style.cursor = i >= 0 || i === -2 ? "pointer" : "grab";
-    tip.classList.toggle("v", i >= 0);
-    if (i >= 0) {
-      tip.querySelector("b").innerHTML = "<span>0" + (i + 1) + "</span>" + ST[i].name;
-      tip.querySelector("p").textContent = ST[i].desc;
+    R.domElement.style.cursor = i >= 0 || i === -2 || i === -3 ? "pointer" : "grab";
+    tip.classList.toggle("v", i >= 0 || i === -3);
+    if (i >= 0 || i === -3) {
+      tip.querySelector("b").innerHTML =
+        i === -3 ? "<span>•</span>Selfie" : "<span>0" + (i + 1) + "</span>" + ST[i].name;
+      tip.querySelector("p").textContent =
+        i === -3 ? "Take a photo. Everyone can see it in the album." : ST[i].desc;
       const r = app.getBoundingClientRect();
       tip.style.left = Math.min(r.width - 250, Math.max(10, e.clientX - r.left + 16)) + "px";
       tip.style.top = Math.max(10, Math.min(r.height - 95, e.clientY - r.top - 60)) + "px";
@@ -730,6 +844,16 @@
     const i = hit(e);
     if (i >= 0) focus(i);
     else if (i === -2) gOpen(-1);
+    else if (i === -3 && openCamera) openCamera();
+  });
+  R.domElement.addEventListener("pointerdown", (e) => {
+    if (hit(e) === -3) camDown = true;
+  });
+  addEventListener("pointerup", () => {
+    camDown = false;
+  });
+  addEventListener("pointercancel", () => {
+    camDown = false;
   });
   // services
   const money = (n) => {
@@ -1469,10 +1593,12 @@
     else localStorage.removeItem(ACC_KEY);
     paintAcc();
   }
+  let accMode = "signup";
   function accOk() {
     const a = accGet();
     return Boolean(
       a &&
+        a.token &&
         String(a.name || "").trim() &&
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email || "") &&
         String(a.phone || "").trim().length >= 6,
@@ -1483,7 +1609,7 @@
   }
   function paintAcc() {
     const a = accGet();
-    const label = a && a.email ? a.email : "Your details";
+    const label = a && a.token && a.email ? a.email : "Log in";
     const btn = $("#accbtn");
     if (btn) btn.textContent = label;
     const bar = pg.querySelector("#accbar");
@@ -1521,9 +1647,38 @@
     if (e) e.value = a.email || "";
     if (p) p.value = a.phone || "";
   }
+  function setAccMode(mode) {
+    accMode = mode === "login" ? "login" : "signup";
+    const signup = $("#accsignup");
+    const login = $("#acclogin");
+    if (signup) signup.setAttribute("aria-pressed", accMode === "signup" ? "true" : "false");
+    if (login) login.setAttribute("aria-pressed", accMode === "login" ? "true" : "false");
+    const name = $("#accname");
+    const phone = $("#accphone");
+    const nameL = name && name.closest("label");
+    const phoneL = phone && phone.closest("label");
+    if (nameL) nameL.hidden = accMode === "login";
+    if (phoneL) phoneL.hidden = accMode === "login";
+    if (name) name.required = accMode !== "login";
+    if (phone) phone.required = accMode !== "login";
+    const note = $("#accnote");
+    if (note) {
+      note.textContent =
+        accMode === "login"
+          ? "Log in with the email and password you created. Orders and photos stay connected to that email."
+          : "Create a password the first time. Anything you do after this, including orders and photos, stays connected to this email. When you come back, log in with the same email and password.";
+    }
+    const title = document.querySelector("#accform .acc-h b");
+    if (title) title.textContent = accMode === "login" ? "Log in" : "Sign up";
+    const submit = accForm && accForm.querySelector('button[type="submit"]');
+    if (submit) submit.textContent = accMode === "login" ? "Log in" : "Sign up";
+    const pass = $("#accpass");
+    if (pass) pass.autocomplete = accMode === "login" ? "current-password" : "new-password";
+  }
   function openAcc(then) {
     pendingQuote = then || null;
     accDismissed = false;
+    setAccMode("signup");
     fillAccForm();
     const err = $("#accerr");
     if (err) {
@@ -1551,7 +1706,7 @@
       (seniors
         ? ""
         : '<button class="acc" id="accbar" type="button">' +
-          (a && a.email ? a.email : "Your details") +
+          (a && a.token && a.email ? a.email : "Log in") +
           "</button>") +
       '<button class="ask" id="askg" type="button"><span class="av" aria-hidden="true"></span>Ask the guide</button></div></div>'
     );
@@ -2091,11 +2246,14 @@
       fillAccForm();
       syncAccPanel();
     });
+  if ($("#accsignup")) $("#accsignup").addEventListener("click", () => setAccMode("signup"));
+  if ($("#acclogin")) $("#acclogin").addEventListener("click", () => setAccMode("login"));
   if (accForm)
     accForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const err = $("#accerr");
       const body = {
+        mode: accMode,
         customer_name: ($("#accname") && $("#accname").value.trim()) || "",
         customer_email: ($("#accemail") && $("#accemail").value.trim()) || "",
         customer_phone: ($("#accphone") && $("#accphone").value.trim()) || "",
@@ -2105,13 +2263,21 @@
         err.hidden = true;
         err.textContent = "";
       }
-      if (!body.customer_name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.customer_email) || body.customer_phone.length < 6 || body.password.length < 6) {
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.customer_email);
+      const signupOk = body.customer_name && emailOk && body.customer_phone.length >= 6 && body.password.length >= 6;
+      const loginOk = emailOk && body.password.length >= 6;
+      if (accMode === "login" ? !loginOk : !signupOk) {
         if (err) {
           err.hidden = false;
-          err.textContent = "Enter your name, a valid email, a phone number and a password of at least 6 characters.";
+          err.textContent =
+            accMode === "login"
+              ? "Enter the email you signed up with and its password."
+              : "Enter your name, a valid email, a phone number and a password of at least 6 characters.";
         }
         return;
       }
+      const submit = accForm.querySelector('button[type="submit"]');
+      if (submit) submit.disabled = true;
       try {
         const res = await fetch("/api/account", {
           method: "POST",
@@ -2153,24 +2319,34 @@
         pendingQuote = null;
         if (next) next();
       } catch (ex) {
+        let msg = (ex && ex.message) || "Could not save your email.";
+        if (location.protocol === "file:") {
+          msg = "Open http://127.0.0.1:8765 in the browser. A page opened from a file cannot sign up.";
+        } else if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+          msg =
+            location.hostname === "127.0.0.1" || location.hostname === "localhost"
+              ? "Could not reach the local server. Refresh http://127.0.0.1:8765 and try Sign up again."
+              : "Could not reach the server. Refresh the page and try Sign up again.";
+        }
+        if (/invalid api key/i.test(msg)) {
+          msg = "The account was not saved. The live database key is not set, so sign up cannot be stored.";
+        }
+        if (/already has an account/i.test(msg)) setAccMode("login");
+        if (/sign up first/i.test(msg)) setAccMode("signup");
         if (err) {
           err.hidden = false;
-          err.textContent = (ex && ex.message) || "Could not save your email.";
+          err.textContent = msg;
         }
+      } finally {
+        const submit = accForm.querySelector('button[type="submit"]');
+        if (submit) submit.disabled = false;
       }
     });
   paintAcc();
 
-  // SHARED ALBUM. The camera icon saves pictures to the signed-in email. Everyone can open the icon and see the album.
+  // SHARED ALBUM. The selfie key on the machine saves pictures to the signed-in email. Everyone who presses it sees the album.
   {
     const appEl = $("#app");
-    const btn = document.createElement("button");
-    btn.id = "cambtn";
-    btn.type = "button";
-    btn.setAttribute("aria-label", "Open the shared photo album");
-    btn.innerHTML =
-      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/></svg><em hidden>0</em>';
-    appEl.appendChild(btn);
     const box = document.createElement("div");
     box.id = "cam";
     box.className = "cam";
@@ -2222,11 +2398,6 @@
       }
       try {
         const photos = await albumList();
-        const mark = btn.querySelector("em");
-        if (tab === "all" && mark) {
-          mark.hidden = !photos.length;
-          mark.textContent = photos.length;
-        }
         if (note) note.textContent = photos.length ? "" : "No pictures yet.";
         host.innerHTML = photos
           .map(
@@ -2293,7 +2464,7 @@
         if (note) note.textContent = "The camera is not available. Choose a photo instead.";
       }
     }
-    btn.onclick = () => {
+    openCamera = () => {
       box.hidden = false;
       shell();
     };
@@ -4185,6 +4356,12 @@
           s.gm.emissiveIntensity) *
         sm;
     });
+    camKey.position.y +=
+      ((camDown ? 0.018 : hov === -3 || camHot ? 0.03 : 0.036) - camKey.position.y) * Math.min(1, sm * 2);
+    camRing.emissiveIntensity +=
+      (((hov === -3 || camHot || camDown) ? 3 : 0.6 + Math.pow(Math.max(0, Math.sin(tact)), 7) * 0.8) -
+        camRing.emissiveIntensity) *
+      sm;
     belt.scale.set(1 + spread * 0.12, 1, 1 + spread * 0.15);
     // station animation
     const ib = mode === "order" ? Math.min(1, ((t / 26) % 1) / 0.15) : beat;

@@ -197,39 +197,6 @@ header {
 #accbtn:hover {
   border-color: var(--amber);
 }
-#cambtn {
-  position: absolute;
-  left: 18px;
-  top: 70px;
-  z-index: 6;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 1px solid var(--amber);
-  border-radius: 50%;
-  background: var(--panel);
-  color: var(--fg);
-  pointer-events: auto;
-}
-#cambtn:hover {
-  background: rgba(65, 105, 225, 0.12);
-}
-#cambtn em {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
-  background: var(--amber);
-  color: var(--on);
-  font: 700 10px/16px ui-monospace, monospace;
-  font-style: normal;
-}
 .cam {
   position: absolute;
   inset: 0;
@@ -1362,10 +1329,35 @@ header {
   display: block;
   font-size: 18px;
 }
-.acc-h p {
-  margin: 6px 0 0;
+.acc-mode {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.acc-mode button {
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-weight: 600;
+}
+.acc-mode button[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--amber);
+  color: var(--on);
+}
+#accnote {
+  margin: 0 0 14px;
   color: var(--mut);
   line-height: 1.45;
+}
+.acc-card label[hidden] {
+  display: none;
+}
+#accerr {
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 600;
 }
 #accx {
   position: absolute;
