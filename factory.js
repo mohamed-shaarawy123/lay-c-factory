@@ -2806,6 +2806,7 @@
         code: c,
         items: d.items,
         rows: d.rows || [],
+        ex: d.ex || null,
         customer_email: acc.email || "",
       }),
     });
@@ -2833,7 +2834,28 @@
     });
     const tt = rows.reduce((a, x) => a + rt(x), 0);
     L.push(["TOTAL", "", ...it.map(() => ""), ...it.map(() => ""), tt, tt / 2, tt / 2].map(q).join(","));
+    if (typeof roomSummaryLines === "function") {
+      roomSummaryLines(it, rows, rt).forEach((line) => L.push(line.map(q).join(",")));
+    }
     return L.join("\r\n");
+  }
+  function roomSummaryLines(it, rows, rt) {
+    const counts = it.map((x, k) => {
+      const cn = RS.map((z) => rows.reduce((a, r) => a + (r.l[k] && r.l[k].s === z ? +r.l[k].q || 0 : 0), 0));
+      const n = cn.reduce((a, b) => a + b, 0);
+      return { n: x.n, cn, pieces: n, price: +x.p || 0, total: n * (+x.p || 0) };
+    });
+    const lines = [
+      [],
+      ["SUMMARY: PIECES OF EACH SIZE, PERSONAL TOUCHES AND DELIVERY"],
+      ["Item", ...RS, "Total pieces", "Unit price", "Item total"],
+    ];
+    counts.forEach((o) => lines.push([o.n, ...o.cn, o.pieces, o.price, o.total]));
+    const grandPieces = counts.reduce((a, o) => a + o.pieces, 0);
+    const bySize = RS.map((z, j) => counts.reduce((a, o) => a + o.cn[j], 0));
+    const moneyTotal = rows.reduce((a, x) => a + rt(x), 0);
+    lines.push(["Grand total", ...bySize, grandPieces, "", moneyTotal]);
+    return lines;
   }
   function saveRoomFile(name, csv) {
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
@@ -2905,13 +2927,26 @@
             })
         : [];
       if (it.length) {
+        const q1 = SV[cur].q[1],
+          q2 = SV[cur].q[2],
+          a1 = ans[1] || [],
+          dk = (ans[2] || [])[0],
+          dop = dk != null && q2 && dk < q2.o.length ? q2.o[dk] : null;
+        const ex = {
+          t: q1
+            ? a1.filter((k) => k < q1.o.length).map((k) => ({ n: q1.o[k][0], p: +q1.o[k][1] || 0 }))
+            : [],
+          ct: q1 ? a1.some((k) => k >= q1.o.length) : false,
+          dl: dop ? dop[0] : "",
+          pc: dop && dop[5] ? +dop[1] || 0 : 0,
+        };
         let c,
           n = 0;
         do {
           c = String(Math.floor(100000 + Math.random() * 900000));
           n++;
         } while (n < 20 && (await rGet(c)));
-        await rPut(c, { items: it, rows: [] });
+        await rPut(c, { items: it, rows: [], ex });
         rstore.auto = c;
         try {
           localStorage.setItem("lclast", c);
@@ -3287,10 +3322,19 @@
       return;
     }
     const it = r.items,
-      N = it.length;
+      N = it.length,
+      EX = Object.assign({ t: [], ct: false, dl: "", pc: 0 }, r.ex || {}),
+      T = EX.t.reduce((a, x) => a + (+x.p || 0), 0),
+      PC = +EX.pc || 0,
+      tl = EX.t.length
+        ? EX.t.map((x) => x.n + " " + money(x.p)).join(" + ") + (EX.ct ? " + custom, priced later" : "")
+        : EX.ct
+          ? "Custom, priced later"
+          : "None",
+      dlab = (EX.dl || "Standard delivery") + (PC ? " +" + PC + "%" : "");
     let rows = (r.rows || []).map((x) => ({
         ...x,
-        l: x.l.map((l) => ({ ...l, q: Math.max(1, Math.floor(+l.q || 1)) })),
+        l: x.l.map((l) => ({ ...l, s: RS.includes(l.s) ? l.s : "M", q: Math.max(1, Math.floor(+l.q || 1)) })),
       })),
       t = 0;
     const blank = () => ({ n: "", p: "", l: it.map(() => ({ s: "M", q: 1 })) });
@@ -3298,20 +3342,92 @@
     pg.innerHTML =
       '<div class="wrap"><div class="bar"><button class="back" id="rback">&larr; Back</button></div><div class="hd"><span>ROOM ' +
       c +
-      '</span><h1>Class order sheet</h1><p>Write each student\'s name and phone, then choose a size and quantity. Download the Excel or email it. Password <b>' +
+      '</span><h1>Class order sheet</h1><p>Write each student\'s name and phone, then choose a size and quantity. The minimum is 1 of each item. Download the Excel or email it. Password <b>' +
       c +
       '</b> opens this same sheet again.</p></div><div id="shx"><div class="shw"><table class="sht"><thead><tr><th>#</th><th>Name</th><th>Phone</th>' +
       it.map((x) => "<th>" + esc(x.n) + "<small>" + money(x.p) + "</small></th>").join("") +
-      '<th>Full payment</th><th>Deposit 50%</th><th>Balance</th><th></th></tr></thead><tbody></tbody><tfoot><tr><td colspan="' +
+      "<th>Personal touches<small>" +
+      esc(tl) +
+      "</small></th><th>Delivery fee<small>" +
+      esc(dlab) +
+      '</small></th><th>Full payment</th><th>Deposit 50%</th><th>Balance</th><th></th></tr></thead><tbody></tbody><tfoot><tr><td colspan="' +
       (3 + N) +
-      '">All customers</td><td id="tf"></td><td id="td"></td><td id="tb"></td><td></td></tr></tfoot></table></div><div class="shb"><button id="radd" type="button">+ Add customer</button><button id="rdl" type="button">Download Excel</button><button id="rml" type="button">Email Excel</button></div><p class="m" id="rnote" hidden></p></div></div>';
+      '">All customers</td><td id="tt"></td><td id="tdl"></td><td id="tf"></td><td id="td"></td><td id="tb"></td><td></td></tr></tfoot></table></div><div class="shb"><button id="radd" type="button">+ Add customer</button><button id="rdl" type="button">Download Excel</button><button id="rml" type="button">Email Excel</button></div><h2 class="sh2">Summary: pieces of each size, personal touches and delivery</h2><p class="m">Updates automatically as customers fill in the sheet. Sizes available: ' +
+      RS.join(", ") +
+      '.</p><div class="shw"><table class="sht" id="sumt"><thead><tr><th>Item</th>' +
+      RS.map((z) => "<th>" + z + "</th>").join("") +
+      '<th>Total pieces</th><th>Unit price</th><th>Item total</th></tr></thead><tbody id="sumb"></tbody><tfoot><tr id="sumf"></tr></tfoot></table></div><p class="m" id="rnote" hidden></p></div></div>';
     const tb = pg.querySelector("tbody"),
       sx = pg.querySelector("#shx");
     let tm;
-    const rt = (x) => x.l.reduce((a, l, k) => a + (+l.q || 0) * it[k].p, 0);
+    const it0 = (x) => x.l.reduce((a, l, k) => a + (+l.q || 0) * it[k].p, 0),
+      dl = (x) => ((it0(x) + T) * PC) / 100,
+      rt = (x) => it0(x) + T + dl(x);
+    const sumRows = () =>
+      it.map((x, k) => {
+        const cn = RS.map((z) => rows.reduce((a, row) => a + (row.l[k] && row.l[k].s === z ? +row.l[k].q || 0 : 0), 0));
+        const n = cn.reduce((a, b) => a + b, 0);
+        return { x, cn, n, m: n * (+x.p || 0) };
+      });
+    const exRows = () => {
+      const n = rows.length;
+      const o = EX.t.map((x) => ({ n: "Personal touch: " + x.n, u: +x.p || 0, c: n + " students", m: (+x.p || 0) * n }));
+      if (EX.ct) o.push({ n: "Custom personal touch", u: "Priced later", c: "", m: 0 });
+      o.push({
+        n: "Delivery: " + (EX.dl || "Standard delivery") + (PC ? " (" + PC + "% fee)" : ""),
+        u: PC ? PC + "%" : money(0),
+        c: "",
+        m: rows.reduce((a, x) => a + dl(x), 0),
+      });
+      return o;
+    };
+    const sumDraw = () => {
+      const R = sumRows(),
+        E = exRows(),
+        tb2 = pg.querySelector("#sumb"),
+        tf2 = pg.querySelector("#sumf");
+      if (!tb2 || !tf2) return;
+      tb2.innerHTML =
+        R.map(
+          (o) =>
+            "<tr><td>" +
+            esc(o.x.n) +
+            "</td>" +
+            o.cn.map((v) => "<td" + (v ? "" : ' class="z"') + ">" + v + "</td>").join("") +
+            "<td><b>" +
+            o.n +
+            "</b></td><td>" +
+            money(+o.x.p || 0) +
+            "</td><td><b>" +
+            money(o.m) +
+            "</b></td></tr>",
+        ).join("") +
+        E.map(
+          (o) =>
+            "<tr><td>" +
+            esc(o.n) +
+            "</td>" +
+            RS.map(() => '<td class="z">-</td>').join("") +
+            "<td>" +
+            (o.c === "" ? "" : "<b>" + o.c + "</b>") +
+            "</td><td>" +
+            (typeof o.u === "number" ? money(o.u) : esc(o.u)) +
+            "</td><td><b>" +
+            money(o.m) +
+            "</b></td></tr>",
+        ).join("");
+      tf2.innerHTML =
+        "<td>Grand total</td>" +
+        RS.map((z, j) => "<td>" + R.reduce((a, o) => a + o.cn[j], 0) + "</td>").join("") +
+        "<td>" +
+        R.reduce((a, o) => a + o.n, 0) +
+        "</td><td></td><td>" +
+        money(R.reduce((a, o) => a + o.m, 0) + E.reduce((a, o) => a + o.m, 0)) +
+        "</td>";
+    };
     const save = () => {
       clearTimeout(tm);
-      tm = setTimeout(() => rPut(c, { items: it, rows }), 400);
+      tm = setTimeout(() => rPut(c, { items: it, rows, ex: EX }), 400);
     };
     const sums = () => {
       let f = 0;
@@ -3319,13 +3435,18 @@
         const v = rt(x),
           tr = tb.children[i];
         f += v;
+        tr.querySelector(".tt").textContent = money(T);
+        tr.querySelector(".tdl").textContent = money(dl(x));
         tr.querySelector(".tf").textContent = money(v);
         tr.querySelector(".td").textContent = money(v / 2);
         tr.querySelector(".tbl").textContent = money(v / 2);
       });
+      pg.querySelector("#tt").textContent = money(T * rows.length);
+      pg.querySelector("#tdl").textContent = money(rows.reduce((a, x) => a + dl(x), 0));
       pg.querySelector("#tf").textContent = money(f);
       pg.querySelector("#td").textContent = money(f / 2);
       pg.querySelector("#tb").textContent = money(f / 2);
+      sumDraw();
     };
     const draw = () => {
       tb.innerHTML = rows
@@ -3356,7 +3477,7 @@
                   '" aria-label="Quantity"></td>',
               )
               .join("") +
-            '<td class="tf"></td><td class="td"></td><td class="tbl"></td><td><button type="button" class="rx" data-del="' +
+            '<td class="tt"></td><td class="tdl"></td><td class="tf"></td><td class="td"></td><td class="tbl"></td><td><button type="button" class="rx" data-del="' +
             i +
             '" aria-label="Remove">&times;</button></td></tr>',
         )

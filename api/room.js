@@ -98,7 +98,18 @@ function cleanRoom(payload, code) {
       };
     }),
   }));
-  return { code, items: cleanItems, rows };
+  if (payload.ex == null) return { code, items: cleanItems, rows, ex: null };
+  const exIn = payload.ex && typeof payload.ex === "object" ? payload.ex : {};
+  const ex = {
+    t: (Array.isArray(exIn.t) ? exIn.t : [])
+      .slice(0, 20)
+      .map((x) => ({ n: text(x && x.n, 80), p: Math.max(0, Number(x && x.p) || 0) }))
+      .filter((x) => x.n),
+    ct: Boolean(exIn.ct),
+    dl: text(exIn.dl, 80),
+    pc: Math.max(0, Math.min(100, Number(exIn.pc) || 0)),
+  };
+  return { code, items: cleanItems, rows, ex };
 }
 
 async function findRoom(supabase, code) {
@@ -135,22 +146,28 @@ module.exports = async function handler(req, res) {
       if (!found || !found.items) return json(res, 404, { ok: false, error: "No sheet found for that password." });
       return json(res, 200, {
         ok: true,
-        room: { items: found.items.items || [], rows: found.items.rows || [] },
+        room: { items: found.items.items || [], rows: found.items.rows || [], ex: found.items.ex || null },
       });
     }
 
     if (req.method !== "POST") return json(res, 405, { ok: false, error: "Use GET or POST." });
     const room = cleanRoom(payload || {}, code);
+    const existing = await findRoom(supabase, room.code);
     const row = {
       customer_name: "Room " + room.code,
       customer_email: text(payload.customer_email, 160).toLowerCase(),
       customer_phone: "",
       delivery_address: "",
-      items: { type: "room", code: room.code, items: room.items, rows: room.rows },
+      items: {
+        type: "room",
+        code: room.code,
+        items: room.items,
+        rows: room.rows,
+        ex: room.ex || (existing && existing.items && existing.items.ex) || { t: [], ct: false, dl: "", pc: 0 },
+      },
       total: 0,
       status: "room",
     };
-    const existing = await findRoom(supabase, room.code);
     const saved = existing
       ? await supabase.from("orders").update(row).eq("id", existing.id).select("id").single()
       : await supabase.from("orders").insert(row).select("id").single();
