@@ -58,12 +58,22 @@ async function accountByToken(supabase, token) {
   if (!token || token.length < 16) return null;
   const { data, error } = await supabase
     .from("orders")
-    .select("customer_email, customer_name")
+    .select("id, customer_email, customer_name, items")
     .eq("status", "account")
     .eq("items->>token", token)
     .maybeSingle();
   if (error || !data) return null;
   return data;
+}
+
+async function photoCount(supabase, email) {
+  const { count, error } = await supabase
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "photo")
+    .eq("customer_email", email);
+  if (error) return 0;
+  return count || 0;
 }
 
 module.exports = async function handler(req, res) {
@@ -84,11 +94,20 @@ module.exports = async function handler(req, res) {
         id = q.get("id") || "";
         mine = q.get("token") || "";
       } catch (e) {}
+      let wantMine = false;
+      try {
+        wantMine = new URL(req.url || "", "http://localhost").searchParams.get("mine") === "1";
+      } catch (e) {}
       if (req.query) {
         id = id || req.query.id || "";
         mine = mine || req.query.token || "";
+        if (String(req.query.mine) === "1") wantMine = true;
       }
+      const who = mine ? await accountByToken(supabase, mine) : null;
+      const mineCount = who ? await photoCount(supabase, who.customer_email) : 0;
+      const isPrivate = Boolean(who && who.items && who.items.private);
       if (id) {
+        if (!who) return json(res, 401, { ok: false, error: "Sign in with your email and password to see a photo." });
         const one = await supabase
           .from("orders")
           .select("id, customer_email, customer_name, items")
@@ -97,6 +116,11 @@ module.exports = async function handler(req, res) {
           .maybeSingle();
         if (one.error || !one.data || !one.data.items) {
           return json(res, 404, { ok: false, error: "That picture was not found." });
+        }
+        const own = one.data.customer_email === who.customer_email;
+        const shared = one.data.items.shared !== false;
+        if (!own && (isPrivate || mineCount < 1 || !shared)) {
+          return json(res, 403, { ok: false, error: "Take a camera photo on a shared album before opening someone else's picture." });
         }
         return json(res, 200, {
           ok: true,
@@ -115,23 +139,36 @@ module.exports = async function handler(req, res) {
         .eq("status", "photo")
         .order("created_at", { ascending: false })
         .limit(80);
-      if (mine) {
-        const who = await accountByToken(supabase, mine);
-        if (!who) return json(res, 401, { ok: false, error: "Sign in with your email and password to see your pictures." });
+      let locked = false;
+      let reason = "";
+      if (!who) {
+        locked = true;
+        reason = "Sign in with your email to see albums.";
+      } else if (wantMine) {
         query = query.eq("customer_email", who.customer_email);
+      } else if (isPrivate) {
+        locked = true;
+        reason = "Your album is private, so you cannot see other albums.";
+      } else if (mineCount < 1) {
+        locked = true;
+        reason = "Take a photo with the camera before you can see other albums.";
       }
-      const list = await query;
-      if (list.error) return json(res, 502, { ok: false, error: list.error.message || "The album could not be opened." });
-      return json(res, 200, {
-        ok: true,
-        photos: (list.data || []).map((row) => ({
+      let rows = [];
+      if (!locked) {
+        const list = await query;
+        if (list.error) return json(res, 502, { ok: false, error: list.error.message || "The album could not be opened." });
+        rows = list.data || [];
+      }
+      const photos = rows
+        .filter((row) => row.items && (wantMine || row.items.shared !== false))
+        .map((row) => ({
           id: row.id,
           email: row.customer_email,
           name: row.customer_name,
-          thumb: (row.items && row.items.thumb) || "",
-          ts: (row.items && row.items.ts) || 0,
-        })),
-      });
+          thumb: row.items.thumb || "",
+          ts: row.items.ts || 0,
+        }));
+      return json(res, 200, { ok: true, photos, mine: mineCount, locked, private: isPrivate, reason });
     }
 
     if (req.method !== "POST") return json(res, 405, { ok: false, error: "Use GET or POST." });
@@ -140,6 +177,31 @@ module.exports = async function handler(req, res) {
     const who = await accountByToken(supabase, text(payload.token, 80));
     if (!who) {
       return json(res, 401, { ok: false, error: "Sign in with your email and password before adding a picture." });
+    }
+    if (payload.privacy === true || payload.privacy === false) {
+      const prev = who.items && typeof who.items === "object" ? who.items : {};
+      const saved = await supabase
+        .from("orders")
+        .update({ items: Object.assign({}, prev, { private: payload.privacy === true }) })
+        .eq("id", who.id);
+      if (saved.error) return json(res, 502, { ok: false, error: saved.error.message || "The album setting was not saved." });
+      const own = await supabase
+        .from("orders")
+        .select("id, items")
+        .eq("status", "photo")
+        .eq("customer_email", who.customer_email);
+      if (!own.error) {
+        for (const row of own.data || []) {
+          await supabase
+            .from("orders")
+            .update({ items: Object.assign({}, row.items || {}, { shared: payload.privacy !== true }) })
+            .eq("id", row.id);
+        }
+      }
+      return json(res, 200, { ok: true, private: payload.privacy === true });
+    }
+    if (payload.source !== "camera") {
+      return json(res, 400, { ok: false, error: "Take the photo with the front or back camera. A picture from your files cannot be added." });
     }
     const image = imageData(payload.image);
     const thumb = imageData(payload.thumb) || image;
@@ -151,7 +213,7 @@ module.exports = async function handler(req, res) {
         customer_email: who.customer_email,
         customer_phone: "",
         delivery_address: "",
-        items: { type: "photo", image, thumb, ts: Date.now() },
+        items: { type: "photo", image, thumb, ts: Date.now(), source: "camera", shared: !(who.items && who.items.private) },
         total: 0,
         status: "photo",
       })

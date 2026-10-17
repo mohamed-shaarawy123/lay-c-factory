@@ -137,6 +137,7 @@
   machine.add(camProp);
   let camDown = false;
   let camHot = false;
+  let camBtnEl = null;
   let openCamera = null;
   const camRing = M.light.clone();
   camRing.emissiveIntensity = 0.6;
@@ -217,7 +218,7 @@
     }
   });
   camIcon.castShadow = false;
-  camIcon.visible = true;
+  camIcon.visible = false;
   camProp.userData.cam3d = true;
   scr(
     machine,
@@ -1227,6 +1228,15 @@
       y = Math.max(80, Math.min(ah - 190, y));
       b.style.transform = "translate(" + x + "px," + y + "px) translate(-50%,-100%)";
     });
+    if (camBtnEl) {
+      pv.copy(camProp.position);
+      pv.project(cam);
+      let bx = (pv.x * 0.5 + 0.5) * aw,
+        by = (-pv.y * 0.5 + 0.5) * ah;
+      bx = Math.max(26, Math.min(aw - 26, bx));
+      by = Math.max(26, Math.min(ah - 26, by));
+      camBtnEl.style.transform = "translate(" + bx + "px," + (by - 18) + "px) translate(-50%,-50%)";
+    }
   }
   // STUDIO CALENDAR. Demo availability only: Fridays are closed and other days are booked by a repeatable pattern.
   // To use real bookings, replace dayBooked() and hourBooked() with a lookup of your own data.
@@ -1612,6 +1622,15 @@
     const label = a && a.token && a.email ? a.email : "Log in";
     const btn = $("#accbtn");
     if (btn) btn.textContent = label;
+    const mail = $("#menuemail");
+    if (mail) mail.textContent = a && a.token && a.email ? a.email : "Not signed in";
+    const signed = Boolean(a && a.token);
+    ["mlogin", "msignup"].forEach((id) => {
+      const el = $("#" + id);
+      if (el) el.hidden = signed;
+    });
+    const leave = $("#mlogout");
+    if (leave) leave.hidden = !signed;
     const bar = pg.querySelector("#accbar");
     if (bar) bar.textContent = label;
     const out = $("#accout");
@@ -1675,10 +1694,10 @@
     const pass = $("#accpass");
     if (pass) pass.autocomplete = accMode === "login" ? "current-password" : "new-password";
   }
-  function openAcc(then) {
-    pendingQuote = then || null;
+  function openAcc(then, mode) {
+    pendingQuote = typeof then === "function" ? then : null;
     accDismissed = false;
-    setAccMode("signup");
+    setAccMode(mode === "login" ? "login" : "signup");
     fillAccForm();
     const err = $("#accerr");
     if (err) {
@@ -2238,6 +2257,44 @@
   });
   const accForm = $("#accform");
   if ($("#accbtn")) $("#accbtn").addEventListener("click", () => openAcc());
+  function menuSet(on) {
+    const menu = $("#menu");
+    const scrim = $("#mscrim");
+    const btn = $("#menub");
+    if (menu) {
+      menu.classList.toggle("on", on);
+      if (on) menu.removeAttribute("inert");
+      else menu.setAttribute("inert", "");
+    }
+    if (scrim) scrim.hidden = !on;
+    if (btn) btn.setAttribute("aria-expanded", on ? "true" : "false");
+  }
+  if ($("#menub")) $("#menub").addEventListener("click", () => menuSet(!$("#menu").classList.contains("on")));
+  if ($("#mscrim")) $("#mscrim").addEventListener("click", () => menuSet(false));
+  if ($("#mlogin"))
+    $("#mlogin").addEventListener("click", () => {
+      menuSet(false);
+      openAcc(null, "login");
+    });
+  if ($("#msignup"))
+    $("#msignup").addEventListener("click", () => {
+      menuSet(false);
+      openAcc(null, "signup");
+    });
+  if ($("#mlogout"))
+    $("#mlogout").addEventListener("click", () => {
+      menuSet(false);
+      accDismissed = false;
+      accSet(null);
+      fillAccForm();
+      syncAccPanel();
+    });
+  document.querySelectorAll("#menu [data-go]").forEach((b) => {
+    b.addEventListener("click", () => {
+      menuSet(false);
+      go(Number(b.getAttribute("data-go")));
+    });
+  });
   if ($("#accx")) $("#accx").addEventListener("click", closeAcc);
   if ($("#accout"))
     $("#accout").addEventListener("click", () => {
@@ -2344,17 +2401,42 @@
     });
   paintAcc();
 
-  // SHARED ALBUM. The selfie key on the machine saves pictures to the signed-in email. Everyone who presses it sees the album.
+  // CAMERA AND SHARED PHOTO BINDER. The selfie key opens the same welcome, camera, and binder as the factory page. Pictures are stored with the signed-in email.
   {
     const appEl = $("#app");
+    const ICON =
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/></svg>';
+    const cb = document.createElement("button");
+    cb.id = "cambtn";
+    cb.type = "button";
+    cb.className = "cambtn";
+    cb.setAttribute("aria-label", "Open the camera and photo binder");
+    cb.innerHTML = "<em hidden></em>";
+    appEl.appendChild(cb);
+    camBtnEl = cb;
+    cb.addEventListener("pointerdown", () => {
+      camDown = true;
+    });
+    cb.addEventListener("pointerenter", () => {
+      camHot = true;
+    });
+    cb.addEventListener("pointerleave", () => {
+      camHot = false;
+    });
     const box = document.createElement("div");
     box.id = "cam";
     box.className = "cam";
     box.hidden = true;
     box.setAttribute("role", "dialog");
-    box.setAttribute("aria-label", "Shared photo album");
+    box.setAttribute("aria-modal", "true");
+    box.setAttribute("aria-label", "Lithyy camera and photo binder");
     appEl.appendChild(box);
     let tab = "all";
+    let view = "";
+    let facing = "user";
+    let last = null;
+    let count = 0;
+    let albumMeta = { mine: 0, locked: true, private: false, reason: "" };
     let stream = null;
     const esc = (s) =>
       String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -2380,159 +2462,296 @@
       });
     async function albumList() {
       const acc = accGet() || {};
-      const q = tab === "mine" && acc.token ? "?token=" + encodeURIComponent(acc.token) : "";
-      const res = await fetch("/api/album" + q, { cache: "no-store" });
+      const q = new URLSearchParams();
+      if (acc.token) q.set("token", acc.token);
+      if (tab === "mine") q.set("mine", "1");
+      const res = await fetch("/api/album?" + q.toString(), { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.error || "The album could not be opened.");
+      albumMeta = {
+        mine: data.mine || 0,
+        locked: Boolean(data.locked),
+        private: Boolean(data.private),
+        reason: data.reason || "",
+      };
       return data.photos || [];
     }
-    async function drawAlbum() {
-      const host = box.querySelector("#agrid");
-      const note = box.querySelector("#anote");
-      if (!host) return;
-      const acc = accGet() || {};
-      if (tab === "mine" && !acc.token) {
-        host.innerHTML = "";
-        if (note) note.textContent = "Sign in with your email and password to see the pictures connected to you.";
-        return;
+    async function faceIn(canvas) {
+      if (typeof FaceDetector !== "function") {
+        throw new Error("This browser cannot confirm a face. Open the site in Chrome and take the photo with the selfie camera or the back camera.");
       }
+      let faces = [];
+      try {
+        faces = await new FaceDetector({ fastMode: true, maxDetectedFaces: 2 }).detect(canvas);
+      } catch (e) {
+        throw new Error("The face check did not run. Take the photo again with the selfie camera or the back camera.");
+      }
+      if (!faces.length) throw new Error("The photo must show a real person's face. Take it again with the selfie camera or the back camera.");
+    }
+    function badge(n) {
+      count = n;
+      const mark = cb.querySelector("em");
+      if (!mark) return;
+      mark.hidden = !n;
+      mark.textContent = n;
+    }
+    function when(ts) {
+      const d = new Date(ts || Date.now());
+      return d.toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+    }
+    function needAccount() {
+      const acc = accGet() || {};
+      if (acc.token) return false;
+      stop();
+      box.hidden = true;
+      openAcc();
+      return true;
+    }
+    async function refreshCount() {
+      const prev = tab;
+      tab = "all";
       try {
         const photos = await albumList();
-        if (note) note.textContent = photos.length ? "" : "No pictures yet.";
-        host.innerHTML = photos
-          .map(
-            (p) =>
-              '<figure><button type="button" data-id="' +
-              esc(p.id) +
-              '"><img src="' +
-              esc(p.thumb) +
-              '" alt="Photo from ' +
-              esc(p.email) +
-              '"></button><figcaption>' +
-              esc(p.email) +
-              "</figcaption></figure>",
-          )
-          .join("");
-      } catch (ex) {
-        if (note) note.textContent = (ex && ex.message) || "The album could not be opened.";
+        badge(albumMeta.mine || 0);
+        return photos;
+      } catch (e) {
+        return [];
+      } finally {
+        tab = prev;
       }
     }
-    function shell() {
-      const acc = accGet() || {};
-      box.innerHTML =
-        '<div class="cbox"><button type="button" class="cx" data-a="close" aria-label="Close">&times;</button><h2>Photo album</h2><p>' +
-        (acc.email
-          ? "Signed in as " + esc(acc.email) + ". Pictures you add stay connected to this email."
-          : "Sign in first. Anything you add is connected to your email, and you come back with that email and password.") +
-        '</p><div class="tabs"><button type="button" class="cs" data-a="all">Everyone</button><button type="button" class="cs" data-a="mine">My pictures</button>' +
-        (acc.token ? "" : '<button type="button" class="cp" data-a="signin">Sign in</button>') +
-        '</div><p id="anote"></p><div id="agrid" class="grid"></div><div class="row"><button type="button" class="cp" data-a="cam">Take a picture</button><button type="button" class="cs" data-a="file">Choose a photo</button></div><input id="afile" type="file" accept="image/*" hidden></div>';
-      drawAlbum();
+    function grid(list) {
+      return list
+        .map(
+          (p, i) =>
+            '<figure class="sl" style="--r:' +
+            [-1.5, 1, -0.5, 1.5][i % 4] +
+            'deg"><button type="button" data-a="view" data-id="' +
+            esc(p.id) +
+            '"><img src="' +
+            esc(p.thumb) +
+            '" alt="Photo from ' +
+            esc(p.email) +
+            '"><span class="nm">' +
+            esc(p.email) +
+            "</span></button><figcaption>" +
+            esc(p.email) +
+            "</figcaption></figure>",
+        )
+        .join("");
     }
-    async function upload(dataUrl) {
+    async function setView(next, arg) {
+      view = next;
+      if (next !== "camera") stop();
       const acc = accGet() || {};
-      if (!acc.token) {
-        box.hidden = true;
-        openAcc();
+      if (next === "welcome") {
+        box.innerHTML =
+          '<div class="cbox"><button type="button" class="cx" data-a="close" aria-label="Close">&times;</button><div class="cic">' +
+          ICON +
+          "</div><h2>Welcome to the Lithyy family</h2><p>Take a picture and we will keep it in the photo binder. It stays connected to " +
+          (acc.email ? esc(acc.email) : "the email you sign in with") +
+          ". The photo cannot be deleted or hidden.</p>" +
+          (acc.token
+            ? '<label class="shr"><input type="checkbox" id="shon"' +
+              (albumMeta.private ? "" : " checked") +
+              "> Also share my pictures in the family album, where everyone who took a picture can see them. Leave this off and you cannot see other albums.</label>"
+            : "") +
+          '<button type="button" class="cp" data-a="cam">Take a picture</button>' +
+          (count || acc.token ? '<button type="button" class="cs" data-a="album">Open the photo binder (' + count + ")</button>" : "") +
+          (acc.token ? "" : '<button type="button" class="cs" data-a="signin">Sign in</button>') +
+          "</div>";
+      } else if (next === "camera") {
+        box.innerHTML =
+          '<div class="cbox cc"><div class="cv"><video id="cvid" playsinline muted autoplay></video><div class="cmsg" id="cmsg" hidden><p>Use the selfie camera or the back camera in this browser. A picture from your files cannot be added.</p></div></div><div class="cbar"><button type="button" class="cs" data-a="back">Cancel</button><button type="button" class="shut" data-a="shot" aria-label="Take the picture"></button><button type="button" class="cs" data-a="flip">Flip</button></div></div>';
+        const video = box.querySelector("#cvid");
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 960 } },
+            audio: false,
+          });
+          if (view !== "camera" || box.hidden) {
+            stop();
+            return;
+          }
+          video.srcObject = stream;
+          video.classList.toggle("mir", facing === "user");
+          await video.play();
+        } catch (e) {
+          const msg = box.querySelector("#cmsg");
+          if (msg) msg.hidden = false;
+          const shut = box.querySelector(".shut");
+          const flip = box.querySelector('[data-a="flip"]');
+          if (shut) shut.hidden = true;
+          if (flip) flip.hidden = true;
+        }
+      } else if (next === "saved" && arg) {
+        box.innerHTML =
+          '<div class="cbox"><button type="button" class="cx" data-a="close" aria-label="Close">&times;</button><div class="ph"><img src="' +
+          esc(arg.thumb) +
+          '" alt="The picture you just took"></div><h2>Saved to your photo binder</h2><p class="sst">Uploaded ' +
+          esc(when(arg.ts)) +
+          '</p><p class="sst" id="sst">' +
+          esc(arg.note || "Saved. This photo cannot be deleted or hidden.") +
+          '</p><button type="button" class="cp" data-a="album">Open the photo binder (' +
+          count +
+          ')</button><button type="button" class="cs" data-a="cam">Take another picture</button></div>';
+      } else if (next === "album") {
+        const all = tab !== "mine";
+        let body = '<p class="em">No pictures yet.</p>';
+        let n = 0;
+        try {
+          const photos = await albumList();
+          if (all) badge(albumMeta.mine || 0);
+          n = all ? albumMeta.mine || photos.length : photos.length;
+          body = photos.length
+            ? grid(photos)
+            : '<p class="em">' +
+              esc(albumMeta.reason || (all ? "No shared pictures yet." : "Your binder is empty. Take a picture with the camera.")) +
+              "</p>";
+        } catch (ex) {
+          body = '<p class="em">' + esc(ex.message || "The album could not be opened.") + "</p>";
+        }
+        box.classList.toggle("prot", all);
+        box.innerHTML =
+          '<div class="cbox ca"><button type="button" class="cx" data-a="close" aria-label="Close">&times;</button><div class="ah"><b>Lithyy photo binder</b><span>' +
+          n +
+          " photo" +
+          (n === 1 ? "" : "s") +
+          '</span></div><div class="tabs"><button type="button" data-a="tab" data-t="all" aria-pressed="' +
+          all +
+          '">Everyone\'s album</button><button type="button" data-a="tab" data-t="mine" aria-pressed="' +
+          !all +
+          '">My pictures</button></div><div class="bind"><div class="rings" aria-hidden="true"></div><div class="pgs">' +
+          body +
+          '</div></div><div class="abar"><button type="button" class="cp" data-a="cam">Take a picture</button></div></div>';
         return;
+      } else if (next === "view" && arg) {
+        box.innerHTML =
+          '<div class="cbox cv2"><button type="button" class="cx" data-a="album" aria-label="Close">&times;</button><div class="ph"><img src="' +
+          esc(arg.image || arg.thumb) +
+          '" alt="Photo from ' +
+          esc(arg.email) +
+          '"><span class="nm">' +
+          esc(arg.email) +
+          "</span></div><p>Uploaded " +
+          esc(when(arg.ts)) +
+          " · " +
+          esc(arg.email) +
+          '</p><div class="row"><button type="button" class="cs" data-a="album">Back to binder</button></div></div>';
       }
-      const note = box.querySelector("#anote");
-      if (note) note.textContent = "Saving your picture…";
-      const image = await shrink(dataUrl, 900, 0.72);
-      const thumb = await shrink(dataUrl, 280, 0.7);
+      box.classList.remove("prot");
+    }
+    async function upload(canvas) {
+      if (needAccount()) return;
+      await faceIn(canvas);
+      const acc = accGet() || {};
+      const image = await shrink(canvas.toDataURL("image/jpeg", 0.85), 900, 0.72);
+      const thumb = await shrink(image, 280, 0.7);
       const res = await fetch("/api/album", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: acc.token, image, thumb }),
+        body: JSON.stringify({ token: acc.token, image, thumb, source: "camera" }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.error || "The picture was not saved.");
-      tab = "all";
-      shell();
+      await refreshCount();
+      last = {
+        thumb,
+        ts: Date.now(),
+        note:
+          "Saved to " +
+          (acc.email || "your email") +
+          ". This photo cannot be deleted or hidden." +
+          (albumMeta.private ? " Your album is private, so other albums stay hidden." : " Everyone who has taken a photo can see it."),
+      };
+      await setView("saved", last);
     }
-    async function openCam() {
+    function closeCam() {
       stop();
-      box.innerHTML =
-        '<div class="cbox"><video id="avid" playsinline muted autoplay></video><p id="anote"></p><div class="row"><button type="button" class="cs" data-a="back">Back</button><button type="button" class="cp" data-a="shot">Take the picture</button></div></div>';
-      const video = box.querySelector("#avid");
-      const note = box.querySelector("#anote");
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
-        video.srcObject = stream;
-        await video.play();
-      } catch (e) {
-        if (note) note.textContent = "The camera is not available. Choose a photo instead.";
-      }
+      box.hidden = true;
+      view = "";
+      cb.focus({ preventScroll: true });
     }
-    openCamera = () => {
+    openCamera = async () => {
       box.hidden = false;
-      shell();
+      await refreshCount();
+      await setView("welcome");
     };
+    cb.onclick = () => openCamera();
     box.addEventListener("click", async (e) => {
-      const t = e.target.closest("[data-a], [data-id], .cx");
-      if (e.target === box) {
-        stop();
-        box.hidden = true;
+      const t = e.target.closest("[data-a]");
+      if (e.target === box && view !== "camera") {
+        closeCam();
         return;
       }
       if (!t) return;
       const a = t.dataset.a;
-      if (a === "close") {
-        stop();
-        box.hidden = true;
-      } else if (a === "all" || a === "mine") {
-        tab = a;
-        shell();
-      } else if (a === "signin") {
+      if (a === "close") closeCam();
+      else if (a === "cam") {
+        if (needAccount()) return;
+        setView("camera");
+      } else if (a === "album") {
+        tab = "all";
+        setView("album");
+      } else if (a === "back") setView(count ? "album" : "welcome");
+      else if (a === "signin") {
         box.hidden = true;
         openAcc();
-      } else if (a === "file") box.querySelector("#afile").click();
-      else if (a === "cam") openCam();
-      else if (a === "back") shell();
-      else if (a === "shot") {
-        const video = box.querySelector("#avid");
+      } else if (a === "tab") {
+        tab = t.dataset.t === "mine" ? "mine" : "all";
+        if (tab === "mine" && needAccount()) return;
+        setView("album");
+      } else if (a === "flip") {
+        facing = facing === "user" ? "environment" : "user";
+        stop();
+        setView("camera");
+      } else if (a === "shot") {
+        const video = box.querySelector("#cvid");
         if (!video || !video.videoWidth) return;
         const c = document.createElement("canvas");
         c.width = video.videoWidth;
         c.height = video.videoHeight;
         c.getContext("2d").drawImage(video, 0, 0);
+        const frame = box.querySelector(".cv");
+        if (frame) frame.classList.add("fl");
         stop();
         try {
-          await upload(c.toDataURL("image/jpeg", 0.85));
+          await upload(c);
         } catch (ex) {
-          shell();
-          const note = box.querySelector("#anote");
-          if (note) note.textContent = ex.message || "The picture was not saved.";
+          await setView("welcome");
+          const p = box.querySelector("p");
+          if (p) p.textContent = ex.message || "The picture was not saved.";
         }
-      } else if (t.dataset.id) {
-        const res = await fetch("/api/album?id=" + encodeURIComponent(t.dataset.id));
+      } else if (a === "view" && t.dataset.id) {
+        const acc = accGet() || {};
+        const res = await fetch("/api/album?id=" + encodeURIComponent(t.dataset.id) + (acc.token ? "&token=" + encodeURIComponent(acc.token) : ""));
         const data = await res.json().catch(() => ({}));
-        if (data.photo) {
-          box.innerHTML =
-            '<div class="cbox"><button type="button" class="cx" data-a="back" aria-label="Back">&times;</button><div class="ph"><img src="' +
-            esc(data.photo.image) +
-            '" alt="Photo from ' +
-            esc(data.photo.email) +
-            '"></div><p>' +
-            esc(data.photo.email) +
-            '</p><button type="button" class="cs" data-a="back">Back to the album</button></div>';
-        }
+        if (data.photo) setView("view", data.photo);
       }
     });
     box.addEventListener("change", async (e) => {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          await upload(reader.result);
-        } catch (ex) {
-          const note = box.querySelector("#anote");
-          if (note) note.textContent = ex.message || "The picture was not saved.";
-        }
-      };
-      reader.readAsDataURL(file);
+      if (e.target.id !== "shon") return;
+      if (needAccount()) {
+        e.target.checked = !albumMeta.private;
+        return;
+      }
+      const share = e.target.checked;
+      const acc = accGet() || {};
+      const res = await fetch("/api/album", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: acc.token, privacy: !share }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        e.target.checked = !albumMeta.private;
+        const p = box.querySelector("p");
+        if (p) p.textContent = data.error || "The album setting was not saved.";
+        return;
+      }
+      albumMeta.private = !share;
     });
+    refreshCount();
   }
 
   // ROOMS. Checkout makes a 6 digit password. Each password opens its own sheet where students pick sizes, write name and phone and quantities. Totals and the 50% deposit are automatic.

@@ -4,7 +4,7 @@
     <title>Lithyy Factory</title>
     <meta charset="utf8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-    <link rel="stylesheet" href="styles.css?v=signup" />
+    <link rel="stylesheet" href="styles.css?v=album-share" />
   </head>
   <body>
     <div id="app">
@@ -14,13 +14,34 @@
         aria-label="Interactive 3D machine with five stations that makes gray beanies: Orders, Knitter, Dye vat, Pom-pom and Checkout. Drag to rotate, scroll to zoom, tap a station."
       ></div>
       <header>
-        <img class="logo" src="logo.png" alt="Lithyy Factory logo" />
-        <div class="id"><b>Lithyy Factory</b></div>
+        <div class="id">
+          <button id="menub" class="menub" type="button" aria-label="Open the menu" aria-expanded="false" aria-controls="menu">
+            <span></span><span></span><span></span>
+          </button>
+          <img class="logo" src="logo.png" alt="Lithyy Factory logo" />
+          <b>Lithyy Factory</b>
+        </div>
         <div class="hdr-right">
           <div id="status"><i></i><span id="st">Machine running</span></div>
-          <button id="accbtn" type="button">Log in</button>
         </div>
       </header>
+      <div id="mscrim" class="mscrim" hidden></div>
+      <nav id="menu" class="menu" aria-label="Account and services" inert>
+        <b id="menuemail">Not signed in</b>
+        <div class="macc">
+          <button type="button" id="mlogin">Log in</button>
+          <button type="button" id="msignup">Sign up</button>
+          <button type="button" id="mlogout" hidden>Log out</button>
+        </div>
+        <b>Services</b>
+        <div class="ml">
+          <button type="button" data-go="0">Designing</button>
+          <button type="button" data-go="1">Clothing manufacturing</button>
+          <button type="button" data-go="2">Seniors uniform</button>
+          <button type="button" data-go="3">Web developing</button>
+          <button type="button" data-go="4">Photo shoots</button>
+        </div>
+      </nav>
       <div id="journey">
         <div><b id="jt"></b><small id="jd"></small></div>
         <div class="track"><i id="jp"></i></div>
@@ -111,6 +132,6 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="factory.js?v=selfie2"></script>
+    <script src="factory.js?v=album-share"></script>
   </body>
 </html>
