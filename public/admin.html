@@ -1,0 +1,286 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Admin — Lay C Factory</title>
+    <meta charset="utf8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="styles.css?v=admin2" />
+    <style>
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+      }
+      .stage {
+        position: fixed;
+        inset: 0;
+        right: min(380px, 58%);
+      }
+      .stage iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        display: block;
+        background: var(--bg);
+      }
+      .side {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(380px, 58%);
+        z-index: 30;
+        box-sizing: border-box;
+        overflow: auto;
+        padding: 22px 16px 28px;
+        background: var(--panel);
+        border-left: 1px solid var(--line);
+        box-shadow: -12px 0 40px rgba(15, 42, 138, 0.12);
+      }
+      .side h1 {
+        margin: 8px 0 6px;
+        font-size: 22px;
+      }
+      .side p {
+        margin: 0 0 12px;
+        color: var(--mut);
+      }
+      form,
+      .card {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 14px;
+        margin: 12px 0;
+      }
+      label {
+        display: block;
+        margin: 0 0 12px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      input {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        margin-top: 6px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font: inherit;
+        background: #fff;
+      }
+      button {
+        padding: 10px 14px;
+        border: 0;
+        border-radius: 10px;
+        background: var(--amber);
+        color: var(--on);
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button.danger {
+        background: #fff;
+        color: #b42318;
+        border: 1px solid #b42318;
+      }
+      .note {
+        min-height: 1.2em;
+        font-weight: 600;
+      }
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 12px 0;
+      }
+      .tabs button {
+        background: #fff;
+        color: var(--fg);
+        border: 1px solid var(--line);
+      }
+      .tabs button.on {
+        background: var(--amber);
+        color: var(--on);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 8px 4px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      td small {
+        display: block;
+        color: var(--mut);
+      }
+      .empty {
+        color: var(--mut);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage"><iframe src="/" title="Lay C Factory"></iframe></div>
+    <aside class="side">
+      <h1>Admin</h1>
+      <p id="who">Sign in with the admin email to manage accounts, photos, orders and rooms.</p>
+      <form id="login">
+        <label>Email<input id="email" type="email" autocomplete="username" required /></label>
+        <label>Password<input id="pass" type="password" autocomplete="current-password" minlength="6" required /></label>
+        <button type="submit">Log in</button>
+      </form>
+      <section id="desk" hidden>
+        <div class="tabs" id="tabs">
+          <button type="button" data-status="account" class="on">Accounts</button>
+          <button type="button" data-status="photo">Photos</button>
+          <button type="button" data-status="room">Rooms</button>
+          <button type="button" data-status="received">Orders</button>
+        </div>
+        <div class="card" id="list"></div>
+      </section>
+      <p class="note" id="note"></p>
+    </aside>
+    <script>
+      const $ = (s) => document.querySelector(s);
+      const esc = (s) =>
+        String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      let token = "";
+      let email = "";
+      let rows = [];
+      let status = "account";
+      function note(t) {
+        $("#note").textContent = t || "";
+      }
+      async function call(body) {
+        const res = await fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.assign({ token }, body)),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) throw new Error(data.error || "The admin request failed.");
+        return data;
+      }
+      function paint() {
+        const shown = rows.filter((row) => (status === "received" ? row.status !== "account" && row.status !== "photo" && row.status !== "room" : row.status === status));
+        if (!shown.length) {
+          $("#list").innerHTML = '<p class="empty">Nothing is stored in this list.</p>';
+          return;
+        }
+        $("#list").innerHTML =
+          "<table><tbody>" +
+          shown
+            .map((row) => {
+              const extra = row.code ? "Room " + row.code : row.status;
+              const self = row.status === "account" && row.email === email;
+              return (
+                "<tr><td><b>" +
+                esc(row.name || row.email || "Record") +
+                "</b><small>" +
+                esc(row.email) +
+                (row.phone ? " · " + esc(row.phone) : "") +
+                "<br>" +
+                esc(extra) +
+                (row.total ? " · " + esc(row.total) + " L.E" : "") +
+                "<br>" +
+                esc(row.created_at ? new Date(row.created_at).toLocaleString() : "") +
+                "</small></td><td>" +
+                (self ? "" : '<button type="button" class="danger" data-id="' + esc(row.id) + '">Delete</button>') +
+                "</td></tr>"
+              );
+            })
+            .join("") +
+          "</tbody></table>";
+      }
+      async function load() {
+        const data = await call({ op: "list" });
+        email = data.email || email;
+        rows = data.rows || [];
+        $("#who").textContent = "Signed in as " + email;
+        paint();
+      }
+      $("#login").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        note("");
+        try {
+          const res = await fetch("/api/account", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              mode: "login",
+              customer_email: $("#email").value.trim(),
+              password: $("#pass").value,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.ok) throw new Error(data.error || "Log in failed.");
+          token = data.token;
+          email = data.customer_email || "";
+          localStorage.setItem(
+            "lcaccount",
+            JSON.stringify({
+              name: data.customer_name || "",
+              email: email,
+              phone: data.customer_phone || "",
+              token: token,
+            }),
+          );
+          $("#pass").value = "";
+          $("#login").hidden = true;
+          $("#desk").hidden = false;
+          await load();
+        } catch (err) {
+          note(err.message || "Log in failed.");
+        }
+      });
+      $("#tabs").addEventListener("click", (e) => {
+        const b = e.target.closest("button[data-status]");
+        if (!b) return;
+        status = b.dataset.status;
+        $("#tabs").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+        paint();
+      });
+      $("#list").addEventListener("click", async (e) => {
+        const b = e.target.closest("button[data-id]");
+        if (!b) return;
+        if (!confirm("Delete this record?")) return;
+        note("");
+        try {
+          await call({ op: "delete", id: b.dataset.id });
+          await load();
+          note("Deleted.");
+        } catch (err) {
+          note(err.message || "It was not deleted.");
+        }
+      });
+      const frame = document.querySelector("iframe");
+      const showSite = () => {
+        try {
+          const box = frame.contentDocument && frame.contentDocument.getElementById("account");
+          if (box) box.hidden = true;
+        } catch (e) {}
+      };
+      frame.addEventListener("load", showSite);
+      showSite();
+      const saved = JSON.parse(localStorage.getItem("lcaccount") || "null");
+      if (saved && saved.token) {
+        token = saved.token;
+        email = saved.email || "";
+        $("#login").hidden = true;
+        $("#desk").hidden = false;
+        load().catch((err) => {
+          token = "";
+          $("#login").hidden = false;
+          $("#desk").hidden = true;
+          note(err.message || "Sign in with the admin email.");
+        });
+      }
+    </script>
+  </body>
+</html>

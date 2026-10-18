@@ -6,6 +6,7 @@ const account = require("./api/account");
 const room = require("./api/room");
 const album = require("./api/album");
 const customerAlbum = require("./api/customer-album");
+const admin = require("./api/admin");
 
 const root = path.join(__dirname, "public");
 const types = {
@@ -36,6 +37,10 @@ function handler(req, res) {
   }
   if (urlPath === "/api/customer-album") {
     customerAlbum(req, res);
+    return;
+  }
+  if (urlPath === "/api/admin") {
+    admin(req, res);
     return;
   }
   const rel = urlPath === "/" ? "index.html" : urlPath.replace(/^\/+/, "");

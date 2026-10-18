@@ -138,6 +138,7 @@
   let camDown = false;
   let camHot = false;
   let camBtnEl = null;
+  let albBtnEl = null;
   let openCamera = null;
   const camRing = M.light.clone();
   camRing.emissiveIntensity = 0.6;
@@ -1236,6 +1237,7 @@
       bx = Math.max(26, Math.min(aw - 26, bx));
       by = Math.max(26, Math.min(ah - 26, by));
       camBtnEl.style.transform = "translate(" + bx + "px," + (by - 18) + "px) translate(-50%,-50%)";
+      if (albBtnEl) albBtnEl.style.transform = "translate(" + (bx + 54) + "px," + (by - 18) + "px) translate(-50%,-50%)";
     }
   }
   // STUDIO CALENDAR. Demo availability only: Fridays are closed and other days are booked by a repeatable pattern.
@@ -2468,6 +2470,16 @@
     cb.innerHTML = "<em hidden></em>";
     appEl.appendChild(cb);
     camBtnEl = cb;
+    const alb = document.createElement("button");
+    alb.id = "albbtn";
+    alb.type = "button";
+    alb.className = "albbtn";
+    alb.hidden = true;
+    alb.setAttribute("aria-label", "Open the public photo album");
+    alb.innerHTML =
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M21 16l-5-4-4 3-2-2-5 5"/></svg>';
+    appEl.appendChild(alb);
+    albBtnEl = alb;
     cb.addEventListener("pointerdown", () => {
       camDown = true;
     });
@@ -2545,9 +2557,11 @@
     function badge(n) {
       count = n;
       const mark = cb.querySelector("em");
-      if (!mark) return;
-      mark.hidden = !n;
-      mark.textContent = n;
+      if (mark) {
+        mark.hidden = !n;
+        mark.textContent = n;
+      }
+      if (albBtnEl) albBtnEl.hidden = !n;
     }
     function when(ts) {
       const d = new Date(ts || Date.now());
@@ -2611,7 +2625,7 @@
               "> Also share my pictures in the family album, where everyone who took a picture can see them. Leave this off and you cannot see other albums.</label>"
             : "") +
           '<button type="button" class="cp" data-a="cam">Take a picture</button>' +
-          (count || acc.token ? '<button type="button" class="cs" data-a="album">Open the photo binder (' + count + ")</button>" : "") +
+          (count ? '<button type="button" class="cs" data-a="album">Open the photo binder (' + count + ")</button>" : "") +
           (acc.token ? "" : '<button type="button" class="cs" data-a="signin">Sign in</button>') +
           "</div>";
       } else if (next === "camera") {
@@ -2665,15 +2679,21 @@
         } catch (ex) {
           body = '<p class="em">' + esc(ex.message || "The album could not be opened.") + "</p>";
         }
-        box.classList.toggle("prot", all);
+        const unlocked = (albumMeta.mine || 0) > 0;
+        if (all && !unlocked) {
+          body = '<p class="em">Take a picture to unlock the family album and see pictures from everyone.</p>';
+        }
+        box.classList.toggle("prot", all && unlocked);
         box.innerHTML =
           '<div class="cbox ca"><button type="button" class="cx" data-a="close" aria-label="Close">&times;</button><div class="ah"><b>Lay C photo binder</b><span>' +
           n +
           " photo" +
           (n === 1 ? "" : "s") +
-          '</span></div><div class="tabs"><button type="button" data-a="tab" data-t="all" aria-pressed="' +
-          all +
-          '">Everyone\'s album</button><button type="button" data-a="tab" data-t="mine" aria-pressed="' +
+          '</span></div><div class="tabs">' +
+          (unlocked
+            ? '<button type="button" data-a="tab" data-t="all" aria-pressed="' + all + '">Everyone\'s album</button>'
+            : "") +
+          '<button type="button" data-a="tab" data-t="mine" aria-pressed="' +
           !all +
           '">My pictures</button></div><div class="bind"><div class="rings" aria-hidden="true"></div><div class="pgs">' +
           body +
@@ -2732,6 +2752,12 @@
       await setView("welcome");
     };
     cb.onclick = () => openCamera();
+    alb.onclick = async () => {
+      if (!count) return;
+      box.hidden = false;
+      tab = "all";
+      await setView("album");
+    };
     box.addEventListener("click", async (e) => {
       const t = e.target.closest("[data-a]");
       if (e.target === box && view !== "camera") {

@@ -451,6 +451,27 @@ header .id {
   color: var(--fg);
   cursor: pointer;
 }
+.albbtn {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 6;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--amber);
+  box-shadow: 0 6px 18px rgba(15, 42, 138, 0.18);
+  cursor: pointer;
+}
+.albbtn[hidden] {
+  display: none !important;
+}
 .cambtn em {
   position: absolute;
   top: -5px;
