@@ -4,7 +4,7 @@
     <title>Lay C Factory</title>
     <meta charset="utf8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-    <link rel="stylesheet" href="styles.css?v=summary" />
+    <link rel="stylesheet" href="styles.css?v=dod" />
   </head>
   <body>
     <div id="app">
@@ -33,16 +33,16 @@
           <button type="button" id="msignup">Sign up</button>
           <button type="button" id="mlogout" hidden>Log out</button>
         </div>
-        <b>Services</b>
-        <div class="ml">
-          <button type="button" data-go="0">Designing</button>
-          <button type="button" data-go="1">Clothing manufacturing</button>
-          <button type="button" data-go="2">Seniors uniform</button>
-          <button type="button" data-go="3">Web developing</button>
-          <button type="button" data-go="4">Photo shoots</button>
-          <a href="desk.html">Customer albums</a>
-          <a href="admin.html">Admin</a>
+        <b class="svc">Services</b>
+        <div class="msr">
+          <input id="msearch" type="search" placeholder="Search services, prices, options" aria-label="Search services" autocomplete="off" />
         </div>
+        <div class="ml" aria-live="polite"></div>
+        <a class="malb" href="desk.html">Customer albums</a>
+        <button type="button" id="mdod" class="mdod">
+          <span class="mdi" aria-hidden="true">?</span>
+          <span><b>Help from DOD</b><small>Ask anything, get advice or send a photo</small></span>
+        </button>
       </nav>
       <div id="journey">
         <div><b id="jt"></b><small id="jd"></small></div>
@@ -134,6 +134,6 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="factory.js?v=summary"></script>
+    <script src="factory.js?v=nomail"></script>
   </body>
 </html>

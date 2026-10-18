@@ -195,26 +195,33 @@ header .id {
   pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 .menub {
-  width: 42px;
-  height: 42px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 5px;
+  gap: 3px;
 }
 .menub span {
   display: block;
-  width: 18px;
+  width: 14px;
   height: 2px;
-  background: currentColor;
+  background: var(--fg);
   border-radius: 2px;
+}
+.menub:hover span {
+  background: var(--amber);
 }
 .mscrim {
   position: fixed;
@@ -231,9 +238,10 @@ header .id {
   top: 0;
   left: 0;
   bottom: 0;
-  width: min(320px, 88vw);
+  width: min(300px, 82%);
+  box-sizing: border-box;
   background: var(--panel);
-  padding: 72px 16px 22px;
+  padding: 72px 16px 24px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -244,9 +252,47 @@ header .id {
   transform: none;
 }
 .menu > b {
-  font-size: 13px;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--mut);
   overflow: hidden;
   text-overflow: ellipsis;
+}
+#menuemail {
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--fg);
+}
+.menu > b.svc {
+  text-align: center;
+  color: var(--amber);
+  font-size: 13px;
+  letter-spacing: 2px;
+}
+.msr input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px 11px 36px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-4-4'/%3E%3C/svg%3E")
+    no-repeat 12px 50%;
+  font: inherit;
+  font-size: 13px;
+  color: var(--fg);
+}
+.msr input:focus {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
+}
+#app.menu-open .logo,
+#app.menu-open .id > b,
+#app.menu-open #status {
+  visibility: hidden;
 }
 .macc,
 .menu .ml {
@@ -260,23 +306,93 @@ header .id {
 }
 .macc button,
 .menu .ml button,
-.menu .ml a,
+.malb,
 .priv {
-  border: 1px solid var(--line);
+  border: 0;
   background: transparent;
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 8px;
+  padding: 14px;
   text-align: left;
+  font-size: 13px;
   font-weight: 600;
   color: inherit;
   text-decoration: none;
 }
+.menu .ml button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+}
+.menu .ml button i {
+  font-style: normal;
+  font: 700 10px ui-monospace, monospace;
+  color: var(--amber);
+}
 .macc button:hover,
-.menu .ml button:hover,
-.menu .ml a:hover,
+.malb:hover,
 .priv:hover,
 .priv[aria-pressed="true"] {
+  background: rgba(65, 105, 225, 0.12);
+}
+.menu .ml button:hover,
+.menu .ml button:focus-visible {
+  background: var(--amber);
   border-color: var(--amber);
+  color: var(--on);
+}
+.menu .ml button:hover i,
+.menu .ml button:focus-visible i {
+  color: var(--on);
+}
+.mno {
+  margin: 4px 2px;
+  font-size: 12px;
+  color: var(--mut);
+}
+.mdod {
+  margin-top: auto;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--amber);
+  border-radius: 12px;
+  background: var(--amber);
+  color: var(--on);
+  text-align: left;
+  cursor: pointer;
+}
+.mdod b {
+  display: block;
+  font-size: 13px;
+}
+.mdod small {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.85;
+}
+.mdi {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--on);
+  color: var(--amber);
+  font: 700 15px ui-monospace, monospace;
+}
+.mdod:hover {
+  filter: brightness(1.08);
 }
 .shr {
   display: flex;
@@ -2161,4 +2277,137 @@ header {
 .guide.drop {
   outline: 3px dashed var(--amber);
   outline-offset: -6px;
+}
+@media (max-width: 700px) {
+  header {
+    top: max(8px, env(safe-area-inset-top));
+    left: 10px;
+    right: 10px;
+  }
+  header .id {
+    min-width: 0;
+  }
+  .logo {
+    position: static;
+    top: auto;
+    left: auto;
+    transform: none;
+    width: 28px;
+    height: 28px;
+  }
+  .id b {
+    font-size: 13px;
+    max-width: 46vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #status span {
+    display: none;
+  }
+  .menub {
+    width: 28px;
+    height: 28px;
+  }
+  #journey {
+    top: 56px;
+    left: 10px;
+    right: 10px;
+  }
+  #ctl {
+    left: 6px;
+    right: 6px;
+    gap: 8px;
+    bottom: max(48px, calc(env(safe-area-inset-bottom) + 40px));
+  }
+  .mas-note {
+    left: 8px;
+    right: 8px;
+    bottom: max(4px, env(safe-area-inset-bottom));
+    max-width: none;
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+  }
+  .mas-note span {
+    display: none;
+  }
+  #modes {
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  #modes button {
+    padding: 8px 8px;
+    font-size: 10px;
+  }
+  #cams {
+    max-width: 100%;
+  }
+  #cams button {
+    padding: 6px 7px;
+  }
+  footer {
+    left: 10px;
+    right: 10px;
+    bottom: max(6px, env(safe-area-inset-bottom));
+    font-size: 9px;
+  }
+  .wrap {
+    padding: 16px 12px 48px;
+  }
+  .hd h1 {
+    font-size: 24px;
+  }
+  .bar-r {
+    margin-left: 0;
+    width: 100%;
+  }
+  .shb,
+  .pwrow {
+    flex-wrap: wrap;
+  }
+  .pwrow {
+    flex-direction: column;
+  }
+  .pwbox > b {
+    font-size: 26px;
+    letter-spacing: 4px;
+  }
+  .sht {
+    font-size: 11px;
+  }
+  .sht input,
+  .sht select,
+  .acc-card input,
+  .acc-card textarea,
+  .gform input {
+    font-size: 16px;
+  }
+  .sht input,
+  .sht select {
+    min-width: 0;
+  }
+  .itc input {
+    width: 52px;
+  }
+  .cbox {
+    padding: 22px 14px 16px;
+  }
+  .account {
+    padding: 12px;
+    align-items: end;
+  }
+  .acc-card {
+    max-height: 100%;
+    overflow: auto;
+  }
+}
+@media (max-width: 420px) {
+  #cams .cap {
+    display: none;
+  }
+  .id b {
+    max-width: 34vw;
+  }
 }
