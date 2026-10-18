@@ -1718,8 +1718,15 @@
     if (box) box.hidden = true;
   }
   function barHTML() {
+    const a = accGet();
+    const seniors = seniorsOpen();
     return (
       '<div class="wrap"><div class="bar"><button class="back" id="back">&larr; Back to the machine</button><div class="bar-r">' +
+      (seniors
+        ? ""
+        : '<button class="acc" id="accbar" type="button">' +
+          (a && a.token && a.email ? a.email : "Log in") +
+          "</button>") +
       '<button class="ask" id="askg" type="button"><span class="av" aria-hidden="true"></span>Ask the guide</button></div></div>'
     );
   }
@@ -2250,71 +2257,17 @@
   });
   const accForm = $("#accform");
   if ($("#accbtn")) $("#accbtn").addEventListener("click", () => openAcc());
-  const menuListEl = document.querySelector("#menu .ml");
-  const menuSearch = $("#msearch");
-  const menuIdx = SV.map((x, i) => ({
-    i,
-    h: (
-      x.n +
-      " " +
-      (x.s || "") +
-      " " +
-      (x.q || [])
-        .map((q) => (q.t || "") + " " + (q.o || []).map((o) => String(o[0])).join(" "))
-        .join(" ")
-    ).toLowerCase(),
-  }));
-  function menuBtn(i, icon) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.dataset.go = String(i);
-    const mark = document.createElement("i");
-    mark.textContent = icon;
-    const label = document.createElement("span");
-    label.textContent = SV[i].n;
-    b.appendChild(mark);
-    b.appendChild(label);
-    return b;
-  }
-  function menuList(q) {
-    if (!menuListEl) return;
-    q = String(q || "").trim().toLowerCase();
-    menuListEl.textContent = "";
-    if (!q) {
-      SV.slice(0, 5).forEach((x, i) => menuListEl.appendChild(menuBtn(i, "0" + (i + 1))));
-      return;
-    }
-    const words = q.split(/\s+/);
-    const hits = menuIdx.filter((o) => words.every((word) => o.h.includes(word))).slice(0, 8);
-    hits.forEach((o) => menuListEl.appendChild(menuBtn(o.i, "\u2192")));
-    if (!hits.length) {
-      const empty = document.createElement("p");
-      empty.className = "mno";
-      empty.textContent = "No match for \u201c" + (menuSearch ? menuSearch.value.trim() : q) + "\u201d.";
-      menuListEl.appendChild(empty);
-    }
-  }
-  menuList("");
   function menuSet(on) {
     const menu = $("#menu");
     const scrim = $("#mscrim");
     const btn = $("#menub");
-    const app = $("#app");
     if (menu) {
       menu.classList.toggle("on", on);
       if (on) menu.removeAttribute("inert");
       else menu.setAttribute("inert", "");
     }
     if (scrim) scrim.hidden = !on;
-    if (app) app.classList.toggle("menu-open", on);
-    if (btn) {
-      btn.setAttribute("aria-expanded", on ? "true" : "false");
-      btn.setAttribute("aria-label", on ? "Close the menu" : "Open the menu");
-    }
-    if (on && menuSearch) {
-      menuSearch.value = "";
-      menuList("");
-    }
+    if (btn) btn.setAttribute("aria-expanded", on ? "true" : "false");
   }
   if ($("#menub")) $("#menub").addEventListener("click", () => menuSet(!$("#menu").classList.contains("on")));
   if ($("#mscrim")) $("#mscrim").addEventListener("click", () => menuSet(false));
@@ -2336,19 +2289,12 @@
       fillAccForm();
       syncAccPanel();
     });
-  if (menuSearch) menuSearch.addEventListener("input", () => menuList(menuSearch.value));
-  if (menuListEl)
-    menuListEl.addEventListener("click", (e) => {
-      const b = e.target.closest("button[data-go]");
-      if (!b) return;
+  document.querySelectorAll("#menu [data-go]").forEach((b) => {
+    b.addEventListener("click", () => {
       menuSet(false);
-      go(Number(b.dataset.go));
+      go(Number(b.getAttribute("data-go")));
     });
-  if ($("#mdod"))
-    $("#mdod").addEventListener("click", () => {
-      menuSet(false);
-      gOpen(-1);
-    });
+  });
   if ($("#accx")) $("#accx").addEventListener("click", closeAcc);
   if ($("#accout"))
     $("#accout").addEventListener("click", () => {
