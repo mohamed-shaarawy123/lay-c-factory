@@ -135,7 +135,7 @@ module.exports = async function handler(req, res) {
       }
       let query = supabase
         .from("orders")
-        .select("id, customer_email, customer_name, items, created_at")
+        .select("id, customer_email, customer_name, created_at, thumb:items->thumb, ts:items->ts, shared:items->shared")
         .eq("status", "photo")
         .order("created_at", { ascending: false })
         .limit(80);
@@ -160,13 +160,13 @@ module.exports = async function handler(req, res) {
         rows = list.data || [];
       }
       const photos = rows
-        .filter((row) => row.items && (wantMine || row.items.shared !== false))
+        .filter((row) => wantMine || row.shared !== false)
         .map((row) => ({
           id: row.id,
           email: row.customer_email,
           name: row.customer_name,
-          thumb: row.items.thumb || "",
-          ts: row.items.ts || 0,
+          thumb: row.thumb || "",
+          ts: row.ts || 0,
         }));
       return json(res, 200, { ok: true, photos, mine: mineCount, locked, private: isPrivate, reason });
     }

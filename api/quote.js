@@ -138,6 +138,43 @@ async function findExisting(supabase, key) {
 module.exports = async function handler(req, res) {
   try {
   loadEnv();
+  if (req.method === "GET") {
+    let supabase;
+    try {
+      supabase = supabaseAdmin();
+    } catch (err) {
+      return json(res, err.status || 500, { ok: false, error: err.message });
+    }
+    const token = text(new URL(req.url, "http://local").searchParams.get("token"), 80);
+    if (!token || token.length < 16) return json(res, 401, { ok: false, error: "Log in to see your orders." });
+    const who = await supabase.from("orders").select("customer_email").eq("status", "account").eq("items->>token", token).maybeSingle();
+    if (who.error || !who.data || !who.data.customer_email) return json(res, 401, { ok: false, error: "Log in to see your orders." });
+    const email = String(who.data.customer_email).toLowerCase();
+    const list = await supabase
+      .from("orders")
+      .select("id, items, total, status, created_at")
+      .ilike("customer_email", email)
+      .in("status", ["received", "notified"])
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (list.error) return json(res, 502, { ok: false, error: list.error.message || "Your orders could not be loaded." });
+    const orders = (list.data || []).map((row) => {
+      const items = row.items && typeof row.items === "object" ? row.items : {};
+      const stage = Number.isInteger(items.stage) ? items.stage : null;
+      return {
+        id: row.id,
+        title: items.service || "Order",
+        slug: items.slug || "",
+        lines: Array.isArray(items.lines) ? items.lines : [],
+        extra: items.extra || "",
+        total: row.total,
+        status: row.status,
+        created_at: row.created_at,
+        stage,
+      };
+    });
+    return json(res, 200, { ok: true, orders });
+  }
   if (req.method !== "POST") return json(res, 405, { ok: false, error: "Use POST." });
   const payload = await readPayload(req);
   if (!payload) return json(res, 400, { ok: false, error: "The order is missing." });

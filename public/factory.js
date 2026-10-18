@@ -180,6 +180,48 @@
     box(phG, PW - 0.1, 0.02, PW - 0.1, 0, 0.14, 0, M.dark);
   }
   let openMeet = null;
+  let openOrders = null;
+  let waveFlag = null;
+  // flag on the front-left corner of the base
+  const flagG = new THREE.Group();
+  flagG.position.set(-6.2, 0.235, 3.7);
+  flagG.scale.setScalar(0.65);
+  machine.add(flagG);
+  cyl(flagG, 0.2, 0.08, 0, 0.04, 0, M.chrome);
+  cyl(flagG, 0.035, 2.6, 0, 1.3, 0, M.chrome);
+  const flagBall = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 12), M.chrome);
+  flagBall.position.y = 2.64;
+  flagBall.castShadow = true;
+  flagG.add(flagBall);
+  const FW = 1.3,
+    FH = 0.82,
+    flagTex = ctex(260, 164, (c, w, h) => {
+      c.fillStyle = "#4169e1";
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = "#ffffff";
+      c.fillRect(0, h * 0.82, w, h * 0.18);
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      txt(c, "LAY C", w / 2, h * 0.43, 58, "#ffffff", 800);
+    });
+  const flagGeo = new THREE.PlaneGeometry(FW, FH, 18, 6),
+    flagMat = new THREE.MeshStandardMaterial({ map: flagTex, side: THREE.DoubleSide, roughness: 0.8, metalness: 0 });
+  const flagMesh = new THREE.Mesh(flagGeo, flagMat);
+  flagMesh.position.set(FW / 2 + 0.04, 2.15, 0);
+  flagMesh.castShadow = true;
+  flagG.add(flagMesh);
+  const flagBase = Float32Array.from(flagGeo.attributes.position.array);
+  waveFlag = function (tm) {
+    const a = flagGeo.attributes.position;
+    for (let i = 0; i < a.count; i++) {
+      const x = flagBase[i * 3],
+        u = (x + FW / 2) / FW;
+      a.setZ(i, Math.sin(u * 5 - tm * 3.2) * 0.09 * u + Math.sin(u * 9 - tm * 4.1) * 0.02 * u);
+      a.setY(i, flagBase[i * 3 + 1] - Math.sin(u * 5 - tm * 3.2) * 0.015 * u);
+    }
+    a.needsUpdate = true;
+  };
+  waveFlag(0);
   // selfie key on the front-right corner of the platform
   const CAMX = 6.0,
     CAMZ = 3.6,
@@ -861,6 +903,7 @@
     if (rc.intersectObject(walk, true).length) return -2;
     if (camProp && rc.intersectObject(camProp, true).length) return -3;
     if (phG && rc.intersectObject(phG, true).length) return -4;
+    if (flagG && rc.intersectObject(flagG, true).length) return -5;
     const h = rc.intersectObjects(
       ST.map((s) => s.g),
       true,
@@ -878,17 +921,25 @@
     if (dragging) return;
     const i = hit(e);
     hov = i;
-    R.domElement.style.cursor = i >= 0 || i === -2 || i === -3 || i === -4 ? "pointer" : "grab";
-    tip.classList.toggle("v", i >= 0 || i === -3 || i === -4);
-    if (i >= 0 || i === -3 || i === -4) {
+    R.domElement.style.cursor = i >= 0 || i === -2 || i === -3 || i === -4 || i === -5 ? "pointer" : "grab";
+    tip.classList.toggle("v", i >= 0 || i === -3 || i === -4 || i === -5);
+    if (i >= 0 || i === -3 || i === -4 || i === -5) {
       tip.querySelector("b").innerHTML =
-        i === -3 ? "<span>•</span>Selfie" : i === -4 ? "<span>•</span>Telephone" : "<span>0" + (i + 1) + "</span>" + ST[i].name;
+        i === -3
+          ? "<span>•</span>Selfie"
+          : i === -4
+            ? "<span>•</span>Telephone"
+            : i === -5
+              ? "<span>•</span>Your order"
+              : "<span>0" + (i + 1) + "</span>" + ST[i].name;
       tip.querySelector("p").textContent =
         i === -3
           ? "Take a photo. Everyone can see it in the album."
           : i === -4
             ? "Start or join an online meeting."
-            : ST[i].desc;
+            : i === -5
+              ? "See your order and its stage."
+              : ST[i].desc;
       const r = app.getBoundingClientRect();
       tip.style.left = Math.min(r.width - 250, Math.max(10, e.clientX - r.left + 16)) + "px";
       tip.style.top = Math.max(10, Math.min(r.height - 95, e.clientY - r.top - 60)) + "px";
@@ -905,6 +956,7 @@
     else if (i === -2) gOpen(-1);
     else if (i === -3 && openCamera) openCamera();
     else if (i === -4 && openMeet) openMeet();
+    else if (i === -5 && openOrders) openOrders();
   });
   R.domElement.addEventListener("pointerdown", (e) => {
     if (hit(e) === -3) camDown = true;
@@ -2252,6 +2304,111 @@
     } catch (e) {}
   }
   openMeet = openTelephone;
+  const ORDER_STAGES = {
+    manufacturing: ["Viewing order", "Gathering materials", "Manufacture started", "Printing", "Accessories", "Finishing", "Delivery"],
+    seniors: ["Viewing order", "Gathering materials", "Manufacture started", "Printing", "Accessories", "Finishing", "Delivery"],
+    "seniors-uniform": ["Viewing order", "Gathering materials", "Manufacture started", "Printing", "Accessories", "Finishing", "Delivery"],
+    designing: ["Viewing order", "Creating the design"],
+    web: [
+      "Viewing order",
+      "Discovery & Planning",
+      "Wireframing & UI/UX Design",
+      "Front-End & Back-End Development",
+      "Content Integration & Populating Data",
+      "Testing, QA & Optimization",
+      "Deployment & Launch",
+      "Post-Launch Maintenance & Handover",
+    ],
+    photo: ["Viewing order", "Mood boards", "Scouting location", "Confirmation", "Equipment", "Day of the shoot", "Photo selection", "Coloring", "Delivery"],
+    "photo-shoot": ["Viewing order", "Mood boards", "Scouting location", "Confirmation", "Equipment", "Day of the shoot", "Photo selection", "Coloring", "Delivery"],
+    "photo-studio": ["Viewing order", "Confirmation", "Day of the shoot", "Delivery"],
+  };
+  function orderStages(slug) {
+    return ORDER_STAGES[slug] || ["Viewing order", "Confirmed", "Done"];
+  }
+  function orderQuote(order) {
+    const lines = Array.isArray(order.lines) ? order.lines : [];
+    const body = lines
+      .map((line) => {
+        const name = line.name || "Item";
+        const qty = line.quantity != null ? " x" + line.quantity : "";
+        const price = line.line_total != null && line.line_total !== "" ? ": " + line.line_total + " L.E" : "";
+        return "- " + name + qty + price;
+      })
+      .join("\n");
+    const extra = order.extra ? "\n" + order.extra : "";
+    const total = order.total != null ? "\nTotal: " + order.total + " L.E" : "";
+    return (body + extra + total).trim();
+  }
+  function paintOrders(orders, err) {
+    const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+    let html = '<div id="od"><div class="bx"><h3>Your orders</h3>';
+    if (err) html += '<p class="er">' + esc(err) + "</p>";
+    else if (!orders.length) html += "<p>You have no order yet. Pick a service, build your request and tap Request.</p>";
+    orders.forEach((order) => {
+      const stages = orderStages(order.slug);
+      const known = Number.isInteger(order.stage);
+      const ix = known ? Math.max(0, Math.min(stages.length - 1, order.stage)) : 0;
+      const fin = known && order.stage >= stages.length;
+      html +=
+        '<article class="ord"><b>' +
+        esc(order.title || "Order") +
+        "</b><p>Placed " +
+        esc(order.created_at ? new Date(order.created_at).toLocaleString() : "") +
+        "</p><pre>" +
+        esc(orderQuote(order) || "No quote details were saved with this order.") +
+        "</pre><b>" +
+        (fin ? "Order complete" : "Now: " + esc(stages[ix])) +
+        "</b>";
+      if (!known) html += '<p class="hint">Only the placed order is saved. Later stages are not stored yet, so this stays on Viewing order.</p>';
+      html += stages
+        .map((name, i) => {
+          const cls = i < ix || fin ? "d" : i === ix ? "n" : "";
+          return '<div class="ost ' + cls + '"><i>' + (i < ix || fin ? "✓" : i + 1) + "</i><div><b>" + esc(name) + "</b></div></div>";
+        })
+        .join("");
+      html += "</article>";
+    });
+    html += '<button type="button" id="odx">Close</button></div></div>';
+    pg.innerHTML = html;
+    const close = $("#odx");
+    if (close) close.onclick = () => mtClose();
+  }
+  async function loadOrders() {
+    const acc = accGet();
+    if (!acc || !acc.token) {
+      paintOrders([], "Log in to see the orders saved for your email.");
+      return;
+    }
+    pg.innerHTML = '<div id="od"><div class="bx"><h3>Your orders</h3><p>Loading your orders…</p></div></div>';
+    try {
+      const res = await fetch("/api/quote?token=" + encodeURIComponent(acc.token));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || "Your orders could not be loaded.");
+      paintOrders(data.orders || [], "");
+    } catch (err) {
+      paintOrders([], (err && err.message) || "Your orders could not be loaded.");
+    }
+  }
+  function openOrderList() {
+    if (closing) {
+      closing = false;
+      if (fa) fa.cancel();
+    }
+    endCall();
+    const was = tf.classList.contains("on");
+    tf.classList.add("on");
+    if (!was) setFull(false);
+    cur = -1;
+    pg.style.display = "block";
+    tbt.textContent = "Your orders";
+    loadOrders();
+    syncAccPanel();
+    try {
+      history.replaceState(null, "", location.pathname + location.search);
+    } catch (e) {}
+  }
+  openOrders = openOrderList;
   tz.onclick = () => setFull(!tfull);
   $("#tx").onclick = () => back();
   tin.addEventListener("dblclick", (e) => {
@@ -2675,7 +2832,7 @@
     cb.type = "button";
     cb.className = "cambtn";
     cb.setAttribute("aria-label", "Open the camera and photo binder");
-    cb.innerHTML = "<em hidden></em>";
+    cb.innerHTML = ICON + "<em hidden></em>";
     appEl.appendChild(cb);
     camBtnEl = cb;
     const alb = document.createElement("button");
@@ -2995,20 +3152,33 @@
         setView("camera");
       } else if (a === "shot") {
         const video = box.querySelector("#cvid");
-        if (!video || !video.videoWidth) return;
+        const msg = box.querySelector("#cmsg");
+        const showMsg = (text) => {
+          if (!msg) return;
+          msg.hidden = false;
+          const p = msg.querySelector("p");
+          if (p) p.textContent = text;
+        };
+        if (!video || !video.videoWidth) {
+          showMsg("The camera is not ready yet. Wait a moment, then take the picture.");
+          return;
+        }
         const c = document.createElement("canvas");
         c.width = video.videoWidth;
         c.height = video.videoHeight;
-        c.getContext("2d").drawImage(video, 0, 0);
+        const g = c.getContext("2d");
+        if (facing === "user") {
+          g.translate(c.width, 0);
+          g.scale(-1, 1);
+        }
+        g.drawImage(video, 0, 0);
         const frame = box.querySelector(".cv");
         if (frame) frame.classList.add("fl");
-        stop();
         try {
           await upload(c);
         } catch (ex) {
-          await setView("welcome");
-          const p = box.querySelector("p");
-          if (p) p.textContent = ex.message || "The picture was not saved.";
+          if (frame) frame.classList.remove("fl");
+          showMsg(ex.message || "The picture was not saved. Take it again with the selfie camera or the back camera.");
         }
       } else if (a === "view" && t.dataset.id) {
         const acc = accGet() || {};
@@ -5028,6 +5198,7 @@
     coin.scale.setScalar(cb > 0.9 ? 1 - (cb - 0.9) * 8 : 1);
     if (t - lastDraw > 1 / 30 || lastDraw < 0) {
       updBelt(t);
+      if (waveFlag) waveFlag(t);
       lastDraw = t;
     }
     // packets
