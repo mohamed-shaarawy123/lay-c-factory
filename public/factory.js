@@ -2164,7 +2164,23 @@
         $("#me").textContent = "Enter the 6-digit code.";
         return;
       }
-      mtOpen(false, c);
+      $("#me").textContent = "Looking for the meeting…";
+      fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op: "join", code: c }),
+      })
+        .then((res) => res.json().then((data) => ({ res, data })))
+        .then(({ res, data }) => {
+          if (!res.ok || !data.ok) {
+            $("#me").textContent = (data && data.error) || "No meeting found with that code.";
+            return;
+          }
+          mtOpen(false, c);
+        })
+        .catch(() => {
+          $("#me").textContent = "The meeting could not be checked.";
+        });
     };
   }
   async function mtOpen(host, code) {

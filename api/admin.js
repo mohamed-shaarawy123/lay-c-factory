@@ -1,3 +1,4 @@
+const { randomInt } = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { createClient } = require("@supabase/supabase-js");
@@ -89,11 +90,19 @@ module.exports = async function handler(req, res) {
     } catch (err) {
       return json(res, err.status || 500, { ok: false, error: err.message });
     }
+    const op = text(payload.op, 20);
+    if (op === "join") {
+      const code = text(payload.code, 12).replace(/\D/g, "");
+      if (code.length !== 6) return json(res, 400, { ok: false, error: "Enter the 6-digit code." });
+      const found = await supabase.from("orders").select("id").eq("status", "meeting").eq("items->>code", code).maybeSingle();
+      if (found.error) return json(res, 502, { ok: false, error: found.error.message || "The meeting could not be checked." });
+      if (!found.data) return json(res, 404, { ok: false, error: "No meeting found with that code." });
+      return json(res, 200, { ok: true, code });
+    }
     const who = await accountByToken(supabase, text(payload.token, 80));
     if (!who || !isStaffEmail(who.customer_email)) {
       return json(res, 403, { ok: false, error: "Sign in with the admin email." });
     }
-    const op = text(payload.op, 20);
     if (op === "delete") {
       const id = text(payload.id, 80);
       if (!/^[0-9a-f-]{36}$/i.test(id)) return json(res, 400, { ok: false, error: "That record was not found." });
@@ -105,6 +114,31 @@ module.exports = async function handler(req, res) {
       const gone = await supabase.from("orders").delete().eq("id", id).select("id");
       if (gone.error) return json(res, 502, { ok: false, error: gone.error.message || "It was not deleted." });
       return json(res, 200, { ok: true });
+    }
+    if (op === "meet") {
+      let code = "";
+      for (let n = 0; n < 8; n++) {
+        code = String(100000 + randomInt(900000));
+        const exists = await supabase.from("orders").select("id").eq("status", "meeting").eq("items->>code", code).maybeSingle();
+        if (!exists.data) break;
+      }
+      const saved = await supabase
+        .from("orders")
+        .insert({
+          customer_name: "Meeting " + code,
+          customer_email: who.customer_email,
+          customer_phone: "",
+          delivery_address: "",
+          items: { type: "meeting", code },
+          total: 0,
+          status: "meeting",
+        })
+        .select("id")
+        .single();
+      if (saved.error || !saved.data) {
+        return json(res, 502, { ok: false, error: (saved.error && saved.error.message) || "The meeting code was not saved." });
+      }
+      return json(res, 200, { ok: true, code, id: saved.data.id });
     }
     const list = await supabase
       .from("orders")

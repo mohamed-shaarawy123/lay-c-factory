@@ -123,12 +123,45 @@
       .empty {
         color: var(--mut);
       }
+      .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .mic {
+        width: 42px;
+        height: 42px;
+        padding: 0;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+      }
+      .mic svg {
+        display: block;
+      }
+      .code {
+        font: 700 22px ui-monospace, monospace;
+        letter-spacing: 3px;
+        color: var(--amber);
+      }
+      a.open {
+        display: inline-block;
+        margin-top: 6px;
+        color: var(--amber);
+        font-weight: 700;
+      }
     </style>
   </head>
   <body>
     <div class="stage"><iframe src="/" title="Lay C Factory"></iframe></div>
     <aside class="side">
-      <h1>Admin</h1>
+      <div class="top">
+        <h1>Admin</h1>
+        <button type="button" id="mkmeet" class="mic" hidden aria-label="Generate a meeting code" title="Generate a meeting code">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h4v4H7z"/><path d="M9 7v3a6 6 0 0 0 6 6h2"/><path d="M15 14l2 2 2-2"/><path d="M6 21h8"/></svg>
+        </button>
+      </div>
       <p id="who">Sign in with the admin email to manage accounts, photos, orders and rooms.</p>
       <form id="login">
         <label>Email<input id="email" type="email" autocomplete="username" required /></label>
@@ -140,6 +173,7 @@
           <button type="button" data-status="account" class="on">Accounts</button>
           <button type="button" data-status="photo">Photos</button>
           <button type="button" data-status="room">Rooms</button>
+          <button type="button" data-status="meeting">Meetings</button>
           <button type="button" data-status="received">Orders</button>
         </div>
         <div class="card" id="list"></div>
@@ -168,7 +202,9 @@
         return data;
       }
       function paint() {
-        const shown = rows.filter((row) => (status === "received" ? row.status !== "account" && row.status !== "photo" && row.status !== "room" : row.status === status));
+        const shown = rows.filter((row) =>
+          status === "received" ? row.status !== "account" && row.status !== "photo" && row.status !== "room" && row.status !== "meeting" : row.status === status,
+        );
         if (!shown.length) {
           $("#list").innerHTML = '<p class="empty">Nothing is stored in this list.</p>';
           return;
@@ -177,21 +213,23 @@
           "<table><tbody>" +
           shown
             .map((row) => {
-              const extra = row.code ? "Room " + row.code : row.status;
+              const meet = row.status === "meeting";
+              const extra = meet ? "" : row.code ? "Room " + row.code : row.status;
               const self = row.status === "account" && row.email === email;
               return (
-                "<tr><td><b>" +
-                esc(row.name || row.email || "Record") +
+                "<tr><td><b" +
+                (meet ? ' class="code"' : "") +
+                ">" +
+                esc(meet ? row.code || row.name : row.name || row.email || "Record") +
                 "</b><small>" +
-                esc(row.email) +
-                (row.phone ? " · " + esc(row.phone) : "") +
-                "<br>" +
-                esc(extra) +
-                (row.total ? " · " + esc(row.total) + " L.E" : "") +
-                "<br>" +
+                (meet
+                  ? 'Share this code. <a class="open" href="https://meet.jit.si/LAYC-' +
+                    esc(row.code) +
+                    '" target="_blank" rel="noopener">Open the meeting</a><br>'
+                  : esc(row.email) + (row.phone ? " · " + esc(row.phone) : "") + "<br>" + esc(extra) + (row.total ? " · " + esc(row.total) + " L.E" : "") + "<br>") +
                 esc(row.created_at ? new Date(row.created_at).toLocaleString() : "") +
                 "</small></td><td>" +
-                (self ? "" : '<button type="button" class="danger" data-id="' + esc(row.id) + '">Delete</button>') +
+                (self ? "" : '<button type="button" class="danger" data-id="' + esc(row.id) + '"' + (meet ? ' data-kind="meeting"' : "") + ">" + (meet ? "End" : "Delete") + "</button>") +
                 "</td></tr>"
               );
             })
@@ -234,6 +272,7 @@
           $("#pass").value = "";
           $("#login").hidden = true;
           $("#desk").hidden = false;
+          $("#mkmeet").hidden = false;
           await load();
         } catch (err) {
           note(err.message || "Log in failed.");
@@ -249,7 +288,7 @@
       $("#list").addEventListener("click", async (e) => {
         const b = e.target.closest("button[data-id]");
         if (!b) return;
-        if (!confirm("Delete this record?")) return;
+        if (!confirm(b.dataset.kind === "meeting" ? "End this meeting code?" : "Delete this record?")) return;
         note("");
         try {
           await call({ op: "delete", id: b.dataset.id });
@@ -257,6 +296,21 @@
           note("Deleted.");
         } catch (err) {
           note(err.message || "It was not deleted.");
+        }
+      });
+      $("#mkmeet").addEventListener("click", async () => {
+        note("");
+        $("#mkmeet").disabled = true;
+        try {
+          const data = await call({ op: "meet" });
+          status = "meeting";
+          $("#tabs").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.status === "meeting"));
+          await load();
+          note("Meeting code " + (data.code || "") + ". Share it to join.");
+        } catch (err) {
+          note(err.message || "The meeting code was not created.");
+        } finally {
+          $("#mkmeet").disabled = false;
         }
       });
       const frame = document.querySelector("iframe");
@@ -274,10 +328,12 @@
         email = saved.email || "";
         $("#login").hidden = true;
         $("#desk").hidden = false;
+        $("#mkmeet").hidden = false;
         load().catch((err) => {
           token = "";
           $("#login").hidden = false;
           $("#desk").hidden = true;
+          $("#mkmeet").hidden = true;
           note(err.message || "Sign in with the admin email.");
         });
       }

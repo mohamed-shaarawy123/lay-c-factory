@@ -43,7 +43,7 @@ function handler(req, res) {
     admin(req, res);
     return;
   }
-  const rel = urlPath === "/" ? "index.html" : urlPath.replace(/^\/+/, "");
+  const rel = urlPath === "/" ? "index.html" : urlPath === "/admin" || urlPath === "/admin/" ? "admin.html" : urlPath.replace(/^\/+/, "");
   const file = path.resolve(root, rel);
   if (!file.startsWith(root)) {
     res.statusCode = 403;
