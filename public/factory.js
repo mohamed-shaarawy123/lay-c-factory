@@ -128,6 +128,58 @@
   box(machine, 13.3, 0.09, 8.6, 0, 0.19, 0, M.body);
   for (const x of [-6, 6])
     for (const z of [-3.6, 3.6]) cyl(machine, 0.36, 0.2, x, -0.33, z, M.dark);
+  // small street telephone booth on the front-left corner of the base
+  const phG = new THREE.Group();
+  phG.position.set(6.1, 0.235, -3.6);
+  phG.scale.setScalar(0.6);
+  machine.add(phG);
+  {
+    const PW = 1.05,
+      PH = 2.6,
+      glassM = new THREE.MeshPhysicalMaterial({
+        color: 0xcfe0ff,
+        transparent: true,
+        opacity: 0.2,
+        roughness: 0.1,
+        metalness: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+    box(phG, PW + 0.12, 0.12, PW + 0.12, 0, 0.06, 0, M.dark);
+    for (const sx of [-1, 1])
+      for (const sz of [-1, 1]) box(phG, 0.08, PH, 0.08, (sx * PW) / 2, 0.12 + PH / 2, (sz * PW) / 2, M.body);
+    for (const y of [0.3, 2.42])
+      for (const s of [-1, 1]) {
+        box(phG, PW, 0.06, 0.06, 0, y, (s * PW) / 2, M.body);
+        box(phG, 0.06, 0.06, PW, (s * PW) / 2, y, 0, M.body);
+      }
+    for (const s of [-1, 1]) {
+      for (const g of [
+        box(phG, PW - 0.08, 2, 0.015, 0, 1.36, (s * PW) / 2, glassM),
+        box(phG, 0.015, 2, PW - 0.08, (s * PW) / 2, 1.36, 0, glassM),
+      ])
+        g.castShadow = false;
+    }
+    box(phG, PW + 0.18, 0.14, PW + 0.18, 0, PH + 0.2, 0, M.body);
+    box(phG, PW + 0.06, 0.05, PW + 0.06, 0, PH + 0.3, 0, M.edge);
+    box(phG, 0.5, 0.04, 0.5, 0, PH + 0.11, 0, M.light);
+    const phTex = ctex(260, 70, (c, w, h) => {
+      c.fillStyle = "#ffffff";
+      c.fillRect(0, 0, w, h);
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      txt(c, "TELEPHONE", w / 2, h / 2, 40, "#0f2a8a", 800);
+    });
+    scr(phG, PW - 0.06, 0.26, 0, 2.56, PW / 2 + 0.012, phTex);
+    const phS2 = scr(phG, PW - 0.06, 0.26, PW / 2 + 0.012, 2.56, 0, phTex);
+    phS2.rotation.y = Math.PI / 2;
+    box(phG, 0.34, 0.46, 0.1, -0.2, 1.45, -PW / 2 + 0.1, M.dark);
+    box(phG, 0.07, 0.36, 0.07, -0.4, 1.45, -PW / 2 + 0.19, M.chrome);
+    box(phG, 0.2, 0.1, 0.02, -0.2, 1.58, -PW / 2 + 0.16, M.chrome);
+    box(phG, 0.16, 0.02, 0.12, -0.2, 1.28, -PW / 2 + 0.18, M.orange);
+    box(phG, PW - 0.1, 0.02, PW - 0.1, 0, 0.14, 0, M.dark);
+  }
+  let openMeet = null;
   // selfie key on the front-right corner of the platform
   const CAMX = 6.0,
     CAMZ = 3.6,
@@ -808,6 +860,7 @@
     rc.setFromCamera(pt, cam);
     if (rc.intersectObject(walk, true).length) return -2;
     if (camProp && rc.intersectObject(camProp, true).length) return -3;
+    if (phG && rc.intersectObject(phG, true).length) return -4;
     const h = rc.intersectObjects(
       ST.map((s) => s.g),
       true,
@@ -825,13 +878,17 @@
     if (dragging) return;
     const i = hit(e);
     hov = i;
-    R.domElement.style.cursor = i >= 0 || i === -2 || i === -3 ? "pointer" : "grab";
-    tip.classList.toggle("v", i >= 0 || i === -3);
-    if (i >= 0 || i === -3) {
+    R.domElement.style.cursor = i >= 0 || i === -2 || i === -3 || i === -4 ? "pointer" : "grab";
+    tip.classList.toggle("v", i >= 0 || i === -3 || i === -4);
+    if (i >= 0 || i === -3 || i === -4) {
       tip.querySelector("b").innerHTML =
-        i === -3 ? "<span>•</span>Selfie" : "<span>0" + (i + 1) + "</span>" + ST[i].name;
+        i === -3 ? "<span>•</span>Selfie" : i === -4 ? "<span>•</span>Telephone" : "<span>0" + (i + 1) + "</span>" + ST[i].name;
       tip.querySelector("p").textContent =
-        i === -3 ? "Take a photo. Everyone can see it in the album." : ST[i].desc;
+        i === -3
+          ? "Take a photo. Everyone can see it in the album."
+          : i === -4
+            ? "Start or join an online meeting."
+            : ST[i].desc;
       const r = app.getBoundingClientRect();
       tip.style.left = Math.min(r.width - 250, Math.max(10, e.clientX - r.left + 16)) + "px";
       tip.style.top = Math.max(10, Math.min(r.height - 95, e.clientY - r.top - 60)) + "px";
@@ -847,6 +904,7 @@
     if (i >= 0) focus(i);
     else if (i === -2) gOpen(-1);
     else if (i === -3 && openCamera) openCamera();
+    else if (i === -4 && openMeet) openMeet();
   });
   R.domElement.addEventListener("pointerdown", (e) => {
     if (hit(e) === -3) camDown = true;
@@ -1756,6 +1814,7 @@
     mailQuote();
   }
   function show(i) {
+    endCall();
     cur = i;
     const s = SV[i];
     ans = s.q.map(() => []);
@@ -1913,6 +1972,7 @@
     syncAccPanel();
   }
   function hide() {
+    endCall();
     cur = -1;
     pg.style.display = "none";
     pg.innerHTML = "";
@@ -2009,6 +2069,7 @@
     }
   };
   hide = function () {
+    endCall();
     if (!tf.classList.contains("on")) {
       _hide();
       return;
@@ -2044,6 +2105,131 @@
     const s = SV[cur];
     return s ? (s.par != null ? s.par : cur) : 0;
   }
+  // TELEPHONE. A 6-digit code is the Jitsi room name. No API key is required.
+  const MT = { name: "", code: "", host: false, api: null };
+  function endCall() {
+    if (MT.api) {
+      try {
+        MT.api.dispose();
+      } catch (e) {}
+      MT.api = null;
+    }
+  }
+  function mtEsc(t) {
+    return String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  }
+  function mtName() {
+    const saved = accGet();
+    return MT.name || (saved && saved.name) || "";
+  }
+  function loadJitsi() {
+    if (window.JitsiMeetExternalAPI) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://meet.jit.si/external_api.js";
+      s.async = true;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error("The video service could not be loaded."));
+      document.head.appendChild(s);
+    });
+  }
+  function mtHome(err) {
+    endCall();
+    pg.innerHTML =
+      '<div id="mt"><div class="bx"><h3>Telephone</h3><p>Start an online meeting, or join one with the code its host gave you.</p><input id="mn" placeholder="Your name" maxlength="24" autocomplete="name" value="' +
+      mtEsc(mtName()) +
+      '"><div class="r"><button type="button" class="p" id="mh">Start a meeting</button></div><div class="r"><input id="mc" placeholder="Meeting code" inputmode="numeric" maxlength="6" autocomplete="off"><button type="button" class="g" id="mj">Join</button></div><div class="er" id="me">' +
+      mtEsc(err || "") +
+      '</div><div class="r"><button type="button" class="g" id="mx">Close</button></div></div></div>';
+    const readName = () => {
+      MT.name = ($("#mn").value || "").trim().slice(0, 24);
+      return MT.name;
+    };
+    $("#mx").onclick = () => mtClose();
+    $("#mh").onclick = () => {
+      if (!readName()) {
+        $("#me").textContent = "Enter your name.";
+        return;
+      }
+      const n = crypto.getRandomValues(new Uint32Array(1))[0] % 900000;
+      mtOpen(true, String(100000 + n));
+    };
+    $("#mj").onclick = () => {
+      if (!readName()) {
+        $("#me").textContent = "Enter your name.";
+        return;
+      }
+      const c = $("#mc").value.replace(/\D/g, "");
+      if (c.length !== 6) {
+        $("#me").textContent = "Enter the 6-digit code.";
+        return;
+      }
+      mtOpen(false, c);
+    };
+  }
+  async function mtOpen(host, code) {
+    MT.host = host;
+    MT.code = code;
+    const room = "LAYC-" + code;
+    pg.innerHTML =
+      '<div id="mt"><div class="bx"><h3>Telephone</h3>' +
+      (host
+        ? '<div class="cd"><small>Meeting code. Share it with the people you invite.</small><b>' + mtEsc(code) + "</b></div>"
+        : "<p>You joined as " + mtEsc(MT.name) + ".</p>") +
+      '<div class="call" id="mv"></div><p class="er" id="me">Opening the meeting…</p><div class="r"><a class="g" id="mlink" href="https://meet.jit.si/' +
+      room +
+      '" target="_blank" rel="noopener">Open the video call in a new tab</a></div><div class="r"><button type="button" class="g" id="mx">Close</button></div></div></div>';
+    $("#mx").onclick = () => mtClose();
+    try {
+      await loadJitsi();
+      const parent = $("#mv");
+      if (!parent || !window.JitsiMeetExternalAPI) throw new Error("The video service could not be loaded.");
+      MT.api = new window.JitsiMeetExternalAPI("meet.jit.si", {
+        roomName: room,
+        parentNode: parent,
+        width: "100%",
+        height: "100%",
+        userInfo: { displayName: MT.name },
+        configOverwrite: { prejoinPageEnabled: true, disableDeepLinking: true, startWithAudioMuted: false, startWithVideoMuted: false },
+      });
+      $("#me").textContent = "";
+    } catch (e) {
+      $("#me").textContent = (e && e.message) || "The video call could not open here. Use the button below.";
+    }
+  }
+  function mtClose() {
+    endCall();
+    closing = false;
+    if (fa) {
+      try {
+        fa.cancel();
+      } catch (e) {}
+    }
+    tf.classList.remove("on");
+    setFull(false);
+    _hide();
+    try {
+      history.replaceState(null, "", location.pathname + location.search);
+    } catch (e) {}
+  }
+  function openTelephone() {
+    if (closing) {
+      closing = false;
+      if (fa) fa.cancel();
+    }
+    const was = tf.classList.contains("on");
+    tf.classList.add("on");
+    if (!was) setFull(false);
+    cur = -1;
+    pg.style.display = "block";
+    tbt.textContent = "Telephone";
+    mtHome();
+    syncAccPanel();
+    try {
+      history.replaceState(null, "", location.pathname + location.search);
+    } catch (e) {}
+  }
+  openMeet = openTelephone;
   tz.onclick = () => setFull(!tfull);
   $("#tx").onclick = () => back();
   tin.addEventListener("dblclick", (e) => {
