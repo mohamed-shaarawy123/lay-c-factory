@@ -2126,7 +2126,7 @@
     if (window.JitsiMeetExternalAPI) return Promise.resolve();
     return new Promise((resolve, reject) => {
       const s = document.createElement("script");
-      s.src = "https://meet.jit.si/external_api.js";
+      s.src = "https://meet.ffmuc.net/external_api.js";
       s.async = true;
       s.onload = () => resolve();
       s.onerror = () => reject(new Error("The video service could not be loaded."));
@@ -2192,7 +2192,7 @@
       (host
         ? '<div class="cd"><small>Meeting code. Share it with the people you invite.</small><b>' + mtEsc(code) + "</b></div>"
         : "<p>You joined as " + mtEsc(MT.name) + ".</p>") +
-      '<div class="call" id="mv"></div><p class="er" id="me">Opening the meeting…</p><div class="r"><a class="g" id="mlink" href="https://meet.jit.si/' +
+      '<div class="call" id="mv"></div><p class="er" id="me">Opening the meeting…</p><div class="r"><a class="g" id="mlink" href="https://meet.ffmuc.net/' +
       room +
       '" target="_blank" rel="noopener">Open the video call in a new tab</a></div><div class="r"><button type="button" class="g" id="mx">Close</button></div></div></div>';
     $("#mx").onclick = () => mtClose();
@@ -2200,13 +2200,19 @@
       await loadJitsi();
       const parent = $("#mv");
       if (!parent || !window.JitsiMeetExternalAPI) throw new Error("The video service could not be loaded.");
-      MT.api = new window.JitsiMeetExternalAPI("meet.jit.si", {
+      MT.api = new window.JitsiMeetExternalAPI("meet.ffmuc.net", {
         roomName: room,
         parentNode: parent,
         width: "100%",
         height: "100%",
         userInfo: { displayName: MT.name },
-        configOverwrite: { prejoinPageEnabled: true, disableDeepLinking: true, startWithAudioMuted: false, startWithVideoMuted: false },
+        configOverwrite: {
+          prejoinPageEnabled: true,
+          disableDeepLinking: true,
+          enableLobby: false,
+          startWithAudioMuted: false,
+          startWithVideoMuted: false,
+        },
       });
       $("#me").textContent = "";
     } catch (e) {
