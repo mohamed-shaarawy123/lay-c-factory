@@ -245,6 +245,7 @@ header .id {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  overflow-x: hidden;
   transform: translateX(-105%);
   transition: transform 0.2s ease;
 }
@@ -261,9 +262,16 @@ header .id {
 }
 #menuemail {
   font-size: 13px;
+  line-height: 1.35;
   letter-spacing: 0;
   text-transform: none;
+  text-align: center;
   color: var(--fg);
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
 }
 .menu > b.svc {
   text-align: center;
@@ -323,9 +331,16 @@ header .id {
   align-items: center;
   gap: 12px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--bg);
+}
+.menu .ml button span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .menu .ml button i {
   font-style: normal;
@@ -360,6 +375,7 @@ header .id {
   align-items: center;
   gap: 12px;
   width: 100%;
+  box-sizing: border-box;
   padding: 14px;
   border: 1px solid var(--amber);
   border-radius: 12px;
