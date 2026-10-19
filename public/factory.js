@@ -2907,17 +2907,63 @@
       };
       return data.photos || [];
     }
-    async function faceIn(canvas) {
-      if (typeof FaceDetector !== "function") {
-        throw new Error("This browser cannot confirm a face. Open the site in Chrome and take the photo with the selfie camera or the back camera.");
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        if (document.querySelector('script[src="' + src + '"]')) {
+          resolve();
+          return;
+        }
+        const s = document.createElement("script");
+        s.src = src;
+        s.async = true;
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error("The photo check could not run, so the picture was not saved."));
+        document.head.appendChild(s);
+      });
+    }
+    let nsfwModel = null;
+    async function photoModel() {
+      if (nsfwModel) return nsfwModel;
+      await loadScript("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js");
+      await loadScript("https://cdn.jsdelivr.net/npm/nsfwjs@4.3.0/dist/models/mobilenet_v2/model.min.js");
+      await loadScript("https://cdn.jsdelivr.net/npm/nsfwjs@4.3.0/dist/models/mobilenet_v2/group1-shard1of1.min.js");
+      await loadScript("https://cdn.jsdelivr.net/npm/nsfwjs@4.3.0/dist/browser/nsfwjs.min.js");
+      if (!window.nsfwjs || typeof window.nsfwjs.load !== "function") {
+        throw new Error("The photo check could not run, so the picture was not saved.");
       }
-      let faces = [];
-      try {
-        faces = await new FaceDetector({ fastMode: true, maxDetectedFaces: 2 }).detect(canvas);
-      } catch (e) {
-        throw new Error("The face check did not run. Take the photo again with the selfie camera or the back camera.");
+      nsfwModel = await window.nsfwjs.load();
+      return nsfwModel;
+    }
+    function properPhoto(canvas) {
+      if (!canvas || canvas.width < 160 || canvas.height < 160) {
+        throw new Error("Take a proper photo. The picture is too small to save.");
       }
-      if (!faces.length) throw new Error("The photo must show a real person's face. Take it again with the selfie camera or the back camera.");
+      const data = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
+      let n = 0;
+      let sum = 0;
+      let sum2 = 0;
+      const step = Math.max(16, Math.floor(data.length / 16000)) * 4;
+      for (let i = 0; i < data.length; i += step) {
+        const y = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        sum += y;
+        sum2 += y * y;
+        n++;
+      }
+      const mean = sum / Math.max(1, n);
+      const variance = sum2 / Math.max(1, n) - mean * mean;
+      if (variance < 40) throw new Error("Take a proper photo. A blank or unusable picture cannot be saved.");
+    }
+    async function allowedPhoto(canvas) {
+      properPhoto(canvas);
+      const model = await photoModel();
+      const preds = await model.classify(canvas);
+      const score = (name) => {
+        const row = (preds || []).find((p) => p.className === name);
+        return row ? row.probability : 0;
+      };
+      if (score("Porn") > 0.5 || score("Hentai") > 0.5 || score("Sexy") > 0.85) {
+        throw new Error("This photo cannot be saved. Only a legal photo is allowed.");
+      }
     }
     function badge(n) {
       count = n;
@@ -2983,7 +3029,7 @@
           ICON +
           "</div><h2>Welcome to the Lay C family</h2><p>Take a picture and we will keep it in the photo binder. It stays connected to " +
           (acc.email ? esc(acc.email) : "the email you sign in with") +
-          ". The photo cannot be deleted or hidden.</p>" +
+          ". Only a legal photo from the camera can be saved. A picture from your files cannot be added, and a photo that breaks the rules is not saved.</p>" +
           (acc.token
             ? '<label class="shr"><input type="checkbox" id="shon"' +
               (albumMeta.private ? "" : " checked") +
@@ -2995,7 +3041,7 @@
           "</div>";
       } else if (next === "camera") {
         box.innerHTML =
-          '<div class="cbox cc"><div class="cv"><video id="cvid" playsinline muted autoplay></video><div class="cmsg" id="cmsg" hidden><p>Use the selfie camera or the back camera in this browser. A picture from your files cannot be added.</p></div></div><div class="cbar"><button type="button" class="cs" data-a="back">Cancel</button><button type="button" class="shut" data-a="shot" aria-label="Take the picture"></button><button type="button" class="cs" data-a="flip">Flip</button></div></div>';
+          '<div class="cbox cc"><div class="cv"><video id="cvid" playsinline muted autoplay></video><div class="cmsg" id="cmsg" hidden><p>Use the camera in this browser. Only a legal photo can be saved.</p></div></div><div class="cbar"><button type="button" class="cs" data-a="back">Cancel</button><button type="button" class="shut" data-a="shot" aria-label="Take the picture"></button><button type="button" class="cs" data-a="flip">Flip</button></div></div>';
         const video = box.querySelector("#cvid");
         try {
           stream = await navigator.mediaDevices.getUserMedia({
@@ -3082,7 +3128,7 @@
     }
     async function upload(canvas) {
       if (needAccount()) return;
-      await faceIn(canvas);
+      await allowedPhoto(canvas);
       const acc = accGet() || {};
       const image = await shrink(canvas.toDataURL("image/jpeg", 0.85), 900, 0.72);
       const thumb = await shrink(image, 280, 0.7);
@@ -3178,7 +3224,7 @@
           await upload(c);
         } catch (ex) {
           if (frame) frame.classList.remove("fl");
-          showMsg(ex.message || "The picture was not saved. Take it again with the selfie camera or the back camera.");
+          showMsg(ex.message || "This photo cannot be saved. Only a legal photo is allowed.");
         }
       } else if (a === "view" && t.dataset.id) {
         const acc = accGet() || {};

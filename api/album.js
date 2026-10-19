@@ -201,7 +201,7 @@ module.exports = async function handler(req, res) {
       return json(res, 200, { ok: true, private: payload.privacy === true });
     }
     if (payload.source !== "camera") {
-      return json(res, 400, { ok: false, error: "Take the photo with the front or back camera. A picture from your files cannot be added." });
+      return json(res, 400, { ok: false, error: "Only a legal photo from the camera can be saved." });
     }
     const image = imageData(payload.image);
     const thumb = imageData(payload.thumb) || image;
