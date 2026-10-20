@@ -704,6 +704,10 @@
       txt(c, "4 creators", 24, 112, 20, "#cfdcff", 500);
     }),
   );
+  // Nudge Marketing a little left in the overview camera frame
+  sM.position.x -= 0.7;
+  sM.position.z += 0.3;
+  ST[4].base.set(sM.position.x, sM.position.y, sM.position.z);
   // Checkout
   box(sC, 1.9, 0.62, 1.3, 0, 0.58, -0.05, M.ivory);
   box(sC, 1.02, 0.25, 0.9, -0.33, 1.05, -0.03, M.body);
