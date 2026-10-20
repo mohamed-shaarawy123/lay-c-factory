@@ -3,7 +3,8 @@
   "functions": {
     "api/album.js": {
       "maxDuration": 60,
-      "memory": 1024
+      "memory": 1024,
+      "includeFiles": "lib/nsfw-model/**"
     }
   },
   "rewrites": [

@@ -2,7 +2,7 @@ const { createClient } = require("@supabase/supabase-js");
 const fs = require("fs");
 const path = require("path");
 const { readPayload } = require("../lib/body");
-const { moderatePhoto } = require("../lib/photo-moderate");
+const { moderatePhoto, warm, status: modelStatus } = require("../lib/photo-moderate");
 
 function loadEnv() {
   try {
@@ -90,10 +90,12 @@ module.exports = async function handler(req, res) {
     if (req.method === "GET") {
       let id = "";
       let mine = "";
+      let wantWarm = false;
       try {
         const q = new URL(req.url || "", "http://localhost").searchParams;
         id = q.get("id") || "";
         mine = q.get("token") || "";
+        wantWarm = q.get("warm") === "1";
       } catch (e) {}
       let wantMine = false;
       try {
@@ -103,6 +105,16 @@ module.exports = async function handler(req, res) {
         id = id || req.query.id || "";
         mine = mine || req.query.token || "";
         if (String(req.query.mine) === "1") wantMine = true;
+        if (String(req.query.warm) === "1") wantWarm = true;
+      }
+      if (wantWarm) {
+        const ok = await warm({ req });
+        const st = modelStatus();
+        return json(res, ok ? 200 : 503, {
+          ok,
+          ready: st.ready,
+          error: st.error || (ok ? "" : "The photo check model could not be loaded."),
+        });
       }
       const who = mine ? await accountByToken(supabase, mine) : null;
       const mineCount = who ? await photoCount(supabase, who.customer_email) : 0;
@@ -209,7 +221,7 @@ module.exports = async function handler(req, res) {
     if (!image) return json(res, 400, { ok: false, error: "Choose a smaller photo.", rejected: true });
 
     // Trusted moderation before any permanent store or family-album share.
-    const check = await moderatePhoto(image, { timeoutMs: 15000 });
+    const check = await moderatePhoto(image, { timeoutMs: 20000, req });
     if (!check.ok) {
       return json(res, 400, {
         ok: false,

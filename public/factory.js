@@ -3783,6 +3783,8 @@
         box.innerHTML =
           '<div class="cbox cc"><div class="cv"><video id="cvid" playsinline muted autoplay></video><div class="cmsg" id="cmsg" hidden><p>Use the camera in this browser. Only a legal photo can be saved.</p></div></div><div class="cbar"><button type="button" class="cs" data-a="back">Cancel</button><button type="button" class="shut" data-a="shot" aria-label="Take the picture"></button><button type="button" class="cs" data-a="flip">Flip</button></div></div>';
         const video = box.querySelector("#cvid");
+        // Warm the server-side NSFW model once while the camera preview starts.
+        fetch("/api/album?warm=1", { cache: "no-store" }).catch(() => {});
         try {
           stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: facing, width: { ideal: 960 }, height: { ideal: 720 } },
