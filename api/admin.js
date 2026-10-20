@@ -627,17 +627,39 @@ module.exports = async function handler(req, res) {
       return json(res, 200, { ok: true });
     }
 
+    if (op === "photo_hide" || op === "photo_moderate_hide") {
+      const id = text(payload.id, 80);
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json(res, 400, { ok: false, error: "That photo was not found." });
+      const row = await supabase.from("orders").select("id, status, items, customer_email").eq("id", id).eq("status", "photo").maybeSingle();
+      if (row.error || !row.data) return json(res, 404, { ok: false, error: "That photo was not found." });
+      const items = Object.assign({}, itemsOf(row.data), {
+        admin_hidden: true,
+        hidden: true,
+        shared: false,
+        moderated: true,
+      });
+      const saved = await supabase.from("orders").update({ items }).eq("id", id).select("id").single();
+      if (saved.error) return json(res, 502, { ok: false, error: saved.error.message || "The photo was not hidden." });
+      await logAdmin(supabase, who, "photo_hide", { id, email: row.data.customer_email });
+      return json(res, 200, { ok: true, hidden: true });
+    }
+
     if (op === "delete") {
       const id = text(payload.id, 80);
       if (!/^[0-9a-f-]{36}$/i.test(id)) return json(res, 400, { ok: false, error: "That record was not found." });
-      const row = await supabase.from("orders").select("id, status, customer_email").eq("id", id).maybeSingle();
+      const row = await supabase.from("orders").select("id, status, customer_email, items").eq("id", id).maybeSingle();
       if (row.error || !row.data) return json(res, 404, { ok: false, error: "That record was not found." });
       if (row.data.status === "account" && String(row.data.customer_email).toLowerCase() === String(who.customer_email).toLowerCase()) {
         return json(res, 400, { ok: false, error: "The admin account stays so you can keep signing in." });
       }
+      // Admins may remove public photos for moderation; owner one-way lock does not apply.
       const gone = await supabase.from("orders").delete().eq("id", id).select("id");
       if (gone.error) return json(res, 502, { ok: false, error: gone.error.message || "It was not deleted." });
-      await logAdmin(supabase, who, "delete", { id, status: row.data.status });
+      await logAdmin(supabase, who, "delete", {
+        id,
+        status: row.data.status,
+        photo_was_public: row.data.status === "photo" ? Boolean(itemsOf(row.data).shared || itemsOf(row.data).publish_locked) : undefined,
+      });
       return json(res, 200, { ok: true });
     }
 

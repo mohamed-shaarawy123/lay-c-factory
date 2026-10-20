@@ -3787,7 +3787,8 @@
           (acc.token
             ? '<label class="shr"><input type="checkbox" id="shon"' +
               (albumMeta.private ? "" : " checked") +
-              "> Also share my pictures in the family album, where everyone who took a picture can see them. Leave this off and you cannot see other albums.</label>"
+              "> Also share my pictures in the family album, where everyone who took a picture can see them. Leave this off and you cannot see other albums.</label>" +
+              '<p class="sst" id="shhint">Public photos stay in the family album permanently. After a photo is public, you cannot make it private or delete it. Private photos can still be deleted or published later.</p>'
             : "") +
           '<button type="button" class="cp" data-a="cam">Take a picture</button>' +
           (count ? '<button type="button" class="cs" data-a="album">Open the photo binder (' + count + ")</button>" : "") +
@@ -3867,6 +3868,20 @@
           '</div></div><div class="abar"><button type="button" class="cp" data-a="cam">Take a picture</button></div></div>';
         return;
       } else if (next === "view" && arg) {
+        const actions =
+          '<div class="row"><button type="button" class="cs" data-a="album">Back to binder</button>' +
+          (arg.can_publish
+            ? '<button type="button" class="cp" data-a="publish" data-id="' + esc(arg.id) + '">Make public</button>'
+            : "") +
+          (arg.can_delete
+            ? '<button type="button" class="cs" data-a="delphoto" data-id="' + esc(arg.id) + '">Delete</button>'
+            : "") +
+          "</div>" +
+          (arg.publish_locked || arg.shared
+            ? '<p class="sst">This photo is public in the family album. It cannot be made private or deleted.</p>'
+            : arg.own
+              ? '<p class="sst">Private binder photo. You may delete it or publish it permanently to the family album.</p>'
+              : "");
         box.innerHTML =
           '<div class="cbox cv2"><button type="button" class="cx" data-a="album" aria-label="Close">&times;</button><div class="ph"><img src="' +
           esc(arg.image || arg.thumb) +
@@ -3878,7 +3893,10 @@
           esc(when(arg.ts)) +
           " · " +
           esc(arg.email) +
-          '</p><div class="row"><button type="button" class="cs" data-a="album">Back to binder</button></div></div>';
+          (arg.shared ? " · Family album" : arg.own ? " · Private" : "") +
+          "</p>" +
+          actions +
+          "</div>";
       }
       box.classList.remove("prot");
     }
@@ -3905,11 +3923,13 @@
       last = {
         thumb,
         ts: Date.now(),
-        note:
-          "Accepted and saved to " +
-          (acc.email || "your email") +
-          ". This photo cannot be deleted or hidden." +
-          (albumMeta.private ? " Your album is private, so other albums stay hidden." : " Everyone who has taken a photo can see it."),
+        note: data.publish_locked
+          ? "Accepted and shared publicly with " +
+            (acc.email || "your email") +
+            ". This photo stays in the family album permanently and cannot be made private or deleted."
+          : "Accepted and saved privately to " +
+            (acc.email || "your email") +
+            ". You can delete it or publish it to the family album later. Once public, it cannot be undone.",
       };
       await setView("saved", last);
     }
@@ -4003,6 +4023,30 @@
         const res = await fetch("/api/album?id=" + encodeURIComponent(t.dataset.id) + (acc.token ? "&token=" + encodeURIComponent(acc.token) : ""));
         const data = await res.json().catch(() => ({}));
         if (data.photo) setView("view", data.photo);
+      } else if (a === "publish" && t.dataset.id) {
+        if (!confirm("Publish this photo to the family album? Once public, you cannot make it private or delete it.")) return;
+        const acc = accGet() || {};
+        const res = await fetch("/api/album", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: acc.token, action: "publish", id: t.dataset.id, confirm: true }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) { alert(data.error || "The photo was not published."); return; }
+        await refreshCount();
+        setView("album");
+      } else if (a === "delphoto" && t.dataset.id) {
+        if (!confirm("Delete this private photo from your binder? This cannot be undone.")) return;
+        const acc = accGet() || {};
+        const res = await fetch("/api/album", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: acc.token, action: "delete", id: t.dataset.id }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) { alert(data.error || "The photo was not deleted."); return; }
+        await refreshCount();
+        setView("album");
       }
     });
     box.addEventListener("change", async (e) => {
@@ -4012,20 +4056,26 @@
         return;
       }
       const share = e.target.checked;
+      if (share) {
+        const ok = confirm("Share new photos publicly? Public photos stay permanent and cannot later be made private or deleted. Already-public photos stay public.");
+        if (!ok) { e.target.checked = false; return; }
+      }
       const acc = accGet() || {};
       const res = await fetch("/api/album", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: acc.token, privacy: !share }),
+        body: JSON.stringify({ token: acc.token, privacy: !share, confirm_public: share ? true : undefined }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
         e.target.checked = !albumMeta.private;
-        const p = box.querySelector("p");
-        if (p) p.textContent = data.error || "The album setting was not saved.";
+        const hint = box.querySelector("#shhint") || box.querySelector("p");
+        if (hint) hint.textContent = data.error || "The album setting was not saved.";
         return;
       }
       albumMeta.private = !share;
+      const hint = box.querySelector("#shhint");
+      if (hint && data.note) hint.textContent = data.note;
     });
     refreshCount();
   }
