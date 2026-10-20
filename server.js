@@ -74,4 +74,9 @@ if (!process.env.VERCEL) {
   const on6 = http.createServer(handler);
   on6.on("error", () => {});
   on6.listen(port, "::1");
+  try {
+    require("./lib/photo-moderate")
+      .warm()
+      .catch(() => {});
+  } catch (e) {}
 }

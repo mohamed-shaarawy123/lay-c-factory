@@ -2,6 +2,7 @@ const { createClient } = require("@supabase/supabase-js");
 const fs = require("fs");
 const path = require("path");
 const { readPayload } = require("../lib/body");
+const { moderatePhoto } = require("../lib/photo-moderate");
 
 function loadEnv() {
   try {
@@ -172,7 +173,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method !== "POST") return json(res, 405, { ok: false, error: "Use GET or POST." });
-    const payload = await readPayload(req);
+    const payload = await readPayload(req, { timeoutMs: 45000 });
     if (!payload) return json(res, 400, { ok: false, error: "The picture is missing." });
     const who = await accountByToken(supabase, text(payload.token, 80));
     if (!who) {
@@ -201,11 +202,22 @@ module.exports = async function handler(req, res) {
       return json(res, 200, { ok: true, private: payload.privacy === true });
     }
     if (payload.source !== "camera") {
-      return json(res, 400, { ok: false, error: "Only a legal photo from the camera can be saved." });
+      return json(res, 400, { ok: false, error: "Only a legal photo from the camera can be saved.", rejected: true });
     }
     const image = imageData(payload.image);
     const thumb = imageData(payload.thumb) || image;
-    if (!image) return json(res, 400, { ok: false, error: "Choose a smaller photo." });
+    if (!image) return json(res, 400, { ok: false, error: "Choose a smaller photo.", rejected: true });
+
+    // Trusted moderation before any permanent store or family-album share.
+    const check = await moderatePhoto(image, { timeoutMs: 15000 });
+    if (!check.ok) {
+      return json(res, 400, {
+        ok: false,
+        rejected: true,
+        error: check.error || "This photo cannot be saved. Only a legal photo is allowed.",
+      });
+    }
+
     const saved = await supabase
       .from("orders")
       .insert({
@@ -213,7 +225,15 @@ module.exports = async function handler(req, res) {
         customer_email: who.customer_email,
         customer_phone: "",
         delivery_address: "",
-        items: { type: "photo", image, thumb, ts: Date.now(), source: "camera", shared: !(who.items && who.items.private) },
+        items: {
+          type: "photo",
+          image: check.dataUrl || image,
+          thumb,
+          ts: Date.now(),
+          source: "camera",
+          shared: !(who.items && who.items.private),
+          moderated: true,
+        },
         total: 0,
         status: "photo",
       })
@@ -222,7 +242,7 @@ module.exports = async function handler(req, res) {
     if (saved.error || !saved.data) {
       return json(res, 502, { ok: false, error: (saved.error && saved.error.message) || "The picture was not saved." });
     }
-    return json(res, 200, { ok: true, id: saved.data.id, email: who.customer_email });
+    return json(res, 200, { ok: true, id: saved.data.id, email: who.customer_email, accepted: true });
   } catch (err) {
     return json(res, err.status || 500, { ok: false, error: err.message || "The album was not saved." });
   }

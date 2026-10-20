@@ -3589,6 +3589,7 @@
     let count = 0;
     let albumMeta = { mine: 0, locked: true, private: false, reason: "" };
     let stream = null;
+    let shooting = false;
     const esc = (s) =>
       String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const stop = () => {
@@ -3597,20 +3598,60 @@
         stream = null;
       }
     };
-    const shrink = (src, max, q) =>
-      new Promise((ok, no) => {
-        const im = new Image();
-        im.onload = () => {
-          const k = Math.min(1, max / Math.max(im.width, im.height));
-          const c = document.createElement("canvas");
-          c.width = Math.max(1, Math.round(im.width * k));
-          c.height = Math.max(1, Math.round(im.height * k));
-          c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
-          ok(c.toDataURL("image/jpeg", q));
-        };
-        im.onerror = no;
-        im.src = src;
+    function canvasToJpeg(canvas, q) {
+      return new Promise((ok, no) => {
+        if (canvas.toBlob) {
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                no(new Error("The picture could not be prepared."));
+                return;
+              }
+              const reader = new FileReader();
+              reader.onload = () => ok(String(reader.result || ""));
+              reader.onerror = () => no(new Error("The picture could not be prepared."));
+              reader.readAsDataURL(blob);
+            },
+            "image/jpeg",
+            q,
+          );
+          return;
+        }
+        try {
+          ok(canvas.toDataURL("image/jpeg", q));
+        } catch (e) {
+          no(e);
+        }
       });
+    }
+    function frameFromVideo(video, maxEdge) {
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      const k = Math.min(1, maxEdge / Math.max(vw, vh));
+      const w = Math.max(1, Math.round(vw * k));
+      const h = Math.max(1, Math.round(vh * k));
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const g = c.getContext("2d", { alpha: false });
+      if (facing === "user") {
+        g.translate(w, 0);
+        g.scale(-1, 1);
+      }
+      g.drawImage(video, 0, 0, w, h);
+      return c;
+    }
+    function makeThumb(canvas, maxEdge, q) {
+      const k = Math.min(1, maxEdge / Math.max(canvas.width, canvas.height));
+      const t = document.createElement("canvas");
+      t.width = Math.max(1, Math.round(canvas.width * k));
+      t.height = Math.max(1, Math.round(canvas.height * k));
+      t.getContext("2d", { alpha: false }).drawImage(canvas, 0, 0, t.width, t.height);
+      return canvasToJpeg(t, q).finally(() => {
+        t.width = 0;
+        t.height = 0;
+      });
+    }
     async function albumList() {
       const acc = accGet() || {};
       const q = new URLSearchParams();
@@ -3626,33 +3667,6 @@
         reason: data.reason || "",
       };
       return data.photos || [];
-    }
-    function loadScript(src) {
-      return new Promise((resolve, reject) => {
-        if (document.querySelector('script[src="' + src + '"]')) {
-          resolve();
-          return;
-        }
-        const s = document.createElement("script");
-        s.src = src;
-        s.async = true;
-        s.onload = () => resolve();
-        s.onerror = () => reject(new Error("The photo check could not run, so the picture was not saved."));
-        document.head.appendChild(s);
-      });
-    }
-    let nsfwModel = null;
-    async function photoModel() {
-      if (nsfwModel) return nsfwModel;
-      await loadScript("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js");
-      await loadScript("https://cdn.jsdelivr.net/npm/nsfwjs@4.3.0/dist/models/mobilenet_v2/model.min.js");
-      await loadScript("https://cdn.jsdelivr.net/npm/nsfwjs@4.3.0/dist/models/mobilenet_v2/group1-shard1of1.min.js");
-      await loadScript("https://cdn.jsdelivr.net/npm/nsfwjs@4.3.0/dist/browser/nsfwjs.min.js");
-      if (!window.nsfwjs || typeof window.nsfwjs.load !== "function") {
-        throw new Error("The photo check could not run, so the picture was not saved.");
-      }
-      nsfwModel = await window.nsfwjs.load();
-      return nsfwModel;
     }
     function properPhoto(canvas) {
       if (!canvas || canvas.width < 160 || canvas.height < 160) {
@@ -3673,16 +3687,22 @@
       const variance = sum2 / Math.max(1, n) - mean * mean;
       if (variance < 40) throw new Error("Take a proper photo. A blank or unusable picture cannot be saved.");
     }
-    async function allowedPhoto(canvas) {
-      properPhoto(canvas);
-      const model = await photoModel();
-      const preds = await model.classify(canvas);
-      const score = (name) => {
-        const row = (preds || []).find((p) => p.className === name);
-        return row ? row.probability : 0;
-      };
-      if (score("Porn") > 0.5 || score("Hentai") > 0.5 || score("Sexy") > 0.85) {
-        throw new Error("This photo cannot be saved. Only a legal photo is allowed.");
+    function setBusy(on, text) {
+      const frame = box.querySelector(".cv");
+      const msg = box.querySelector("#cmsg");
+      const shut = box.querySelector(".shut");
+      const flip = box.querySelector('[data-a="flip"]');
+      if (frame) frame.classList.toggle("busy", Boolean(on));
+      if (shut) shut.disabled = Boolean(on);
+      if (flip) flip.disabled = Boolean(on);
+      if (!msg) return;
+      if (on) {
+        msg.hidden = false;
+        msg.classList.add("busy");
+        const p = msg.querySelector("p");
+        if (p) p.textContent = text || "Checking your photo…";
+      } else {
+        msg.classList.remove("busy");
       }
     }
     function badge(n) {
@@ -3765,7 +3785,7 @@
         const video = box.querySelector("#cvid");
         try {
           stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 960 } },
+            video: { facingMode: facing, width: { ideal: 960 }, height: { ideal: 720 } },
             audio: false,
           });
           if (view !== "camera" || box.hidden) {
@@ -3848,23 +3868,29 @@
     }
     async function upload(canvas) {
       if (needAccount()) return;
-      await allowedPhoto(canvas);
+      properPhoto(canvas);
       const acc = accGet() || {};
-      const image = await shrink(canvas.toDataURL("image/jpeg", 0.85), 900, 0.72);
-      const thumb = await shrink(image, 280, 0.7);
+      const image = await canvasToJpeg(canvas, 0.78);
+      const thumb = await makeThumb(canvas, 280, 0.7);
+      canvas.width = 0;
+      canvas.height = 0;
       const res = await fetch("/api/album", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: acc.token, image, thumb, source: "camera" }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) throw new Error(data.error || "The picture was not saved.");
+      if (!res.ok || !data.ok) {
+        const err = new Error(data.error || "The picture was not saved.");
+        err.rejected = Boolean(data.rejected);
+        throw err;
+      }
       await refreshCount();
       last = {
         thumb,
         ts: Date.now(),
         note:
-          "Saved to " +
+          "Accepted and saved to " +
           (acc.email || "your email") +
           ". This photo cannot be deleted or hidden." +
           (albumMeta.private ? " Your album is private, so other albums stay hidden." : " Everyone who has taken a photo can see it."),
@@ -3917,11 +3943,13 @@
         stop();
         setView("camera");
       } else if (a === "shot") {
+        if (shooting) return;
         const video = box.querySelector("#cvid");
         const msg = box.querySelector("#cmsg");
         const showMsg = (text) => {
           if (!msg) return;
           msg.hidden = false;
+          msg.classList.remove("busy");
           const p = msg.querySelector("p");
           if (p) p.textContent = text;
         };
@@ -3929,22 +3957,30 @@
           showMsg("The camera is not ready yet. Wait a moment, then take the picture.");
           return;
         }
-        const c = document.createElement("canvas");
-        c.width = video.videoWidth;
-        c.height = video.videoHeight;
-        const g = c.getContext("2d");
-        if (facing === "user") {
-          g.translate(c.width, 0);
-          g.scale(-1, 1);
-        }
-        g.drawImage(video, 0, 0);
+        shooting = true;
         const frame = box.querySelector(".cv");
         if (frame) frame.classList.add("fl");
+        setBusy(true, "Checking your photo…");
+        let c = null;
         try {
+          // Scale once from the live frame — no full-res encode + re-decode round trip.
+          c = frameFromVideo(video, 900);
+          setBusy(true, "Uploading and checking your photo…");
           await upload(c);
         } catch (ex) {
           if (frame) frame.classList.remove("fl");
+          setBusy(false);
           showMsg(ex.message || "This photo cannot be saved. Only a legal photo is allowed.");
+        } finally {
+          shooting = false;
+          if (c) {
+            c.width = 0;
+            c.height = 0;
+          }
+          const shut = box.querySelector(".shut");
+          const flip = box.querySelector('[data-a="flip"]');
+          if (shut) shut.disabled = false;
+          if (flip) flip.disabled = false;
         }
       } else if (a === "view" && t.dataset.id) {
         const acc = accGet() || {};

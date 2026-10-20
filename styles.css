@@ -647,6 +647,24 @@ header .id {
   background: #0b1233;
   color: #fff;
 }
+.cmsg.busy {
+  background: rgba(11, 18, 51, 0.58);
+  pointer-events: none;
+}
+.cmsg.busy::before {
+  content: "";
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(207, 220, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: camspin 0.8s linear infinite;
+}
+@keyframes camspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .cmsg p {
   margin: 0;
   color: #cfdcff;
@@ -675,6 +693,11 @@ header .id {
   background: #fff;
   box-shadow: 0 0 0 3px var(--bg) inset;
   cursor: pointer;
+}
+.shut:disabled,
+.cbar .cs:disabled {
+  opacity: 0.45;
+  cursor: wait;
 }
 .ph {
   position: relative;

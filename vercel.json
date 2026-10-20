@@ -1,5 +1,11 @@
 {
   "outputDirectory": "public",
+  "functions": {
+    "api/album.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
   "rewrites": [
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/admin/", "destination": "/admin.html" }
