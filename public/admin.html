@@ -5,10 +5,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="robots" content="noindex,nofollow" />
-    <link rel="stylesheet" href="styles.css?v=admin4" />
+    <link rel="stylesheet" href="styles.css?v=admin5" />
     <style>
       :root {
         --admin-side: min(260px, 86vw);
+        --navy: #0f2a8a;
+        --blue: #4169e1;
       }
       html,
       body {
@@ -255,12 +257,143 @@
         white-space: pre-wrap;
         font-family: ui-monospace, monospace;
         font-size: 12px;
-        max-height: 320px;
+        max-height: 220px;
         overflow: auto;
         border: 1px solid var(--line);
         border-radius: 12px;
         padding: 12px;
         background: #fff;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        max-width: 320px;
+      }
+      .actions .btn {
+        font-size: 12px;
+        padding: 7px 10px;
+      }
+      .order-doc {
+        margin-top: 14px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: #fff;
+        padding: clamp(16px, 3vw, 28px);
+        box-shadow: 0 12px 36px rgba(15, 42, 138, 0.08);
+      }
+      .order-doc .doc-brand {
+        color: var(--navy);
+        font-size: clamp(20px, 3vw, 26px);
+        font-weight: 800;
+        letter-spacing: 0.02em;
+      }
+      .order-doc .doc-sub {
+        color: var(--blue);
+        margin: 2px 0 14px;
+        font-weight: 600;
+      }
+      .order-doc h3 {
+        margin: 18px 0 8px;
+        color: var(--navy);
+        font-size: 14px;
+        border-bottom: 1px solid #d8e0f8;
+        padding-bottom: 6px;
+      }
+      .order-doc .meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 8px 14px;
+        margin-bottom: 8px;
+      }
+      .order-doc .meta div span {
+        display: block;
+        font-size: 11px;
+        color: var(--mut);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .order-doc .meta div b {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .order-doc table.sheet {
+        font-size: 12px;
+      }
+      .order-doc .grand {
+        margin-top: 12px;
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--navy);
+      }
+      .icon-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .icon-btn svg {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+      }
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin: 0 0 12px;
+      }
+      .filters button {
+        padding: 7px 11px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #fff;
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+      }
+      .filters button.on {
+        background: rgba(65, 105, 225, 0.14);
+        border-color: var(--blue);
+        color: var(--navy);
+        font-weight: 600;
+      }
+      .timeline {
+        display: grid;
+        gap: 8px;
+      }
+      .tl-item {
+        display: grid;
+        grid-template-columns: 72px 1fr auto;
+        gap: 10px;
+        align-items: start;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.95);
+        cursor: pointer;
+      }
+      .tl-item:hover {
+        border-color: var(--blue);
+      }
+      .tl-item .kind {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--navy);
+        text-transform: uppercase;
+      }
+      .modal-back {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        background: rgba(15, 42, 138, 0.28);
+        display: grid;
+        place-items: start center;
+        padding: 24px 12px;
+        overflow: auto;
+      }
+      .modal-back .order-doc {
+        width: min(920px, 100%);
+        margin: 0;
       }
       .thumb {
         width: 64px;
@@ -337,10 +470,8 @@
         <nav id="sections">
           <button type="button" data-sec="overview" class="on">Overview</button>
           <button type="button" data-sec="orders">Orders</button>
-          <button type="button" data-sec="exports">Excel exports</button>
           <button type="button" data-sec="customers">Customers</button>
           <button type="button" data-sec="meetings">Meeting rooms</button>
-          <button type="button" data-sec="photos">Photo binder</button>
           <button type="button" data-sec="albums">Family albums</button>
           <button type="button" data-sec="reviews">Reviews</button>
           <button type="button" data-sec="rooms">Order sheets</button>
@@ -374,10 +505,8 @@
       const titles = {
         overview: "Overview",
         orders: "Orders",
-        exports: "Excel exports",
-        customers: "Customer emails and accounts",
+        customers: "Customers",
         meetings: "Meeting rooms",
-        photos: "Photo binder",
         albums: "Family photo album",
         reviews: "Reviews",
         rooms: "Order room sheets",
@@ -390,6 +519,11 @@
       let page = 1;
       let q = "";
       let selected = null;
+      let customerEmail = "";
+      let activityFilter = "all";
+      const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL"];
+      const iconUser =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 19c1.5-3.2 4-4.8 7-4.8s5.5 1.6 7 4.8"/></svg>';
 
       function note(el, t) {
         const n = $(el);
@@ -490,6 +624,195 @@
         a.click();
         URL.revokeObjectURL(a.href);
       }
+      function downloadBase64(filename, b64, mime) {
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const blob = new Blob([bytes], { type: mime || "application/octet-stream" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = filename || "download.bin";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+      function np(v) {
+        return v == null || v === "" ? "Not provided" : String(v);
+      }
+      async function exportOrderExcel(id) {
+        const file = await call({ op: "order_excel", id });
+        if (file.url) {
+          window.open(file.url, "_blank", "noopener");
+        } else if (file.csv) {
+          downloadCsv(file.filename, file.csv);
+        } else {
+          throw new Error("No Excel export available for this order.");
+        }
+        setStatus("Excel ready · " + (file.source || "order"));
+      }
+      async function downloadOrderPdf(id) {
+        const file = await call({ op: "order_pdf", id });
+        if (!file.pdf_base64) throw new Error("PDF was not generated.");
+        downloadBase64(file.filename, file.pdf_base64, file.mime || "application/pdf");
+        setStatus("PDF downloaded");
+      }
+      function renderOrderDocument(doc) {
+        if (!doc) return '<p class="empty">Order document unavailable.</p>';
+        const meta =
+          '<div class="meta">' +
+          [
+            ["Order number", doc.order_number],
+            ["Source", doc.source],
+            ["Status", doc.status],
+            ["Order date", doc.created_at ? when(doc.created_at) : "Not provided"],
+            ["Updated", doc.updated_at ? when(doc.updated_at) : "Not provided"],
+            ["Sheet password", doc.sheet_code || "Not provided"],
+          ]
+            .map((x) => "<div><span>" + esc(x[0]) + "</span><b>" + esc(np(x[1])) + "</b></div>")
+            .join("") +
+          "</div>";
+        const cust =
+          "<h3>Customer</h3><div class=\"meta\">" +
+          [
+            ["Name", doc.customer && doc.customer.name],
+            ["Email", doc.customer && doc.customer.email],
+            ["Phone", doc.customer && doc.customer.phone],
+            ["Address", doc.customer && doc.customer.address],
+          ]
+            .map((x) => "<div><span>" + esc(x[0]) + "</span><b>" + esc(np(x[1])) + "</b></div>")
+            .join("") +
+          "</div>";
+        let lines =
+          "<h3>Products &amp; services</h3>" +
+          ((doc.lines || []).length
+            ? "<table><thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Subtotal</th></tr></thead><tbody>" +
+              doc.lines
+                .map(
+                  (l) =>
+                    "<tr><td><b>" +
+                    esc(np(l.name)) +
+                    "</b>" +
+                    (l.question ? "<small>" + esc(l.question) + "</small>" : "") +
+                    (l.detail ? "<small>" + esc(l.detail) + "</small>" : "") +
+                    "</td><td>" +
+                    esc(np(l.quantity)) +
+                    "</td><td>" +
+                    esc(l.unit_price == null ? "Not provided" : l.unit_price + " " + (doc.currency || "EGP")) +
+                    "</td><td>" +
+                    esc(l.subtotal == null ? "Not provided" : l.subtotal + " " + (doc.currency || "EGP")) +
+                    "</td></tr>",
+                )
+                .join("") +
+              "</tbody></table>"
+            : '<p class="empty">No line items stored.</p>');
+        let sizes = "";
+        if (doc.is_room && (doc.size_breakdown || []).length) {
+          sizes =
+            "<h3>Size breakdown</h3><table class=\"sheet\"><thead><tr><th>Item</th>" +
+            SIZES.map((z) => "<th>" + z + "</th>").join("") +
+            "<th>Pieces</th><th>Subtotal</th></tr></thead><tbody>" +
+            doc.size_breakdown
+              .map(
+                (b) =>
+                  "<tr><td>" +
+                  esc(b.name) +
+                  "</td>" +
+                  SIZES.map((z) => "<td>" + esc((b.sizes && b.sizes[z]) || 0) + "</td>").join("") +
+                  "<td><b>" +
+                  esc(b.pieces) +
+                  "</b></td><td>" +
+                  esc(b.subtotal) +
+                  " " +
+                  esc(doc.currency || "EGP") +
+                  "</td></tr>",
+              )
+              .join("") +
+            "</tbody></table>";
+        }
+        let students = "";
+        if (doc.is_room && (doc.students || []).length) {
+          students =
+            "<h3>Student sheet (" +
+            doc.students.length +
+            ")</h3><table class=\"sheet\"><thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Selections</th><th>Line total</th></tr></thead><tbody>" +
+            doc.students
+              .map(
+                (s) =>
+                  "<tr><td>" +
+                  esc(s.index) +
+                  "</td><td>" +
+                  esc(np(s.name)) +
+                  "</td><td>" +
+                  esc(np(s.phone)) +
+                  "</td><td><small>" +
+                  esc(
+                    (s.products || [])
+                      .map((p) => p.name + " " + np(p.size) + " × " + np(p.quantity))
+                      .join(" · "),
+                  ) +
+                  "</small></td><td>" +
+                  esc(s.line_total) +
+                  " " +
+                  esc(doc.currency || "EGP") +
+                  "</td></tr>",
+              )
+              .join("") +
+            "</tbody></table>";
+        }
+        let extras = "";
+        if ((doc.extras || []).length || doc.delivery) {
+          extras =
+            "<h3>Extras &amp; delivery</h3><ul>" +
+            (doc.extras || [])
+              .map(
+                (x) =>
+                  "<li>" +
+                  esc(np(x.name)) +
+                  (x.note ? " <small>(" + esc(x.note) + ")</small>" : "") +
+                  " — " +
+                  esc(x.subtotal == null ? "Not provided" : x.subtotal + " " + (doc.currency || "EGP")) +
+                  "</li>",
+              )
+              .join("") +
+            (doc.delivery
+              ? "<li>" +
+                esc(np(doc.delivery.label)) +
+                (doc.delivery.percent ? " (" + esc(doc.delivery.percent) + "%)" : "") +
+                " — " +
+                esc(doc.delivery.amount) +
+                " " +
+                esc(doc.currency || "EGP") +
+                "</li>"
+              : "") +
+            "</ul>";
+        }
+        const notes = doc.notes
+          ? "<h3>Notes</h3><p>" + esc(String(doc.notes).slice(0, 2000)) + "</p>"
+          : "<h3>Notes</h3><p class=\"empty\">Not provided</p>";
+        const fileRef =
+          "<h3>Attached file</h3><p>" +
+          (doc.has_excel && doc.excel_path
+            ? esc(doc.excel_path)
+            : "Not provided — use Export Excel to generate an order-specific file.") +
+          "</p>";
+        return (
+          '<div class="doc-brand">' +
+          esc(doc.brand || "LAY C Factory") +
+          '</div><div class="doc-sub">' +
+          esc(doc.title || "Order report") +
+          "</div>" +
+          meta +
+          cust +
+          lines +
+          sizes +
+          students +
+          extras +
+          notes +
+          fileRef +
+          '<div class="grand">Grand total: ' +
+          esc(doc.grand_total_label || "Not provided") +
+          "</div>"
+        );
+      }
 
       async function showOverview() {
         const data = await call({ op: "overview" });
@@ -530,108 +853,331 @@
           "</div>";
       }
 
+      async function openOrderView(id) {
+        const data = await call({ op: "order_document", id });
+        selected = data.brief;
+        const doc = data.document;
+        const prev = $("#orderModal");
+        if (prev) prev.remove();
+        const wrap = document.createElement("div");
+        wrap.className = "modal-back";
+        wrap.id = "orderModal";
+        const bodyHtml = renderOrderDocument(doc);
+        wrap.innerHTML =
+          '<div class="order-doc">' +
+          '<div class="tools" style="justify-content:space-between;margin-bottom:12px">' +
+          '<button type="button" class="btn ghost" id="closeDoc">Close</button>' +
+          '<div class="actions">' +
+          '<button type="button" class="btn" id="docPdf">Download PDF</button>' +
+          '<button type="button" class="btn ghost" id="docExcel">Export Excel</button>' +
+          (doc.customer && doc.customer.email && doc.customer.email !== "Not provided"
+            ? '<button type="button" class="btn ghost icon-btn" id="docCust">' + iconUser + " Customer</button>"
+            : "") +
+          "</div></div>" +
+          bodyHtml +
+          '<div class="tools" style="margin-top:14px"><select id="newStatus"><option>received</option><option>notified</option><option>processing</option><option>done</option><option>cancelled</option><option>room</option></select><input id="adminNote" placeholder="Admin note" /><button type="button" class="btn" id="saveStatus">Update status</button><button type="button" class="btn danger" id="delOrder">Delete</button></div>' +
+          '<details style="margin-top:12px"><summary>Technical data (secondary)</summary><div class="detail">' +
+          esc(JSON.stringify(data.brief, null, 2)) +
+          "</div></details></div>";
+        document.body.appendChild(wrap);
+        $("#newStatus", wrap).value = selected.status === "room" ? "room" : selected.status || "received";
+        $("#closeDoc", wrap).onclick = () => wrap.remove();
+        wrap.addEventListener("click", (e) => {
+          if (e.target === wrap) wrap.remove();
+        });
+        $("#docPdf", wrap).onclick = async () => {
+          try {
+            await downloadOrderPdf(id);
+          } catch (err) {
+            alert(err.message);
+          }
+        };
+        $("#docExcel", wrap).onclick = async () => {
+          try {
+            await exportOrderExcel(id);
+          } catch (err) {
+            alert(err.message);
+          }
+        };
+        const custBtn = $("#docCust", wrap);
+        if (custBtn) {
+          custBtn.onclick = () => {
+            wrap.remove();
+            customerEmail = String(doc.customer.email).toLowerCase();
+            activityFilter = "all";
+            sec = "customers";
+            go("customers");
+          };
+        }
+        $("#saveStatus", wrap).onclick = async () => {
+          await call({
+            op: "update_status",
+            id,
+            status: $("#newStatus", wrap).value,
+            note: $("#adminNote", wrap).value,
+          });
+          setStatus("Status updated");
+          wrap.remove();
+          showOrders();
+        };
+        $("#delOrder", wrap).onclick = async () => {
+          if (!confirm("Delete this order?")) return;
+          await call({ op: "delete", id });
+          setStatus("Deleted");
+          wrap.remove();
+          showOrders();
+        };
+      }
+
       async function showOrders() {
-        const status = $("#fStatus")?.value || "";
-        const data = await call({ op: "orders", q, page, pageSize: 25, status: status || "orders" });
+        const status = $("#fStatus")?.value || "orders";
+        const type = $("#fType")?.value || "";
+        const data = await call({ op: "orders", q, page, pageSize: 25, status, order_type: type });
         $("#panel").innerHTML =
           tools(
-            '<select id="fStatus"><option value="orders">All order statuses</option><option value="received">received</option><option value="notified">notified</option><option value="processing">processing</option><option value="done">done</option><option value="cancelled">cancelled</option></select><button type="button" class="btn ghost" id="expOrders">Export Excel CSV</button>',
+            '<select id="fStatus"><option value="orders">All statuses</option><option value="received">received</option><option value="notified">notified</option><option value="processing">processing</option><option value="done">done</option><option value="cancelled">cancelled</option><option value="room">seniors sheets</option></select><select id="fType"><option value="">All types</option><option value="quote">Quotes</option><option value="seniors">Seniors / Excel</option></select><button type="button" class="btn ghost" id="refreshOrders">Refresh</button>',
           ) +
           ((data.rows || []).length
-            ? "<table><thead><tr><th>Date</th><th>Customer</th><th>Status</th><th>Total</th><th></th></tr></thead><tbody>" +
+            ? "<table><thead><tr><th>Order</th><th>Customer</th><th>Type</th><th>Status</th><th>Total</th><th>Actions</th></tr></thead><tbody>" +
               data.rows
                 .map(
                   (r) =>
-                    "<tr><td>" +
+                    "<tr><td><b>" +
+                    esc(r.id.slice(0, 8)) +
+                    "</b><small>" +
                     esc(when(r.created_at)) +
-                    "</td><td><b>" +
+                    (r.updated_at && r.updated_at !== r.created_at ? "<br>Updated " + esc(when(r.updated_at)) : "") +
+                    (r.code ? "<br>Sheet " + esc(r.code) : "") +
+                    "</small></td><td><b>" +
                     esc(r.name || "Customer") +
                     "</b><small>" +
-                    esc(r.email) +
+                    esc(r.email || "Not provided") +
                     (r.phone ? " · " + esc(r.phone) : "") +
-                    "</small></td><td><span class=\"pill\">" +
-                    esc(r.status) +
-                    "</span><small>" +
-                    esc(r.service || "") +
                     "</small></td><td>" +
-                    esc(r.total || "—") +
-                    "</td><td><button type=\"button\" class=\"btn ghost\" data-open=\"" +
+                    esc(r.order_type || r.service || "—") +
+                    '</td><td><span class="pill">' +
+                    esc(r.status) +
+                    "</span></td><td>" +
+                    esc(r.total != null && r.total !== "" ? r.total : "Not provided") +
+                    '</td><td><div class="actions">' +
+                    '<button type="button" class="btn" data-view="' +
                     esc(r.id) +
-                    "\">Open</button></td></tr>",
+                    '">View Order</button>' +
+                    '<button type="button" class="btn ghost" data-pdf="' +
+                    esc(r.id) +
+                    '">Download PDF</button>' +
+                    '<button type="button" class="btn ghost" data-xlsx="' +
+                    esc(r.id) +
+                    '">Export Excel</button>' +
+                    (r.email
+                      ? '<button type="button" class="btn ghost icon-btn" data-cust="' +
+                        esc(r.email) +
+                        '">' +
+                        iconUser +
+                        " Customer</button>"
+                      : "") +
+                    "</div></td></tr>",
                 )
                 .join("") +
               "</tbody></table>" +
               pager(data)
             : '<p class="empty">No orders match this filter.</p>') +
           '<div id="detail"></div>';
-        if ($("#fStatus") && status) $("#fStatus").value = status;
+        if ($("#fStatus")) $("#fStatus").value = status;
+        if ($("#fType")) $("#fType").value = type;
         bindTools(showOrders);
         $("#fStatus")?.addEventListener("change", () => {
           page = 1;
           showOrders();
         });
-        $("#expOrders")?.addEventListener("click", async () => {
-          const exp = await call({ op: "export", kind: "orders", q });
-          downloadCsv(exp.filename, exp.csv);
-          setStatus("Exported " + exp.rows + " rows");
+        $("#fType")?.addEventListener("change", () => {
+          page = 1;
+          showOrders();
         });
-        $$("[data-open]").forEach((b) =>
+        $("#refreshOrders")?.addEventListener("click", () => showOrders());
+        $$("[data-view]").forEach((b) =>
           b.addEventListener("click", async () => {
-            const row = await call({ op: "get", id: b.dataset.open });
-            selected = row.row;
-            $("#detail").innerHTML =
-              '<div class="card"><div class="tools"><select id="newStatus"><option>received</option><option>notified</option><option>processing</option><option>done</option><option>cancelled</option></select><input id="adminNote" placeholder="Admin note" /><button type="button" class="btn" id="saveStatus">Update status</button><button type="button" class="btn danger" id="delOrder">Delete</button></div><div class="detail">' +
-              esc(JSON.stringify(selected, null, 2)) +
-              "</div></div>";
-            $("#newStatus").value = selected.status;
-            $("#saveStatus").onclick = async () => {
-              await call({ op: "update_status", id: selected.id, status: $("#newStatus").value, note: $("#adminNote").value });
-              setStatus("Status updated");
-              showOrders();
-            };
-            $("#delOrder").onclick = async () => {
-              if (!confirm("Delete this order?")) return;
-              await call({ op: "delete", id: selected.id });
-              setStatus("Deleted");
-              showOrders();
-            };
+            try {
+              await openOrderView(b.dataset.view);
+            } catch (err) {
+              alert(err.message);
+            }
+          }),
+        );
+        $$("[data-pdf]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            try {
+              await downloadOrderPdf(b.dataset.pdf);
+            } catch (err) {
+              alert(err.message);
+            }
+          }),
+        );
+        $$("[data-xlsx]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            try {
+              await exportOrderExcel(b.dataset.xlsx);
+            } catch (err) {
+              alert(err.message || "No Excel file");
+            }
+          }),
+        );
+        $$("[data-cust]").forEach((b) =>
+          b.addEventListener("click", () => {
+            customerEmail = String(b.dataset.cust || "").toLowerCase();
+            activityFilter = "all";
+            sec = "customers";
+            go("customers");
           }),
         );
       }
 
-      async function showExports() {
+      async function showCustomerActivity(emailKey) {
+        customerEmail = emailKey;
+        const data = await call({ op: "customer_activity", email: emailKey, filter: activityFilter });
+        const p = data.profile || {};
+        const c = data.counts || {};
+        const filters = [
+          ["all", "All"],
+          ["orders", "Orders"],
+          ["photos", "Photos"],
+          ["reviews", "Reviews"],
+          ["meetings", "Meetings"],
+          ["marketing", "Marketing"],
+          ["unlinked", "Unlinked photos"],
+        ];
+        const list =
+          activityFilter === "unlinked" ? data.unlinked_photos || [] : data.activity || [];
         $("#panel").innerHTML =
-          '<div class="card"><p>Download Excel-compatible CSV files from live Supabase data. Each export is recorded in activity logs.</p><div class="tools">' +
-          ["orders", "customers", "reviews", "meetings"]
-            .map((k) => '<button type="button" class="btn" data-kind="' + k + '">Export ' + k + "</button>")
+          '<div class="card"><div class="tools" style="justify-content:space-between"><button type="button" class="btn ghost" id="backCust">← All customers</button><span class="pill">' +
+          (p.has_account ? "Authenticated account" : "Email only") +
+          '</span></div><div class="meta" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:10px">' +
+          [
+            ["Name", p.name],
+            ["Email", p.email],
+            ["Phone", p.phone],
+            ["Account id", p.account_id || "Not provided"],
+            ["Last activity", p.last_at ? when(p.last_at) : "Not provided"],
+            ["Last seen", p.last_seen ? when(p.last_seen) : "Not provided"],
+          ]
+            .map((x) => "<div><span style=\"display:block;font-size:11px;color:var(--mut)\">" + esc(x[0]) + "</span><b>" + esc(np(x[1])) + "</b></div>")
             .join("") +
-          '</div><p class="empty" id="expNote"></p></div>';
-        $$("[data-kind]").forEach((b) =>
+          '</div><div class="cards" style="margin-top:14px">' +
+          [
+            ["Orders", c.orders],
+            ["Photos", c.photos],
+            ["Reviews", c.reviews],
+            ["Meetings", c.meetings],
+            ["Unlinked photos", c.unlinked_photos],
+          ]
+            .map((x) => '<div class="card"><b>' + esc(x[1] || 0) + "</b><span>" + esc(x[0]) + "</span></div>")
+            .join("") +
+          '</div></div><div class="filters">' +
+          filters
+            .map(
+              (f) =>
+                '<button type="button" data-filter="' +
+                f[0] +
+                '" class="' +
+                (activityFilter === f[0] ? "on" : "") +
+                '">' +
+                f[1] +
+                "</button>",
+            )
+            .join("") +
+          '</div><div class="timeline">' +
+          (list.length
+            ? list
+                .map((a) => {
+                  return (
+                    '<div class="tl-item" data-open-act="' +
+                    esc(a.id) +
+                    '" data-kind="' +
+                    esc(a.kind) +
+                    '"><div class="kind">' +
+                    esc(a.kind) +
+                    "</div><div><b>" +
+                    esc(a.title || a.status) +
+                    "</b><small>" +
+                    esc(when(a.created_at)) +
+                    (a.status ? " · " + esc(a.status) : "") +
+                    (a.rating != null ? " · " + esc(a.rating) + "/5" : "") +
+                    (a.review ? "<br>" + esc(String(a.review).slice(0, 140)) : "") +
+                    (a.kind === "photo"
+                      ? "<br>" + (a.shared ? "Family album" : "Private binder") + (a.moderated ? " · Moderated" : "")
+                      : "") +
+                    "</small></div><div>" +
+                    (a.thumb ? '<img class="thumb" src="' + esc(a.thumb) + '" alt="" />' : a.total != null && a.total !== "" ? esc(a.total) : "") +
+                    "</div></div>"
+                  );
+                })
+                .join("")
+            : '<p class="empty">No ' +
+              (activityFilter === "unlinked" ? "unlinked photos" : "activity") +
+              " for this filter.</p>") +
+          "</div>";
+        $("#backCust").onclick = () => {
+          customerEmail = "";
+          activityFilter = "all";
+          showCustomers();
+        };
+        $$("[data-filter]").forEach((b) =>
+          b.addEventListener("click", () => {
+            activityFilter = b.dataset.filter;
+            showCustomerActivity(emailKey);
+          }),
+        );
+        $$("[data-open-act]").forEach((b) =>
           b.addEventListener("click", async () => {
-            b.disabled = true;
+            const kind = b.dataset.kind;
+            const id = b.dataset.openAct;
             try {
-              const exp = await call({ op: "export", kind: b.dataset.kind });
-              downloadCsv(exp.filename, exp.csv);
-              $("#expNote").textContent = "Downloaded " + exp.filename + " (" + exp.rows + " rows).";
+              if (kind === "order") await openOrderView(id);
+              else if (kind === "photo") {
+                const ph = await call({ op: "photo_get", id });
+                alert(
+                  (ph.photo.shared ? "Family album" : "Private binder") +
+                    "\n" +
+                    (ph.photo.name || "") +
+                    "\n" +
+                    when(ph.photo.created_at) +
+                    (ph.photo.image || ph.photo.thumb ? "\n\nImage available in storage." : ""),
+                );
+              } else if (kind === "review") {
+                const row = await call({ op: "get", id });
+                alert((row.row.review || "") + "\nRating: " + (row.row.rating || "—"));
+              } else {
+                const row = await call({ op: "get", id });
+                alert(JSON.stringify({ id: row.row.id, status: row.row.status, name: row.row.name, code: row.row.code }, null, 2));
+              }
             } catch (err) {
-              $("#expNote").textContent = err.message;
-            } finally {
-              b.disabled = false;
+              alert(err.message);
             }
           }),
         );
       }
 
       async function showCustomers() {
+        if (customerEmail) {
+          await showCustomerActivity(customerEmail);
+          return;
+        }
         const data = await call({ op: "customers", q, page, pageSize: 25 });
         $("#panel").innerHTML =
-          tools('<button type="button" class="btn ghost" id="expCust">Export</button>') +
+          tools(
+            '<button type="button" class="btn ghost" id="unlinkedPhotos">Unlinked photos</button>',
+          ) +
+          '<p class="empty">Photos are managed inside each customer profile. Use Unlinked photos for binder images without a reliable email.</p>' +
           ((data.rows || []).length
-            ? "<table><thead><tr><th>Customer</th><th>Account</th><th>Activity</th><th>Last seen</th></tr></thead><tbody>" +
+            ? "<table><thead><tr><th></th><th>Customer</th><th>Account</th><th>Activity</th><th>Last seen</th><th></th></tr></thead><tbody>" +
               data.rows
                 .map(
                   (c) =>
-                    "<tr><td><b>" +
+                    "<tr><td><button type=\"button\" class=\"btn ghost icon-btn\" data-act=\"" +
+                    esc(c.email) +
+                    '" title="View activity">' +
+                    iconUser +
+                    '</button></td><td><b>' +
                     esc(c.name || "—") +
                     "</b><small>" +
                     esc(c.email) +
@@ -646,44 +1192,94 @@
                     esc(c.reviews) +
                     "</small></td><td>" +
                     esc(when(c.last_at)) +
-                    "</td></tr>",
+                    '</td><td><button type="button" class="btn" data-act="' +
+                    esc(c.email) +
+                    '">View Activity</button></td></tr>',
                 )
                 .join("") +
               "</tbody></table>" +
               pager(data)
             : '<p class="empty">No customers found.</p>');
         bindTools(showCustomers);
-        $("#expCust")?.addEventListener("click", async () => {
-          const exp = await call({ op: "export", kind: "customers" });
-          downloadCsv(exp.filename, exp.csv);
+        const openAct = (em) => {
+          customerEmail = String(em || "").toLowerCase();
+          activityFilter = "all";
+          showCustomerActivity(customerEmail);
+        };
+        $$("[data-act]").forEach((b) => b.addEventListener("click", () => openAct(b.dataset.act)));
+        $("#unlinkedPhotos")?.addEventListener("click", async () => {
+          activityFilter = "unlinked";
+          // Pick a placeholder profile view via dedicated unlinked list
+          const dataU = await call({ op: "photos_unlinked", q, page, pageSize: 40 });
+          $("#panel").innerHTML =
+            '<div class="card"><button type="button" class="btn ghost" id="backCust2">← Customers</button><p class="empty">Photos without a reliable customer email — not assigned to any profile.</p></div>' +
+            ((dataU.rows || []).length
+              ? "<table><thead><tr><th>Photo</th><th>Label</th><th>Visibility</th><th>Uploaded</th><th></th></tr></thead><tbody>" +
+                dataU.rows
+                  .map(
+                    (r) =>
+                      "<tr><td>" +
+                      (r.thumb ? '<img class="thumb" src="' + esc(r.thumb) + '" alt="" />' : "—") +
+                      "</td><td>" +
+                      esc(r.name || "Unlinked") +
+                      "<small>" +
+                      esc(r.email || "No email") +
+                      "</small></td><td>" +
+                      (r.shared ? '<span class="pill on">Family album</span>' : '<span class="pill">Private binder</span>') +
+                      "</td><td>" +
+                      esc(when(r.created_at)) +
+                      '</td><td><button type="button" class="btn danger" data-del="' +
+                      esc(r.id) +
+                      '">Remove</button></td></tr>',
+                  )
+                  .join("") +
+                "</tbody></table>" +
+                pager(dataU)
+              : '<p class="empty">No unlinked photos.</p>');
+          $("#backCust2").onclick = () => {
+            activityFilter = "all";
+            showCustomers();
+          };
+          $$("[data-del]").forEach((b) =>
+            b.addEventListener("click", async () => {
+              if (!confirm("Remove this photo record?")) return;
+              await call({ op: "delete", id: b.dataset.del });
+              $("#unlinkedPhotos").click();
+            }),
+          );
+          bindTools(async () => {
+            activityFilter = "unlinked";
+            $("#unlinkedPhotos")?.click();
+          });
         });
       }
 
       async function showMeetings() {
         const data = await call({ op: "list", status: "meeting", q, page, pageSize: 50 });
         $("#panel").innerHTML =
-          '<div class="card"><b style="font-size:14px">Create meeting room</b><div class="form-grid"><label>Name<input id="mName" placeholder="Design review" /></label><label>Date / time<input id="mWhen" type="datetime-local" /></label><label>Duration (min)<input id="mDur" type="number" min="15" value="60" /></label></div><button type="button" class="btn" id="mCreate">Create room</button><p class="empty" id="mNote"></p></div>' +
+          '<div class="card"><b style="font-size:14px">Create private meeting room</b><p class="empty">Rooms stay private until you email an access code to a chosen recipient.</p><div class="form-grid"><label>Name<input id="mName" placeholder="Design review" /></label><label>Date / time<input id="mWhen" type="datetime-local" /></label><label>Duration (min)<input id="mDur" type="number" min="15" value="60" /></label></div><button type="button" class="btn" id="mCreate">Create room</button><p class="empty" id="mNote"></p></div>' +
           tools() +
           ((data.rows || []).length
-            ? "<table><thead><tr><th>Room</th><th>Code / link</th><th>Status</th><th></th></tr></thead><tbody>" +
+            ? "<table><thead><tr><th>Room</th><th>Status</th><th>Send access code</th><th></th></tr></thead><tbody>" +
               data.rows
                 .map((r) => {
-                  const link = "https://meet.ffmuc.net/LAYC-" + esc(r.code);
                   return (
                     "<tr><td><b>" +
                     esc(r.room_name || r.name) +
                     "</b><small>" +
                     esc(when(r.starts_at || r.created_at)) +
                     (r.duration_min ? " · " + esc(r.duration_min) + " min" : "") +
-                    "</small></td><td><b>" +
+                    "<br>Internal id " +
                     esc(r.code) +
-                    '</b><small><a href="' +
-                    link +
-                    '" target="_blank" rel="noopener">Open link</a></small></td><td>' +
-                    (r.closed ? '<span class="pill off">Closed</span>' : r.active ? '<span class="pill on">Active</span>' : '<span class="pill off">Inactive</span>') +
-                    '</td><td><button type="button" class="btn ghost" data-copy="' +
-                    link +
-                    '">Copy link</button> <button type="button" class="btn ghost" data-toggle="' +
+                    "</small></td><td>" +
+                    (r.closed ? '<span class="pill off">Closed</span>' : r.active ? '<span class="pill on">Active</span>' : '<span class="pill off">Private / inactive</span>') +
+                    '</td><td><input data-email-for="' +
+                    esc(r.id) +
+                    '" placeholder="customer@email.com" style="min-width:180px;padding:8px;border:1px solid var(--line);border-radius:8px" /><button type="button" class="btn" data-invite="' +
+                    esc(r.id) +
+                    '">Send Access Code by Email</button><button type="button" class="btn ghost" data-invites="' +
+                    esc(r.id) +
+                    '">Invites</button></td><td><button type="button" class="btn ghost" data-toggle="' +
                     esc(r.id) +
                     '" data-active="' +
                     (r.active ? "0" : "1") +
@@ -699,7 +1295,8 @@
                 .join("") +
               "</tbody></table>" +
               pager(data)
-            : '<p class="empty">No meeting rooms yet. Create one above.</p>');
+            : '<p class="empty">No meeting rooms yet. Create one above.</p>') +
+          '<div id="inviteBox"></div>';
         bindTools(showMeetings);
         $("#mCreate").onclick = async () => {
           try {
@@ -709,19 +1306,55 @@
               starts_at: $("#mWhen").value,
               duration_min: Number($("#mDur").value) || 60,
             });
-            $("#mNote").textContent = "Created code " + created.code + ". Customers can join from Telephone → Join a Room.";
+            $("#mNote").textContent =
+              "Private room created. Send an access code by email — it is not listed publicly.";
+            void created;
             showMeetings();
           } catch (err) {
             $("#mNote").textContent = err.message;
           }
         };
-        $$("[data-copy]").forEach((b) =>
+        $$("[data-invite]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            const input = document.querySelector('[data-email-for="' + b.dataset.invite + '"]');
+            const email = (input && input.value.trim()) || "";
+            try {
+              const sent = await call({ op: "meet_invite_send", id: b.dataset.invite, email });
+              setStatus("Invite sent to " + sent.email);
+              alert("Access code emailed to " + sent.email + ". It expires " + when(sent.expires_at) + ".");
+            } catch (err) {
+              alert(err.message || "Invite was not sent.");
+            }
+          }),
+        );
+        $$("[data-invites]").forEach((b) =>
           b.addEventListener("click", async () => {
             try {
-              await navigator.clipboard.writeText(b.dataset.copy);
-              setStatus("Link copied");
-            } catch (e) {
-              setStatus(b.dataset.copy);
+              const list = await call({ op: "meet_invites", id: b.dataset.invites });
+              $("#inviteBox").innerHTML =
+                '<div class="card"><b style="font-size:14px">Invitations</b>' +
+                ((list.rows || []).length
+                  ? "<table><thead><tr><th>Email</th><th>Status</th><th>Sent</th><th>Expires</th></tr></thead><tbody>" +
+                    list.rows
+                      .map(
+                        (r) =>
+                          "<tr><td>" +
+                          esc(r.email) +
+                          "</td><td><span class=\"pill\">" +
+                          esc(r.status) +
+                          "</span></td><td>" +
+                          esc(when(r.created_at)) +
+                          "</td><td>" +
+                          esc(when(r.expires_at)) +
+                          (r.redeemed_at ? "<br>Used " + esc(when(r.redeemed_at)) : "") +
+                          "</td></tr>",
+                      )
+                      .join("") +
+                    "</tbody></table>"
+                  : '<p class="empty">No invites sent for this room yet.</p>') +
+                "</div>";
+            } catch (err) {
+              $("#inviteBox").innerHTML = '<p class="empty">' + esc(err.message) + "</p>";
             }
           }),
         );
@@ -742,44 +1375,6 @@
             if (!confirm("Delete this meeting room?")) return;
             await call({ op: "delete", id: b.dataset.del });
             showMeetings();
-          }),
-        );
-      }
-
-      async function showPhotos() {
-        const data = await call({ op: "photos", q, page, pageSize: 24 });
-        $("#panel").innerHTML =
-          tools() +
-          ((data.rows || []).length
-            ? "<table><thead><tr><th>Photo</th><th>Owner</th><th>Visibility</th><th></th></tr></thead><tbody>" +
-              data.rows
-                .map(
-                  (r) =>
-                    "<tr><td>" +
-                    (r.thumb ? '<img class="thumb" src="' + esc(r.thumb) + '" alt="" />' : "—") +
-                    "</td><td><b>" +
-                    esc(r.name || "—") +
-                    "</b><small>" +
-                    esc(r.email) +
-                    "<br>" +
-                    esc(when(r.created_at)) +
-                    "</small></td><td>" +
-                    (r.shared ? '<span class="pill on">Family album</span>' : '<span class="pill">Private binder</span>') +
-                    (r.moderated ? "<small>Moderated</small>" : "") +
-                    '</td><td><button type="button" class="btn danger" data-del="' +
-                    esc(r.id) +
-                    '">Remove</button></td></tr>',
-                )
-                .join("") +
-              "</tbody></table>" +
-              pager(data)
-            : '<p class="empty">No binder photos yet.</p>');
-        bindTools(showPhotos);
-        $$("[data-del]").forEach((b) =>
-          b.addEventListener("click", async () => {
-            if (!confirm("Remove this photo record?")) return;
-            await call({ op: "delete", id: b.dataset.del });
-            showPhotos();
           }),
         );
       }
@@ -867,9 +1462,9 @@
         const data = await call({ op: "list", status: "room", q, page, pageSize: 25 });
         $("#panel").innerHTML =
           tools() +
-          '<p class="empty">These are seniors / order sheet passwords (not video meetings).</p>' +
+          '<p class="empty">Seniors / class order sheets. Open the formatted order document for student and size details.</p>' +
           ((data.rows || []).length
-            ? "<table><thead><tr><th>Sheet</th><th>Code</th><th>Customer</th><th></th></tr></thead><tbody>" +
+            ? "<table><thead><tr><th>Sheet</th><th>Code</th><th>Customer</th><th>Actions</th></tr></thead><tbody>" +
               data.rows
                 .map(
                   (r) =>
@@ -880,16 +1475,26 @@
                     "</small></td><td><b>" +
                     esc(r.code) +
                     "</b></td><td>" +
-                    esc(r.email || "—") +
-                    '</td><td><button type="button" class="btn danger" data-del="' +
+                    esc(r.email || "Not provided") +
+                    '</td><td><div class="actions"><button type="button" class="btn" data-view="' +
                     esc(r.id) +
-                    '">Delete</button></td></tr>',
+                    '">View Order</button><button type="button" class="btn ghost" data-xlsx="' +
+                    esc(r.id) +
+                    '">Export Excel</button><button type="button" class="btn danger" data-del="' +
+                    esc(r.id) +
+                    '">Delete</button></div></td></tr>',
                 )
                 .join("") +
               "</tbody></table>" +
               pager(data)
             : '<p class="empty">No order sheets stored.</p>');
         bindTools(showRooms);
+        $$("[data-view]").forEach((b) =>
+          b.addEventListener("click", () => openOrderView(b.dataset.view).catch((e) => alert(e.message))),
+        );
+        $$("[data-xlsx]").forEach((b) =>
+          b.addEventListener("click", () => exportOrderExcel(b.dataset.xlsx).catch((e) => alert(e.message))),
+        );
         $$("[data-del]").forEach((b) =>
           b.addEventListener("click", async () => {
             if (!confirm("Delete this sheet?")) return;
@@ -942,16 +1547,25 @@
       const screens = {
         overview: showOverview,
         orders: showOrders,
-        exports: showExports,
         customers: showCustomers,
         meetings: showMeetings,
-        photos: showPhotos,
         albums: showAlbums,
         reviews: showReviews,
         rooms: showRooms,
         logs: showLogs,
         settings: showSettings,
       };
+
+      let liveTimer = 0;
+      function armLiveRefresh() {
+        clearInterval(liveTimer);
+        if (sec !== "orders" && sec !== "meetings") return;
+        liveTimer = setInterval(() => {
+          if (document.hidden) return;
+          if (sec === "orders") showOrders().catch(() => {});
+          else if (sec === "meetings") showMeetings().catch(() => {});
+        }, 20000);
+      }
 
       async function go(next) {
         sec = next || sec;
@@ -964,6 +1578,7 @@
         try {
           await screens[sec]();
           setStatus("Ready");
+          armLiveRefresh();
         } catch (err) {
           if (err.status === 403) {
             logout(err.message);

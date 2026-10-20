@@ -2,6 +2,7 @@ const { createClient } = require("@supabase/supabase-js");
 const fs = require("fs");
 const path = require("path");
 const { readPayload } = require("../lib/body");
+const { storeRoomExcel } = require("../lib/order-excel");
 
 function loadEnv() {
   try {
@@ -153,19 +154,35 @@ module.exports = async function handler(req, res) {
     if (req.method !== "POST") return json(res, 405, { ok: false, error: "Use GET or POST." });
     const room = cleanRoom(payload || {}, code);
     const existing = await findRoom(supabase, room.code);
+    const prevItems = (existing && existing.items) || {};
+    const email = text(payload.customer_email, 160).toLowerCase();
+    const name = text(payload.customer_name, 120) || (email ? email.split("@")[0] : "Room " + room.code);
+    const items = {
+      type: "room",
+      order_type: "seniors_excel",
+      source: "seniors",
+      code: room.code,
+      items: room.items,
+      rows: room.rows,
+      ex: room.ex || prevItems.ex || { t: [], ct: false, dl: "", pc: 0 },
+      excel_path: prevItems.excel_path || "",
+      excel_updated_at: prevItems.excel_updated_at || "",
+      updated_at: new Date().toISOString(),
+    };
+    const lineTotal = (room.rows || []).reduce((sum, row) => {
+      const cells = row && row.l ? row.l : [];
+      return (
+        sum +
+        (room.items || []).reduce((s, item, i) => s + (Number(item.p) || 0) * Math.max(0, Number((cells[i] || {}).q) || 0), 0)
+      );
+    }, 0);
     const row = {
-      customer_name: "Room " + room.code,
-      customer_email: text(payload.customer_email, 160).toLowerCase(),
-      customer_phone: "",
+      customer_name: name,
+      customer_email: email,
+      customer_phone: text(payload.customer_phone, 40),
       delivery_address: "",
-      items: {
-        type: "room",
-        code: room.code,
-        items: room.items,
-        rows: room.rows,
-        ex: room.ex || (existing && existing.items && existing.items.ex) || { t: [], ct: false, dl: "", pc: 0 },
-      },
-      total: 0,
+      items,
+      total: lineTotal,
       status: "room",
     };
     const saved = existing
@@ -177,7 +194,26 @@ module.exports = async function handler(req, res) {
         error: (saved.error && saved.error.message) || "The room was not saved.",
       });
     }
-    return json(res, 200, { ok: true, room_id: saved.data.id });
+    const roomId = saved.data.id;
+    // Store a downloadable Excel copy for the admin whenever the sheet has content.
+    if ((room.rows && room.rows.length) || (room.items && room.items.length)) {
+      try {
+        const file = await storeRoomExcel(supabase, roomId, room.code, room.items, room.rows, items.ex);
+        await supabase
+          .from("orders")
+          .update({
+            items: Object.assign({}, items, {
+              excel_path: file.path,
+              excel_updated_at: file.updated_at,
+              has_excel: true,
+            }),
+          })
+          .eq("id", roomId);
+      } catch (e) {
+        // Sheet data is saved even if storage upload fails.
+      }
+    }
+    return json(res, 200, { ok: true, room_id: roomId });
   } catch (err) {
     return json(res, err.status || 500, { ok: false, error: err.message || "The room was not saved." });
   }

@@ -1073,7 +1073,7 @@
         i === -3
           ? "Take a photo. Everyone can see it in the album."
           : i === -4
-            ? "Join a room created by Lay C."
+            ? "Join a private room with your emailed access code."
             : i === -5
               ? "See your order and its stage."
               : i === -6
@@ -2705,10 +2705,13 @@
   }
   function mtHome(err) {
     endCall();
+    const saved = accGet() || {};
     pg.innerHTML =
-      '<div id="mt"><div class="bx"><h3>Telephone</h3><p>Join a room created by Lay C. Enter the code you were given, or pick an available room below.</p><input id="mn" placeholder="Your name" maxlength="24" autocomplete="name" value="' +
+      '<div id="mt"><div class="bx"><h3>Telephone</h3><p>Join a private room with the email and access code Lay C sent you.</p><input id="mn" placeholder="Your name" maxlength="24" autocomplete="name" value="' +
       mtEsc(mtName()) +
-      '"><div class="r"><input id="mc" placeholder="Room code" inputmode="numeric" maxlength="6" autocomplete="off"><button type="button" class="p" id="mj">Join a Room</button></div><div id="mlist" class="r" style="flex-direction:column;align-items:stretch;gap:8px"></div><div class="er" id="me">' +
+      '"><input id="meail" type="email" placeholder="Email that received the invite" autocomplete="email" value="' +
+      mtEsc(saved.email || "") +
+      '"><div class="r"><input id="mc" placeholder="Access code from email" maxlength="40" autocomplete="one-time-code"><button type="button" class="p" id="mj">Join a Room</button></div><div class="er" id="me">' +
       mtEsc(err || "") +
       '</div><div class="r"><button type="button" class="g" id="mx">Close</button></div></div></div>';
     const readName = () => {
@@ -2716,77 +2719,52 @@
       return MT.name;
     };
     $("#mx").onclick = () => mtClose();
-    const joinCode = (c) => {
+    $("#mj").onclick = () => {
       if (!readName()) {
         $("#me").textContent = "Enter your name.";
         return;
       }
-      c = String(c || "").replace(/\D/g, "");
-      if (c.length !== 6) {
-        $("#me").textContent = "Enter the 6-digit code.";
+      const email = ($("#meail").value || "").trim().toLowerCase();
+      const access = ($("#mc").value || "").trim();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        $("#me").textContent = "Enter the email address that received the invite.";
         return;
       }
-      $("#me").textContent = "Looking for the room…";
+      if (access.length < 8) {
+        $("#me").textContent = "Enter the access code from your email.";
+        return;
+      }
+      $("#me").textContent = "Checking your invite…";
       fetch("/api/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ op: "join", code: c }),
+        body: JSON.stringify({ op: "redeem", email, access_code: access }),
       })
         .then((res) => res.json().then((data) => ({ res, data })))
         .then(({ res, data }) => {
           if (!res.ok || !data.ok) {
-            $("#me").textContent = (data && data.error) || "No available room found with that code.";
+            $("#me").textContent = (data && data.error) || "That invite could not be used.";
             return;
           }
-          mtOpen(false, c);
+          mtOpen(false, data.room || data.link, data);
         })
         .catch(() => {
-          $("#me").textContent = "The room could not be checked.";
+          $("#me").textContent = "The invite could not be checked.";
         });
     };
-    $("#mj").onclick = () => joinCode($("#mc").value);
-    fetch("/api/admin", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ op: "available" }),
-    })
-      .then((res) => res.json().then((data) => ({ res, data })))
-      .then(({ res, data }) => {
-        const box = $("#mlist");
-        if (!box) return;
-        const rooms = (data && data.rooms) || [];
-        if (!res.ok || !data.ok || !rooms.length) {
-          box.innerHTML = "<p class=\"er\" style=\"margin:0\">No open rooms right now. Ask Lay C for a code.</p>";
-          return;
-        }
-        box.innerHTML = rooms
-          .map(
-            (r) =>
-              '<button type="button" class="g" data-code="' +
-              mtEsc(r.code) +
-              '"><b>' +
-              mtEsc(r.name || "Room " + r.code) +
-              "</b><br><small>Code " +
-              mtEsc(r.code) +
-              (r.starts_at ? " · " + mtEsc(r.starts_at) : "") +
-              "</small></button>",
-          )
-          .join("");
-        box.querySelectorAll("[data-code]").forEach((b) => (b.onclick = () => joinCode(b.dataset.code)));
-      })
-      .catch(() => {});
   }
-  async function mtOpen(host, code) {
+  async function mtOpen(host, roomName, meta) {
     MT.host = host;
-    MT.code = code;
-    const room = "LAYC-" + code;
+    const room = String(roomName || "").replace(/^https?:\/\/meet\.ffmuc\.net\//, "") || "LAYC-000000";
+    MT.code = room.replace(/^LAYC-/, "");
+    const title = (meta && meta.name) || "Lay C meeting";
     pg.innerHTML =
       '<div id="mt"><div class="bx"><h3>Telephone</h3>' +
       (host
-        ? '<div class="cd"><small>Room code</small><b>' + mtEsc(code) + "</b></div>"
-        : "<p>You joined as " + mtEsc(MT.name) + ".</p>") +
+        ? '<div class="cd"><small>Room</small><b>' + mtEsc(MT.code) + "</b></div>"
+        : "<p>Joined <b>" + mtEsc(title) + "</b> as " + mtEsc(MT.name) + ".</p>") +
       '<div class="call" id="mv"></div><p class="er" id="me">Opening the meeting…</p><div class="r"><a class="g" id="mlink" href="https://meet.ffmuc.net/' +
-      room +
+      mtEsc(room) +
       '" target="_blank" rel="noopener">Open the video call in a new tab</a></div><div class="r"><button type="button" class="g" id="mx">Close</button></div></div></div>';
     $("#mx").onclick = () => mtClose();
     try {
@@ -4106,6 +4084,8 @@
         rows: d.rows || [],
         ex: d.ex || null,
         customer_email: acc.email || "",
+        customer_name: acc.name || "",
+        customer_phone: acc.phone || "",
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -4869,6 +4849,8 @@
       } else if (t.id === "rdl" || t.id === "rml") {
         const csv = roomCsv(it, rows, rt);
         const note = pg.querySelector("#rnote");
+        // Flush sheet to Supabase so admin Orders has the same Excel copy.
+        rPut(c, { items: it, rows, ex: EX }).catch(() => {});
         if (t.id === "rdl") {
           saveRoomFile("room-" + c + ".csv", csv);
           if (note) {

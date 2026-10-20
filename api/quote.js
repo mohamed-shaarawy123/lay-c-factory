@@ -200,10 +200,13 @@ module.exports = async function handler(req, res) {
     idempotency_key: key || null,
     service: priced.service,
     slug: priced.slug,
+    order_type: priced.slug === "seniors-uniform" || /senior/i.test(priced.slug || "") ? "seniors" : "quote",
+    source: priced.slug || "website",
     lines: priced.lines,
     extra: String(payload.extra || "")
       .trim()
       .slice(0, 2000),
+    updated_at: new Date().toISOString(),
   };
   const row = {
     customer_name,

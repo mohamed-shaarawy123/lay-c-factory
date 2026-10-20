@@ -1,9 +1,15 @@
-const { randomInt } = require("crypto");
+const { randomInt, randomBytes, createHash } = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { createClient } = require("@supabase/supabase-js");
 const { readPayload } = require("../lib/body");
 const { requireAdmin, logAdmin, meetLink } = require("../lib/admin-auth");
+const { signedExcelUrl, orderToExcelCsv } = require("../lib/order-excel");
+const { buildOrderDocument } = require("../lib/order-document");
+const { renderOrderPdf } = require("../lib/order-pdf");
+const { sendEmail } = require("../lib/email");
+
+const redeemAttempts = new Map();
 
 function loadEnv() {
   try {
@@ -53,16 +59,30 @@ function itemsOf(row) {
   return row && row.items && typeof row.items === "object" ? row.items : {};
 }
 
+function orderTypeOf(row) {
+  const items = itemsOf(row);
+  if (row.status === "room" || items.order_type === "seniors_excel") return "Full Excel / Seniors sheet";
+  if (items.order_type === "seniors" || items.slug === "seniors-uniform") return "Seniors";
+  if (items.service || items.slug) return items.service || items.slug;
+  if (row.status === "meeting") return "Meeting room";
+  return row.status || "order";
+}
+
 function orderBrief(row) {
   const items = itemsOf(row);
   const secretKeys = ["pass", "salt", "token", "image", "thumb"];
   const safeItems = {};
   Object.keys(items).forEach((k) => {
-    if (secretKeys.includes(k)) return;
+    if (secretKeys.includes(k) || k === "rows" || k === "lines") return;
     const v = items[k];
     if (typeof v === "string" && v.length > 500) safeItems[k] = v.slice(0, 500) + "…";
     else safeItems[k] = v;
   });
+  if (Array.isArray(items.rows)) safeItems.row_count = items.rows.length;
+  if (Array.isArray(items.lines)) {
+    safeItems.line_count = items.lines.length;
+    safeItems.lines = items.lines;
+  }
   return {
     id: row.id,
     name: row.customer_name || "",
@@ -72,12 +92,18 @@ function orderBrief(row) {
     total: row.total,
     status: row.status || "",
     created_at: row.created_at || "",
+    updated_at: items.updated_at || items.excel_updated_at || row.created_at || "",
+    order_type: orderTypeOf(row),
+    source: items.source || items.slug || items.type || row.status || "",
     code: items.code || "",
+    has_excel: Boolean(items.excel_path || items.has_excel),
+    excel_path: items.excel_path || "",
+    excel_updated_at: items.excel_updated_at || "",
     shared: items.shared !== false,
-    private: Boolean(items.private),
+    private: items.private !== false,
     service: items.service || items.type || "",
     hidden: Boolean(items.hidden),
-    active: items.active !== false,
+    active: items.active === true,
     closed: Boolean(items.closed),
     room_name: items.name || items.room_name || "",
     starts_at: items.starts_at || "",
@@ -88,6 +114,26 @@ function orderBrief(row) {
     rejected: Boolean(items.rejected),
     items: safeItems,
   };
+}
+
+function hashInviteCode(code) {
+  return createHash("sha256").update(String(code || "").trim().toLowerCase()).digest("hex");
+}
+
+function makeInviteCode() {
+  return randomBytes(5).toString("hex"); // 10 hex chars
+}
+
+function rateLimited(key, limit, windowMs) {
+  const now = Date.now();
+  const cur = redeemAttempts.get(key) || { n: 0, t: now };
+  if (now - cur.t > windowMs) {
+    redeemAttempts.set(key, { n: 1, t: now });
+    return false;
+  }
+  cur.n += 1;
+  redeemAttempts.set(key, cur);
+  return cur.n > limit;
 }
 
 function photoBrief(row) {
@@ -169,48 +215,111 @@ module.exports = async function handler(req, res) {
 
     const op = text(payload.op, 40);
 
-    // Public: join / list available admin-created meeting rooms only.
-    if (op === "join") {
-      const code = text(payload.code, 12).replace(/\D/g, "");
-      if (code.length !== 6) return json(res, 400, { ok: false, error: "Enter the 6-digit code." });
-      const found = await supabase
-        .from("orders")
-        .select("id, items")
-        .eq("status", "meeting")
-        .eq("items->>code", code)
+    // Public: redeem a private emailed access code (no public room list).
+    if (op === "available") {
+      return json(res, 200, { ok: true, rooms: [] });
+    }
+
+    if (op === "join" || op === "redeem") {
+      const email = text(payload.email || payload.customer_email, 160).toLowerCase();
+      const access = text(payload.access_code || payload.code, 40).toLowerCase();
+      const ip = String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "ip").split(",")[0].trim();
+      if (rateLimited("join:" + ip, 20, 15 * 60 * 1000) || rateLimited("join-mail:" + email, 12, 15 * 60 * 1000)) {
+        return json(res, 429, { ok: false, error: "Too many attempts. Try again in a few minutes." });
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return json(res, 400, { ok: false, error: "Enter the email address that received the invite." });
+      }
+      if (access.length < 8) {
+        return json(res, 400, { ok: false, error: "Enter the access code from your email." });
+      }
+      const codeHash = hashInviteCode(access);
+      let inviteRow = null;
+      let inviteSource = "table";
+      const invite = await supabase
+        .from("meeting_invites")
+        .select("id, meeting_id, email, expires_at, redeemed_at")
+        .eq("code_hash", codeHash)
         .maybeSingle();
-      if (found.error) return json(res, 502, { ok: false, error: found.error.message || "The meeting could not be checked." });
-      if (!found.data) return json(res, 404, { ok: false, error: "No meeting found with that code." });
-      const items = itemsOf(found.data);
-      if (items.closed || items.active === false) {
-        return json(res, 403, { ok: false, error: "This room is not available right now." });
+      if (invite.error && /meeting_invites|schema cache|does not exist/i.test(invite.error.message || "")) {
+        inviteSource = "orders";
+        const fallback = await supabase
+          .from("orders")
+          .select("id, customer_email, items, created_at")
+          .eq("status", "meet_invite")
+          .eq("items->>code_hash", codeHash)
+          .maybeSingle();
+        if (fallback.error) return json(res, 502, { ok: false, error: fallback.error.message || "The invite could not be checked." });
+        if (fallback.data) {
+          const it = itemsOf(fallback.data);
+          inviteRow = {
+            id: fallback.data.id,
+            meeting_id: it.meeting_id,
+            email: fallback.data.customer_email || it.email,
+            expires_at: it.expires_at,
+            redeemed_at: it.redeemed_at || null,
+          };
+        }
+      } else if (invite.error) {
+        return json(res, 502, { ok: false, error: invite.error.message || "The invite could not be checked." });
+      } else {
+        inviteRow = invite.data;
+      }
+      if (!inviteRow) return json(res, 404, { ok: false, error: "That access code was not found." });
+      if (String(inviteRow.email).toLowerCase() !== email) {
+        return json(res, 403, { ok: false, error: "This access code was sent to a different email." });
+      }
+      if (inviteRow.redeemed_at) {
+        return json(res, 403, { ok: false, error: "This access code was already used." });
+      }
+      if (new Date(inviteRow.expires_at).getTime() < Date.now()) {
+        return json(res, 403, { ok: false, error: "This access code has expired." });
+      }
+      const meeting = await supabase
+        .from("orders")
+        .select("id, customer_name, items, status")
+        .eq("id", inviteRow.meeting_id)
+        .eq("status", "meeting")
+        .maybeSingle();
+      if (meeting.error || !meeting.data) {
+        return json(res, 404, { ok: false, error: "This meeting is no longer available." });
+      }
+      const items = itemsOf(meeting.data);
+      if (items.closed) return json(res, 403, { ok: false, error: "This meeting has ended." });
+      if (items.active === false) {
+        return json(res, 403, { ok: false, error: "This meeting has not been activated yet." });
+      }
+      const roomCode = text(items.code, 12).replace(/\D/g, "");
+      if (roomCode.length !== 6) {
+        return json(res, 502, { ok: false, error: "This meeting room is misconfigured." });
+      }
+      const redeemedAt = new Date().toISOString();
+      if (inviteSource === "table") {
+        const marked = await supabase
+          .from("meeting_invites")
+          .update({ redeemed_at: redeemedAt })
+          .eq("id", inviteRow.id)
+          .is("redeemed_at", null)
+          .select("id")
+          .maybeSingle();
+        if (marked.error || !marked.data) {
+          return json(res, 403, { ok: false, error: "This access code was already used." });
+        }
+      } else {
+        const cur = await supabase.from("orders").select("id, items").eq("id", inviteRow.id).maybeSingle();
+        const it = itemsOf(cur.data);
+        if (it.redeemed_at) return json(res, 403, { ok: false, error: "This access code was already used." });
+        await supabase
+          .from("orders")
+          .update({ items: Object.assign({}, it, { redeemed_at: redeemedAt }) })
+          .eq("id", inviteRow.id);
       }
       return json(res, 200, {
         ok: true,
-        code,
-        name: items.name || "Meeting " + code,
-        link: meetLink(code),
+        name: items.name || meeting.data.customer_name || "Lay C meeting",
+        link: meetLink(roomCode),
+        room: "LAYC-" + roomCode,
       });
-    }
-
-    if (op === "available") {
-      const list = await fetchOrders(supabase, ["meeting"]);
-      const rooms = list
-        .map((row) => {
-          const items = itemsOf(row);
-          if (items.closed || items.active === false) return null;
-          const code = text(items.code, 12).replace(/\D/g, "");
-          if (code.length !== 6) return null;
-          return {
-            code,
-            name: text(items.name || "Meeting " + code, 80),
-            starts_at: items.starts_at || "",
-            duration_min: items.duration_min || null,
-            created_at: row.created_at || "",
-          };
-        })
-        .filter(Boolean);
-      return json(res, 200, { ok: true, rooms });
     }
 
     const who = await requireAdmin(supabase, text(payload.token, 80));
@@ -242,7 +351,7 @@ module.exports = async function handler(req, res) {
         counts,
         recent,
         totals: {
-          orders: rows.filter((r) => ["received", "notified", "processing", "done", "cancelled"].includes(r.status)).length,
+          orders: rows.filter((r) => ["received", "notified", "processing", "done", "cancelled", "room"].includes(r.status)).length,
           accounts: counts.account || 0,
           photos: counts.photo || 0,
           meetings: counts.meeting || 0,
@@ -256,20 +365,103 @@ module.exports = async function handler(req, res) {
 
     if (op === "list" || op === "orders") {
       const status = text(payload.status, 40);
-      const orderStatuses = ["received", "notified", "processing", "done", "cancelled"];
+      const typeFilter = text(payload.order_type || payload.type, 40).toLowerCase();
+      const orderStatuses = ["received", "notified", "processing", "done", "cancelled", "room"];
       let statuses = null;
-      if (status === "orders" || status === "received") statuses = orderStatuses;
+      if (status === "orders" || status === "received" || (!status && op === "orders")) statuses = orderStatuses;
       else if (status) statuses = [status];
       const raw = await fetchOrders(supabase, statuses);
       let briefs = raw.map(orderBrief);
       if (status === "orders" || (!status && op === "orders")) {
-        briefs = briefs.filter((r) => orderStatuses.includes(r.status) || !["account", "photo", "room", "meeting", "review", "admin_log"].includes(r.status));
+        briefs = briefs.filter((r) => orderStatuses.includes(r.status));
+      }
+      if (typeFilter === "seniors" || typeFilter === "excel") {
+        briefs = briefs.filter((r) => r.status === "room" || /senior|excel/i.test(r.order_type + " " + r.source));
+      } else if (typeFilter === "quote") {
+        briefs = briefs.filter((r) => r.status !== "room");
       }
       if (payload.from) briefs = briefs.filter((r) => !r.created_at || r.created_at >= text(payload.from, 40));
       if (payload.to) briefs = briefs.filter((r) => !r.created_at || r.created_at.slice(0, 10) <= text(payload.to, 40));
-      briefs = briefs.filter((r) => matchQuery(r, q));
+      briefs = briefs.filter((r) => matchQuery(r, q) || String(r.order_type).toLowerCase().includes(q));
+      if (payload.sort === "oldest") briefs.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+      else briefs.sort((a, b) => String(b.updated_at || b.created_at).localeCompare(String(a.updated_at || a.created_at)));
       const sliced = pageSlice(briefs, page, pageSize);
       return json(res, 200, { ok: true, email: who.customer_email, ...sliced });
+    }
+
+    if (op === "excel_download" || op === "order_excel") {
+      const id = text(payload.id, 80);
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json(res, 400, { ok: false, error: "That order was not found." });
+      const row = await supabase
+        .from("orders")
+        .select("id, status, items, total, customer_name, customer_email, customer_phone, delivery_address, created_at")
+        .eq("id", id)
+        .maybeSingle();
+      if (row.error || !row.data) return json(res, 404, { ok: false, error: "That order was not found." });
+      const items = itemsOf(row.data);
+      if (items.excel_path) {
+        const url = await signedExcelUrl(supabase, items.excel_path, 600);
+        if (!url) return json(res, 502, { ok: false, error: "The download link could not be created." });
+        await logAdmin(supabase, who, "excel_download", { id, source: "storage" });
+        return json(res, 200, {
+          ok: true,
+          url,
+          expires_in: 600,
+          filename: path.basename(items.excel_path),
+          source: "storage",
+        });
+      }
+      // Generate an order-specific Excel-compatible CSV when no stored file exists.
+      const csv = orderToExcelCsv(row.data);
+      const filename = "lay-c-order-" + String(id).slice(0, 8) + ".csv";
+      await logAdmin(supabase, who, "excel_download", { id, source: "generated" });
+      return json(res, 200, {
+        ok: true,
+        csv,
+        filename,
+        mime: "text/csv; charset=utf-8",
+        source: "generated",
+      });
+    }
+
+    if (op === "order_document" || op === "view_order") {
+      const id = text(payload.id, 80);
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json(res, 400, { ok: false, error: "That order was not found." });
+      const row = await supabase
+        .from("orders")
+        .select("id, customer_name, customer_email, customer_phone, delivery_address, total, status, created_at, items")
+        .eq("id", id)
+        .maybeSingle();
+      if (row.error || !row.data) return json(res, 404, { ok: false, error: "That order was not found." });
+      if (["account", "admin_log"].includes(row.data.status)) {
+        return json(res, 400, { ok: false, error: "That record is not an order document." });
+      }
+      const document = buildOrderDocument(row.data);
+      return json(res, 200, { ok: true, document, brief: orderBrief(row.data) });
+    }
+
+    if (op === "order_pdf") {
+      const id = text(payload.id, 80);
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json(res, 400, { ok: false, error: "That order was not found." });
+      const row = await supabase
+        .from("orders")
+        .select("id, customer_name, customer_email, customer_phone, delivery_address, total, status, created_at, items")
+        .eq("id", id)
+        .maybeSingle();
+      if (row.error || !row.data) return json(res, 404, { ok: false, error: "That order was not found." });
+      if (["account", "admin_log", "photo"].includes(row.data.status)) {
+        return json(res, 400, { ok: false, error: "PDF export is only available for orders and sheets." });
+      }
+      const pdf = await renderOrderPdf(row.data);
+      const filename = "lay-c-order-" + String(id).slice(0, 8) + ".pdf";
+      await logAdmin(supabase, who, "order_pdf", { id, bytes: pdf.length });
+      return json(res, 200, {
+        ok: true,
+        filename,
+        mime: "application/pdf",
+        pdf_base64: pdf.toString("base64"),
+        bytes: pdf.length,
+      });
     }
 
     if (op === "get") {
@@ -282,15 +474,136 @@ module.exports = async function handler(req, res) {
         .maybeSingle();
       if (row.error || !row.data) return json(res, 404, { ok: false, error: "That record was not found." });
       const brief = orderBrief(row.data);
+      const rawItems = itemsOf(row.data);
       if (row.data.status === "photo") {
-        const items = itemsOf(row.data);
-        brief.thumb = typeof items.thumb === "string" ? items.thumb : "";
-        brief.has_image = Boolean(items.image || items.thumb);
+        brief.thumb = typeof rawItems.thumb === "string" ? rawItems.thumb : "";
+        brief.has_image = Boolean(rawItems.image || rawItems.thumb);
+        brief.image = typeof rawItems.image === "string" ? rawItems.image : "";
       }
       if (row.data.status === "account") {
-        brief.items = { type: "account", has_password: Boolean(itemsOf(row.data).pass) };
+        brief.items = { type: "account", has_password: Boolean(rawItems.pass) };
+      }
+      if (row.data.status === "room") {
+        brief.sheet_items = Array.isArray(rawItems.items) ? rawItems.items : [];
+        brief.sheet_rows = Array.isArray(rawItems.rows) ? rawItems.rows.slice(0, 500) : [];
+        brief.sheet_ex = rawItems.ex || null;
+      }
+      if (!["account", "admin_log"].includes(row.data.status)) {
+        brief.document = buildOrderDocument(row.data);
       }
       return json(res, 200, { ok: true, row: brief });
+    }
+
+    if (op === "customer_activity") {
+      const emailKey = text(payload.email || payload.customer_email, 160).toLowerCase();
+      const filter = text(payload.filter || "all", 40).toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailKey)) {
+        return json(res, 400, { ok: false, error: "Enter a valid customer email." });
+      }
+      const all = await fetchOrders(supabase, null);
+      const linked = all.filter((r) => String(r.customer_email || "").trim().toLowerCase() === emailKey);
+      const account = linked.find((r) => r.status === "account");
+      const accountItems = itemsOf(account);
+      const profile = {
+        email: emailKey,
+        name: (account && account.customer_name) || linked.find((r) => r.customer_name)?.customer_name || "Not provided",
+        phone: (account && account.customer_phone) || linked.find((r) => r.customer_phone)?.customer_phone || "Not provided",
+        has_account: Boolean(account),
+        account_id: account ? account.id : null,
+        last_at: linked.reduce((best, r) => (!best || (r.created_at && r.created_at > best) ? r.created_at : best), ""),
+        // Never expose credentials
+        last_seen: accountItems.last_seen || accountItems.seen_at || null,
+      };
+      const asActivity = (row) => {
+        const it = itemsOf(row);
+        const kind =
+          row.status === "photo"
+            ? "photo"
+            : row.status === "review"
+              ? "review"
+              : row.status === "meeting" || row.status === "meet_invite"
+                ? "meeting"
+                : row.status === "room"
+                  ? "order"
+                  : ["received", "notified", "processing", "done", "cancelled"].includes(row.status)
+                    ? "order"
+                    : row.status === "account"
+                      ? "account"
+                      : "other";
+        return {
+          id: row.id,
+          kind,
+          status: row.status,
+          title:
+            row.status === "photo"
+              ? it.shared !== false
+                ? "Family album photo"
+                : "Private binder photo"
+              : row.status === "review"
+                ? "Review"
+                : row.status === "meet_invite"
+                  ? "Meeting invite"
+                  : row.status === "meeting"
+                    ? it.name || "Meeting room"
+                    : orderTypeOf(row),
+          name: row.customer_name || "",
+          email: row.customer_email || "",
+          total: row.total,
+          created_at: row.created_at,
+          has_excel: Boolean(it.excel_path || it.has_excel),
+          thumb: typeof it.thumb === "string" ? it.thumb : "",
+          shared: it.shared !== false,
+          moderated: Boolean(it.moderated),
+          rating: it.r || null,
+          review: typeof it.t === "string" ? it.t : "",
+          code: it.code || "",
+        };
+      };
+      let activity = linked
+        .filter((r) => r.status !== "account" && r.status !== "admin_log")
+        .map(asActivity)
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+      if (filter === "orders") activity = activity.filter((a) => a.kind === "order");
+      else if (filter === "photos") activity = activity.filter((a) => a.kind === "photo");
+      else if (filter === "reviews") activity = activity.filter((a) => a.kind === "review");
+      else if (filter === "meetings") activity = activity.filter((a) => a.kind === "meeting");
+      else if (filter === "marketing") {
+        activity = activity.filter((a) => a.kind === "order" && /design|web|manufactur|quote|marketing/i.test(a.title + " " + a.status));
+      }
+      const unlinkedPhotos = all
+        .filter((r) => r.status === "photo")
+        .filter((r) => {
+          const em = String(r.customer_email || "").trim().toLowerCase();
+          return !em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em);
+        })
+        .map(asActivity);
+      const counts = {
+        orders: linked.filter((r) => ["received", "notified", "processing", "done", "cancelled", "room"].includes(r.status)).length,
+        photos: linked.filter((r) => r.status === "photo").length,
+        reviews: linked.filter((r) => r.status === "review").length,
+        meetings: linked.filter((r) => r.status === "meeting" || r.status === "meet_invite").length,
+        unlinked_photos: unlinkedPhotos.length,
+      };
+      return json(res, 200, {
+        ok: true,
+        profile,
+        counts,
+        activity,
+        unlinked_photos: filter === "unlinked" || filter === "photos_unlinked" ? unlinkedPhotos : [],
+      });
+    }
+
+    if (op === "photos_unlinked") {
+      const all = await fetchOrders(supabase, ["photo"]);
+      let briefs = all
+        .map(photoBrief)
+        .filter((r) => {
+          const em = String(r.email || "").trim().toLowerCase();
+          return !em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em);
+        });
+      if (q) briefs = briefs.filter((r) => matchQuery(r, q));
+      const sliced = pageSlice(briefs, page, pageSize);
+      return json(res, 200, { ok: true, ...sliced });
     }
 
     if (op === "update_status") {
@@ -353,7 +666,9 @@ module.exports = async function handler(req, res) {
             name,
             starts_at,
             duration_min,
-            active: payload.active !== false,
+            private: true,
+            // Private by default: not joinable until admin activates + sends invite codes.
+            active: payload.active === true || payload.active === "true",
             closed: false,
             link: meetLink(code),
           },
@@ -365,8 +680,156 @@ module.exports = async function handler(req, res) {
       if (saved.error || !saved.data) {
         return json(res, 502, { ok: false, error: (saved.error && saved.error.message) || "The meeting room was not saved." });
       }
-      await logAdmin(supabase, who, "meet_create", { id: saved.data.id, code, name });
-      return json(res, 200, { ok: true, code, id: saved.data.id, link: meetLink(code), name });
+      await logAdmin(supabase, who, "meet_create", { id: saved.data.id, code, name, private: true });
+      return json(res, 200, { ok: true, code, id: saved.data.id, link: meetLink(code), name, private: true });
+    }
+
+    if (op === "meet_invite" || op === "meet_invite_send") {
+      const id = text(payload.id || payload.meeting_id, 80);
+      const email = text(payload.email || payload.customer_email, 160).toLowerCase();
+      const hours = Math.max(1, Math.min(72, Number(payload.expires_hours) || 24));
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json(res, 400, { ok: false, error: "Choose a meeting room." });
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return json(res, 400, { ok: false, error: "Enter a valid recipient email." });
+      }
+      const meeting = await supabase.from("orders").select("id, customer_name, items, status").eq("id", id).eq("status", "meeting").maybeSingle();
+      if (meeting.error || !meeting.data) return json(res, 404, { ok: false, error: "That meeting room was not found." });
+      const items = itemsOf(meeting.data);
+      if (items.closed) return json(res, 400, { ok: false, error: "This meeting is closed." });
+      const access = makeInviteCode();
+      const expires = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+      const codeHash = hashInviteCode(access);
+      let inviteId = "";
+      let inviteSource = "table";
+      const saved = await supabase
+        .from("meeting_invites")
+        .insert({
+          meeting_id: id,
+          email,
+          code_hash: codeHash,
+          expires_at: expires,
+          created_by: who.customer_email,
+        })
+        .select("id")
+        .single();
+      if (saved.error && /meeting_invites|schema cache|does not exist/i.test(saved.error.message || "")) {
+        inviteSource = "orders";
+        const fallback = await supabase
+          .from("orders")
+          .insert({
+            customer_name: "Invite " + email,
+            customer_email: email,
+            customer_phone: "",
+            delivery_address: "",
+            items: {
+              type: "meet_invite",
+              meeting_id: id,
+              email,
+              code_hash: codeHash,
+              expires_at: expires,
+              redeemed_at: null,
+              created_by: who.customer_email,
+            },
+            total: 0,
+            status: "meet_invite",
+          })
+          .select("id")
+          .single();
+        if (fallback.error || !fallback.data) {
+          return json(res, 502, { ok: false, error: (fallback.error && fallback.error.message) || "The invite was not saved." });
+        }
+        inviteId = fallback.data.id;
+      } else if (saved.error || !saved.data) {
+        return json(res, 502, { ok: false, error: (saved.error && saved.error.message) || "The invite was not saved." });
+      } else {
+        inviteId = saved.data.id;
+      }
+      const roomName = items.name || meeting.data.customer_name || "Lay C meeting";
+      const when = new Date(expires).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+      const site = String(process.env.SITE_URL || "https://lay-c-factory.vercel.app").replace(/\/+$/, "");
+      const summary =
+        "Lay C Factory meeting invite\n\n" +
+        "Meeting: " +
+        roomName +
+        "\nYour access code: " +
+        access +
+        "\nExpires: " +
+        when +
+        "\n\nOpen " +
+        site +
+        ", choose Telephone → Join a Room, then enter this email and access code.";
+      try {
+        await sendEmail({
+          to_email: email,
+          service: "Meeting invite",
+          order_summary: summary,
+          products: roomName,
+          quantities: "Access code: " + access,
+          total_price: "Expires " + when,
+          customer_details: email,
+          customer_name: "",
+          customer_phone: "",
+          customer_email: email,
+          client_email: email,
+        });
+      } catch (err) {
+        if (inviteSource === "table") await supabase.from("meeting_invites").delete().eq("id", inviteId);
+        else await supabase.from("orders").delete().eq("id", inviteId);
+        return json(res, err.status || 502, { ok: false, error: err.message || "The invite email was not sent." });
+      }
+      if (items.active !== true) {
+        await supabase
+          .from("orders")
+          .update({ items: Object.assign({}, items, { active: true, private: true }) })
+          .eq("id", id);
+      }
+      await logAdmin(supabase, who, "meet_invite", { meeting_id: id, email, invite_id: inviteId, source: inviteSource });
+      return json(res, 200, { ok: true, invite_id: inviteId, email, expires_at: expires, sent: true });
+    }
+
+    if (op === "meet_invites") {
+      const id = text(payload.id || payload.meeting_id, 80);
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json(res, 400, { ok: false, error: "Choose a meeting room." });
+      const list = await supabase
+        .from("meeting_invites")
+        .select("id, email, expires_at, redeemed_at, created_at, created_by")
+        .eq("meeting_id", id)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (list.error && /meeting_invites|schema cache|does not exist/i.test(list.error.message || "")) {
+        const fallback = await supabase
+          .from("orders")
+          .select("id, customer_email, items, created_at")
+          .eq("status", "meet_invite")
+          .eq("items->>meeting_id", id)
+          .order("created_at", { ascending: false })
+          .limit(100);
+        if (fallback.error) return json(res, 502, { ok: false, error: fallback.error.message || "Invites could not be loaded." });
+        const rows = (fallback.data || []).map((r) => {
+          const it = itemsOf(r);
+          return {
+            id: r.id,
+            email: r.customer_email || it.email || "",
+            created_at: r.created_at,
+            expires_at: it.expires_at,
+            redeemed_at: it.redeemed_at || null,
+            status: it.redeemed_at ? "used" : new Date(it.expires_at).getTime() < Date.now() ? "expired" : "sent",
+            created_by: it.created_by || "",
+          };
+        });
+        return json(res, 200, { ok: true, rows });
+      }
+      if (list.error) return json(res, 502, { ok: false, error: list.error.message || "Invites could not be loaded." });
+      const rows = (list.data || []).map((r) => ({
+        id: r.id,
+        email: r.email,
+        created_at: r.created_at,
+        expires_at: r.expires_at,
+        redeemed_at: r.redeemed_at,
+        status: r.redeemed_at ? "used" : new Date(r.expires_at).getTime() < Date.now() ? "expired" : "sent",
+        created_by: r.created_by || "",
+      }));
+      return json(res, 200, { ok: true, rows });
     }
 
     if (op === "meet_update") {
