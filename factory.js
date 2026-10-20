@@ -795,12 +795,23 @@
       h = H();
     if (!w || !h) return;
     mobile = w <= 900;
-    R.setSize(w, h);
+    R.setPixelRatio(Math.min(devicePixelRatio || 1, mobile ? 1.5 : 1.75));
+    R.setSize(w, h, false);
+    const canvas = R.domElement;
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
     cam.aspect = w / h;
-    cam.setViewOffset(w, h, 0, h * 0.05, w, h);
+    // Keep a little top bias on tall phones so the machine sits under the header.
+    const yOff = mobile ? Math.min(h * 0.04, 28) : h * 0.05;
+    cam.setViewOffset(w, h, 0, yOff, w, h);
+    cam.updateProjectionMatrix();
     const th = 2 * Math.tan((cam.fov * Math.PI) / 360);
-    baseD = Math.max(13.5 / (th * cam.aspect * 0.92), 10.5 / (th * 0.7));
+    const aspectPad = mobile ? 0.84 : 0.92;
+    const heightPad = mobile ? 0.62 : 0.7;
+    baseD = Math.max(13.5 / (th * cam.aspect * aspectPad), 10.5 / (th * heightPad));
+    if (mobile) baseD = Math.max(baseD, 16);
     ctrl.maxDistance = Math.max(55, baseD * 1.6);
+    ctrl.minDistance = mobile ? 8.5 : 7;
     goal();
     if (!sized) {
       sized = true;
@@ -878,6 +889,10 @@
   document.querySelectorAll("[data-cam]").forEach((b) => (b.onclick = () => setCam(b.dataset.cam)));
   $("#play").onclick = () => (playing ? pause() : play());
   addEventListener("resize", layout);
+  if (window.visualViewport) {
+    visualViewport.addEventListener("resize", layout);
+    visualViewport.addEventListener("scroll", layout);
+  }
   new ResizeObserver(layout).observe(app);
   layout();
   ctrl.addEventListener("start", () => {
@@ -1152,6 +1167,13 @@
       ],
     },
     {
+      n: "Marketing",
+      slug: "marketing",
+      pick: [10, 11],
+      s: "Choose what you would like to book.",
+      q: [],
+    },
+    {
       n: "Web developing",
       slug: "web",
       s: "Websites, stores and web apps built by our agents and developers.",
@@ -1210,14 +1232,14 @@
     {
       n: "Photo shoots",
       slug: "photo",
-      pick: [5, 6],
+      pick: [6, 7],
       s: "Choose what you would like to book.",
       q: [],
     },
     {
       n: "Book a shoot",
       slug: "photo-shoot",
-      par: 4,
+      par: 2,
       s: "Product, portrait, event and brand photography with our photographer.",
       q: [
         {
@@ -1268,7 +1290,7 @@
     {
       n: "Book a studio",
       slug: "photo-studio",
-      par: 4,
+      par: 2,
       cal: 1,
       s: "Hire the studio at 350 L.E per hour, 2 hours minimum. Open 8 AM to 4 AM. Choose Area 1 or Area 2, then pick a date and an exact start time.",
       q: [
@@ -1293,15 +1315,117 @@
       ],
     },
   ];
-  SV.push(Object.assign({}, SV[2], { slug: "seniors-uniform", par: 2 }), {
+  SV.push(Object.assign({}, SV[2], { slug: "seniors-uniform", par: 5 }), {
     n: "Rooms",
     slug: "seniors-rooms",
-    par: 2,
+    par: 5,
     s: "Enter the 6 digit password you got at checkout on the Seniors uniform page to open your class order sheet.",
     q: [],
   });
-  SV[2].pick = [7, 8];
+  SV.push(
+    {
+      n: "Media buying",
+      slug: "media-buying",
+      par: 4,
+      s: "Paid ads planned, bought and tuned by our team. You set the budget and the schedule.",
+      q: [
+        { t: "What are your sales?", sp: "si" },
+        { t: "What sales do you expect?", sp: "sw" },
+        { t: "Set your daily ad budget for each platform", bt: 1 },
+        { t: "How many days per month should the ads run?", sp: "d" },
+        { t: "For how many months?", sp: "m" },
+        {
+          t: "What is your goal?",
+          o: [
+            ["Brand awareness", 0],
+            ["Website traffic", 0],
+            ["Leads and messages", 0],
+            ["Online sales", 0],
+            ["App installs", 0],
+          ],
+        },
+        {
+          t: "How much should we handle?",
+          o: [
+            ["Campaign setup only", "?*"],
+            ["Setup and monthly management", "?*"],
+            ["Full service with creatives", "?*"],
+          ],
+        },
+        {
+          t: "Anything extra?",
+          m: 1,
+          np: 1,
+          o: [
+            ["Creative and video production", 0],
+            ["Audience research", 0],
+            ["Monthly report", 0],
+            ["Landing page", 0],
+            ["Pixel and tracking setup", 0],
+          ],
+        },
+        { t: "Would you like a personal account manager?", sp: "am" },
+      ],
+    },
+    {
+      n: "UGC",
+      slug: "ugc",
+      par: 4,
+      s: "Real-looking creator videos and photos for your brand. Prices are confirmed after we review your brief.",
+      q: [
+        { t: "How many creators do you need?", ug: 1 },
+        {
+          t: "What content do you need?",
+          o: [
+            ["UGC video ad", "?*"],
+            ["Product review video", "?*"],
+            ["Unboxing video", "?*"],
+            ["Testimonial video", "?*"],
+            ["Photos only", "?*"],
+          ],
+        },
+        {
+          t: "How long is each video?",
+          o: [
+            ["Up to 15 seconds", "?*"],
+            ["Up to 30 seconds", "?*"],
+            ["Up to 60 seconds", "?*"],
+          ],
+        },
+        {
+          t: "Where will you use it?",
+          o: [
+            ["Organic posts only", "?*"],
+            ["Paid ads included", "?*"],
+          ],
+        },
+        {
+          t: "Which extras?",
+          m: 1,
+          o: [
+            ["Raw footage", "?*"],
+            ["Subtitles", "?*"],
+            ["Hook variations", "?*"],
+            ["We ship the product to the creator", "?*"],
+          ],
+        },
+        {
+          t: "How fast do you need it?",
+          o: [
+            ["Standard (10 days)", 0],
+            ["Rush (5 days)", "?*"],
+          ],
+        },
+      ],
+    },
+  );
+  SV[2].pick = [8, 9];
   SV[2].s = "Choose what you would like to open.";
+  // Station order: 01 Designing, 02 Clothing, 03 Photo shoots, 04 Web, 05 Marketing, 06 Seniors
+  {
+    const o = [0, 1, 5, 4, 3, 2, 6, 7, 8, 9].map((i) => SV[i]);
+    SV.splice(0, o.length, ...o);
+  }
 
   const pg = $("#page"),
     pins = $("#pins");
@@ -1312,15 +1436,165 @@
     txtOut = "",
     quotePack = { title: "", rows: [], total: "", extra: "" },
     hrs = 2;
+  const MBP = [
+    "Facebook",
+    "Instagram",
+    "TikTok",
+    "YouTube",
+    "Google Ads",
+    "Snapchat",
+    "LinkedIn",
+    "X (Twitter)",
+    "ChatGPT Ads",
+  ];
+  let mbv = {
+    b: MBP.map(() => 0),
+    d: 10,
+    m: 1,
+    si: 100,
+    sw: 200,
+    am: false,
+    ugS: 1,
+    ugB: 0,
+    ugA: 0,
+  };
+  const UG = {
+    S: { n: "Class S", min: 1 },
+    B: { n: "Class B", base: 12000, min: 4, ex: 2000 },
+    A: { n: "Class A", base: 24000, min: 4, ex: 6000 },
+  };
+  const ugPrice = (c, n) => (n <= 0 || c === "S" ? 0 : UG[c].base + Math.max(0, n - UG[c].min) * UG[c].ex);
+  const mbBtn = (k, d, l) =>
+    '<button type="button" class="mbb" data-k="' +
+    k +
+    '" data-step="' +
+    d +
+    '" aria-label="' +
+    l +
+    '">' +
+    (d < 0 ? "&minus;" : "+") +
+    "</button>";
+  function mbHTML(q, j) {
+    if (q.ug)
+      return (
+        "<fieldset><legend>" +
+        (j + 1) +
+        ". " +
+        q.t +
+        "</legend>" +
+        ["S", "A", "B"]
+          .map(
+            (c) =>
+              '<div class="stp" style="margin-bottom:10px"><div class="stn" style="flex:1 1 140px"><b style="font-size:14px;color:var(--fg)">' +
+              UG[c].n +
+              "</b><br>" +
+              (c === "S"
+                ? "Price confirmed after we review your brief<br>" +
+                  (UG[c].min > 1 ? UG[c].min + " creators" : "1 creator") +
+                  " minimum"
+                : money(UG[c].base) +
+                  " for " +
+                  UG[c].min +
+                  " creators<br>+" +
+                  money(UG[c].ex) +
+                  " for each additional creator") +
+              "</div>" +
+              mbBtn("ug" + c, -1, "Fewer " + UG[c].n + " creators") +
+              '<output id="mb-ug' +
+              c +
+              '"></output>' +
+              mbBtn("ug" + c, 1, "More " + UG[c].n + " creators") +
+              "</div>",
+          )
+          .join("") +
+        "</fieldset>"
+      );
+    if (q.bt)
+      return (
+        "<fieldset><legend>" +
+        (j + 1) +
+        ". " +
+        q.t +
+        '</legend><table class="mbt"><tr><th>Platform</th><th style="text-align:right">Per day</th></tr>' +
+        MBP.map(
+          (n, i) =>
+            "<tr><td>" +
+            n +
+            '</td><td><div class="mbc">' +
+            mbBtn(i, -1, "Less for " + n) +
+            '<output id="mb-b' +
+            i +
+            '"></output>' +
+            mbBtn(i, 1, "More for " + n) +
+            "</div></td></tr>",
+        ).join("") +
+        '<tr><td><b>Total per day</b></td><td style="text-align:right"><b id="mb-t"></b></td></tr><tr><td><b>Total ad spend</b><br><small>per day x days x months</small></td><td style="text-align:right"><b id="mb-s"></b></td></tr><tr id="mb-fr"><td><b>Agency fee</b><br><small>fixed fee, to be confirmed</small></td><td style="text-align:right"><b>?*</b></td></tr><tr><td><b>Agency percentage</b><br><small>of total sales, to be confirmed</small></td><td style="text-align:right"><b>?*</b></td></tr></table></fieldset>'
+      );
+    if (q.sp === "am")
+      return (
+        "<fieldset><legend>" +
+        (j + 1) +
+        ". " +
+        q.t +
+        ' <small>(optional)</small></legend><div class="mbr"><button type="button" class="mbb" data-k="am" data-step="0" id="mb-am" style="width:auto;padding:0 14px"></button><span><b>Personal account manager</b><br><small>' +
+        money(10000) +
+        " per month</small></span></div></fieldset>"
+      );
+    return (
+      "<fieldset><legend>" +
+      (j + 1) +
+      ". " +
+      q.t +
+      '</legend><div class="mbr">' +
+      mbBtn(q.sp, -1, "Fewer") +
+      '<output id="mb-' +
+      q.sp +
+      '"></output>' +
+      mbBtn(q.sp, 1, "More") +
+      "</div></fieldset>"
+    );
+  }
+  function mbUpd() {
+    const o = (id, t) => {
+        const e = document.getElementById(id);
+        if (e) e.textContent = t;
+      },
+      ugT = (n) => (n <= 0 ? "Not added" : n + (n > 1 ? " creators" : " creator"));
+    o("mb-ugS", ugT(mbv.ugS));
+    o("mb-ugB", ugT(mbv.ugB));
+    o("mb-ugA", ugT(mbv.ugA));
+    const T = mbv.b.reduce((a, b) => a + b, 0);
+    MBP.forEach((n, i) => o("mb-b" + i, money(mbv.b[i])));
+    o("mb-si", mbv.si + " items");
+    o("mb-sw", mbv.sw + " items");
+    o("mb-d", mbv.d + (mbv.d > 1 ? " days" : " day"));
+    o("mb-m", mbv.m + (mbv.m > 1 ? " months" : " month"));
+    o("mb-t", money(T));
+    o("mb-s", money(T * mbv.d * mbv.m));
+    const ab = document.getElementById("mb-am");
+    if (ab) {
+      ab.textContent = mbv.am ? "Added \u2713" : "Add";
+      ab.setAttribute("aria-pressed", String(mbv.am));
+      ab.style.background = mbv.am ? "var(--amber)" : "";
+      ab.style.color = mbv.am ? "#fff" : "";
+    }
+    const fr = document.getElementById("mb-fr");
+    if (fr) fr.style.display = mbv.si < 100 ? "" : "none";
+  }
+  const mbNext = (v, st) => {
+    const f = (x) => (x < 100 ? 10 : x < 1000 ? 50 : x < 10000 ? 100 : 1000);
+    return st > 0 ? Math.min(1000000, v + f(v)) : Math.max(0, v - f(v - 1));
+  };
   const esc = (x) =>
     String(x).replace(
       /[&<>"]/g,
       (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
     );
-  const pinB = SV.slice(0, 5).map((s, i) => {
+  const pinB = SV.slice(0, 6).map((s, i) => {
     const b = document.createElement("button");
     b.className = "pin";
-    b.innerHTML = "<i>0" + (i + 1) + "</i>" + s.n;
+    b.innerHTML = "<i>0" + (i + 1) + "</i><span class=\"pn\">" + s.n + "</span>";
+    b.setAttribute("aria-label", "0" + (i + 1) + " " + s.n);
     b.onclick = () => go(i);
     pins.appendChild(b);
     return b;
@@ -1329,14 +1603,39 @@
   function pinUpdate() {
     const aw = W(),
       ah = H();
+    if (!aw || !ah || !pinB.length) return;
+    const narrow = aw <= 700;
+    const padX = narrow ? 36 : 70;
+    const padTop = narrow ? 64 : 80;
+    const padBot = narrow ? Math.max(150, ah * 0.28) : 190;
+    const placed = [];
     pinB.forEach((b, i) => {
-      pv.copy(ST[i].g.position);
-      pv.y += 4.2;
+      const st = ST[Math.min(i, ST.length - 1)];
+      pv.copy(st.g.position);
+      if (i >= ST.length) pv.x += 1.35;
+      pv.y += narrow ? 3.6 : 4.2;
       pv.project(cam);
       let x = (pv.x * 0.5 + 0.5) * aw,
         y = (-pv.y * 0.5 + 0.5) * ah;
-      x = Math.max(70, Math.min(aw - 70, x));
-      y = Math.max(80, Math.min(ah - 190, y));
+      x = Math.max(padX, Math.min(aw - padX, x));
+      y = Math.max(padTop, Math.min(ah - padBot, y));
+      // Nudge overlapping pins on small screens so labels stay tappable.
+      if (narrow) {
+        for (let n = 0; n < 8; n++) {
+          let hit = false;
+          for (let j = 0; j < placed.length; j++) {
+            const p = placed[j];
+            if (Math.abs(x - p.x) < 54 && Math.abs(y - p.y) < 28) {
+              y = p.y + (y >= p.y ? 28 : -28);
+              y = Math.max(padTop, Math.min(ah - padBot, y));
+              hit = true;
+              break;
+            }
+          }
+          if (!hit) break;
+        }
+      }
+      placed.push({ x, y });
       b.style.transform = "translate(" + x + "px," + y + "px) translate(-50%,-100%)";
     });
     if (camBtnEl) {
@@ -1531,6 +1830,68 @@
       hi = 0;
     s.q.forEach((q, j) => {
       const a = ans[j];
+      if (q.ug) {
+        let any = 0;
+        ["S", "A", "B"].forEach((c) => {
+          const n = mbv["ug" + c];
+          if (n > 0) {
+            any = 1;
+            const p = ugPrice(c, n),
+              ex = n - UG[c].min;
+            sum += p;
+            if (c === "S") cust = true;
+            rows.push([
+              "Creators",
+              UG[c].n +
+                ": " +
+                n +
+                (n > 1 ? " creators" : " creator") +
+                (ex > 0 ? " (" + UG[c].min + " + " + ex + " additional)" : ""),
+              c === "S" ? "?*" : money(p),
+            ]);
+          }
+        });
+        if (!any) done = false;
+        return;
+      }
+      if (q.bt) {
+        let ds = 0;
+        MBP.forEach((nm, i) => {
+          const v = mbv.b[i];
+          if (v > 0) {
+            ds += v;
+            sum += v * mbv.d * mbv.m;
+            rows.push(["Ad budget", nm + " (" + money(v) + " per day)", money(v * mbv.d * mbv.m)]);
+          }
+        });
+        if (!ds) done = false;
+        else {
+          cust = true;
+          if (mbv.si < 100) rows.push(["Fixed fee to be confirmed", "Agency fee", "?*"]);
+          rows.push(["% of total sales to be confirmed", "Agency percentage", "?*"]);
+        }
+        return;
+      }
+      if (q.sp) {
+        if (q.sp === "si") rows.push(["Sales", mbv.si + " items sold now", "Included"]);
+        else if (q.sp === "sw") rows.push(["Expected sales", mbv.sw + " items expected", "Included"]);
+        else if (q.sp === "m")
+          rows.push([
+            "Schedule",
+            mbv.d + " days per month for " + mbv.m + (mbv.m > 1 ? " months" : " month"),
+            "Included",
+          ]);
+        else if (q.sp === "am" && mbv.am) {
+          const am = 10000 * mbv.m;
+          sum += am;
+          rows.push([
+            money(10000) + " per month for " + mbv.m + (mbv.m > 1 ? " months" : " month"),
+            "Personal account manager",
+            "+" + money(am),
+          ]);
+        }
+        return;
+      }
       if (q.h) {
         sum += hrs * q.rate;
         rows.push([
@@ -1870,6 +2231,17 @@
     cur = i;
     const s = SV[i];
     ans = s.q.map(() => []);
+    mbv = {
+      b: MBP.map(() => 0),
+      d: 10,
+      m: 1,
+      si: 100,
+      sw: 200,
+      am: false,
+      ugS: 1,
+      ugB: 0,
+      ugA: 0,
+    };
     oth = [];
     det = {};
     hrs = (s.q.find((x) => x.h) || { min: 2 }).min;
@@ -1882,7 +2254,7 @@
         barHTML() +
         '<div class="hd"><span>0' +
         (i + 1) +
-        " / 05</span><h1>" +
+        " / 06</span><h1>" +
         s.n +
         "</h1><p>" +
         s.s +
@@ -1911,7 +2283,7 @@
       barHTML() +
       '<div class="hd"><span>0' +
       ((s.par != null ? s.par : i) + 1) +
-      " / 05</span><h1>" +
+      " / 06</span><h1>" +
       s.n +
       "</h1><p>" +
       s.s +
@@ -1920,95 +2292,97 @@
         .map((q, j) =>
           q.h
             ? stepHTML(q, j)
-            : "<fieldset><legend>" +
-              (j + 1) +
-              ". " +
-              q.t +
-              (q.m ? " <small>(choose any)</small>" : "") +
-              "</legend>" +
-              q.o
-                .map(
-                  (o, k) =>
-                    '<label><input type="' +
-                    (q.m ? "checkbox" : "radio") +
-                    '" name="q' +
-                    j +
-                    '" value="' +
-                    k +
-                    '"><span>' +
-                    o[0] +
-                    "</span><b>" +
-                    (Array.isArray(o[1])
-                      ? (j ? "+" : "") + money(o[1][0]) + " to " + money(o[1][1])
-                      : typeof o[1] === "string"
-                        ? o[1]
-                        : q.np
-                          ? ""
-                          : o[5]
-                            ? "+" + o[1] + "% of total"
-                            : q.x
-                              ? "x " +
-                                o[1] +
-                                (s.disc && s.disc(o[1])
-                                  ? " (" + Math.round(s.disc(o[1]) * 100) + "% off)"
-                                  : "")
-                              : o[1]
-                                ? (j ? "+" : "") +
-                                  money(o[1]) +
-                                  (o[4]
-                                    ? " per " + o[4]
-                                    : o[3]
-                                      ? " (one-time)"
-                                      : s.u && !q.x
-                                        ? " /" + s.u.slice(0, 2)
-                                        : "")
-                                : "Included") +
-                    "</b></label>" +
-                    (o[4]
-                      ? '<div class="det" data-j="' +
-                        j +
-                        '" data-k="' +
-                        k +
-                        '" hidden><small>How many boxes?</small><input class="nb" data-key="' +
-                        j +
-                        "-" +
-                        k +
-                        '" type="number" min="1" placeholder="Number of boxes"></div>'
-                      : "") +
-                    (o[2]
-                      ? '<div class="det" data-j="' +
-                        j +
-                        '" data-k="' +
-                        k +
-                        '" hidden><small>Tell us what you need, or upload an image</small><textarea class="dt" data-key="' +
-                        j +
-                        "-" +
-                        k +
-                        '" placeholder="Describe it: style, details, measurements"></textarea><input class="fi" data-key="' +
-                        j +
-                        "-" +
-                        k +
-                        '" type="file" accept="image/*"><img class="pv" hidden alt=""></div>'
-                      : ""),
-                )
-                .join("") +
-              '<label><input type="' +
-              (q.m ? "checkbox" : "radio") +
-              '" name="q' +
-              j +
-              '" value="' +
-              q.o.length +
-              '"><span>Other</span><b>' +
-              (q.x ? "type a number" : "priced after review") +
-              '</b></label><input class="ot" data-j="' +
-              j +
-              '" type="' +
-              (q.x ? "number" : "text") +
-              '"' +
-              (q.x ? ' min="1"' : "") +
-              ' placeholder="' +
-              (q.x ? "How many?" : "Tell us what you want") +
-              '" hidden></fieldset>',
+            : q.bt || q.sp || q.ug
+              ? mbHTML(q, j)
+              : "<fieldset><legend>" +
+                (j + 1) +
+                ". " +
+                q.t +
+                (q.m ? " <small>(choose any)</small>" : "") +
+                "</legend>" +
+                q.o
+                  .map(
+                    (o, k) =>
+                      '<label><input type="' +
+                      (q.m ? "checkbox" : "radio") +
+                      '" name="q' +
+                      j +
+                      '" value="' +
+                      k +
+                      '"><span>' +
+                      o[0] +
+                      "</span><b>" +
+                      (Array.isArray(o[1])
+                        ? (j ? "+" : "") + money(o[1][0]) + " to " + money(o[1][1])
+                        : typeof o[1] === "string"
+                          ? o[1]
+                          : q.np
+                            ? ""
+                            : o[5]
+                              ? "+" + o[1] + "% of total"
+                              : q.x
+                                ? "x " +
+                                  o[1] +
+                                  (s.disc && s.disc(o[1])
+                                    ? " (" + Math.round(s.disc(o[1]) * 100) + "% off)"
+                                    : "")
+                                : o[1]
+                                  ? (j ? "+" : "") +
+                                    money(o[1]) +
+                                    (o[4]
+                                      ? " per " + o[4]
+                                      : o[3]
+                                        ? " (one-time)"
+                                        : s.u && !q.x
+                                          ? " /" + s.u.slice(0, 2)
+                                          : "")
+                                  : "Included") +
+                      "</b></label>" +
+                      (o[4]
+                        ? '<div class="det" data-j="' +
+                          j +
+                          '" data-k="' +
+                          k +
+                          '" hidden><small>How many boxes?</small><input class="nb" data-key="' +
+                          j +
+                          "-" +
+                          k +
+                          '" type="number" min="1" placeholder="Number of boxes"></div>'
+                        : "") +
+                      (o[2]
+                        ? '<div class="det" data-j="' +
+                          j +
+                          '" data-k="' +
+                          k +
+                          '" hidden><small>Tell us what you need, or upload an image</small><textarea class="dt" data-key="' +
+                          j +
+                          "-" +
+                          k +
+                          '" placeholder="Describe it: style, details, measurements"></textarea><input class="fi" data-key="' +
+                          j +
+                          "-" +
+                          k +
+                          '" type="file" accept="image/*"><img class="pv" hidden alt=""></div>'
+                        : ""),
+                  )
+                  .join("") +
+                '<label><input type="' +
+                (q.m ? "checkbox" : "radio") +
+                '" name="q' +
+                j +
+                '" value="' +
+                q.o.length +
+                '"><span>Other</span><b>' +
+                (q.x ? "type a number" : "priced after review") +
+                '</b></label><input class="ot" data-j="' +
+                j +
+                '" type="' +
+                (q.x ? "number" : "text") +
+                '"' +
+                (q.x ? ' min="1"' : "") +
+                ' placeholder="' +
+                (q.x ? "How many?" : "Tell us what you want") +
+                '" hidden></fieldset>',
         )
         .join("") +
       "" +
@@ -2018,8 +2392,9 @@
     pg.scrollTop = 0;
     tip.classList.remove("v");
     stp();
+    mbUpd();
     calc();
-    const focusEl = pg.querySelector("input,.sb");
+    const focusEl = pg.querySelector("input,.sb,.mbb");
     if (focusEl) focusEl.focus({ preventScroll: true });
     syncAccPanel();
   }
@@ -2048,7 +2423,7 @@
       } catch (_) {}
     }
   }
-  // FLOATING TABLET. The five station pages open in a floating tablet that flies out of the pin; Zoom expands it to a full display.
+  // FLOATING TABLET. The six station pages open in a floating tablet that flies out of the pin; Zoom expands it to a full display.
   const tcalm = matchMedia("(prefers-reduced-motion:reduce)").matches;
   const tf = document.createElement("div");
   tf.id = "tabf";
@@ -2090,11 +2465,12 @@
     }
     const was = tf.classList.contains("on");
     tf.classList.add("on");
-    if (!was) setFull(false);
+    // Phones: open the tablet full-screen so forms stay readable and tappable.
+    if (!was) setFull(W() <= 768);
     _show(i);
     const s = SV[i],
       n = s.par != null ? s.par : i;
-    tbt.textContent = (n < 5 ? "0" + (n + 1) + " / 05 \u00b7 " : "") + s.n;
+    tbt.textContent = (n < 6 ? "0" + (n + 1) + " / 06 \u00b7 " : "") + s.n;
     if (!was && !tcalm) {
       const o = pinFrom(i);
       if (o)
@@ -2293,7 +2669,7 @@
     }
     const was = tf.classList.contains("on");
     tf.classList.add("on");
-    if (!was) setFull(false);
+    if (!was) setFull(W() <= 768);
     cur = -1;
     pg.style.display = "block";
     tbt.textContent = "Telephone";
@@ -2322,6 +2698,8 @@
     photo: ["Viewing order", "Mood boards", "Scouting location", "Confirmation", "Equipment", "Day of the shoot", "Photo selection", "Coloring", "Delivery"],
     "photo-shoot": ["Viewing order", "Mood boards", "Scouting location", "Confirmation", "Equipment", "Day of the shoot", "Photo selection", "Coloring", "Delivery"],
     "photo-studio": ["Viewing order", "Confirmation", "Day of the shoot", "Delivery"],
+    "media-buying": ["Viewing order", "Strategy & planning", "Campaign setup", "Launch", "Optimization", "Reporting"],
+    ugc: ["Viewing order", "Brief & creator matching", "Filming", "Editing", "Review & revisions", "Delivery"],
   };
   function orderStages(slug) {
     return ORDER_STAGES[slug] || ["Viewing order", "Confirmed", "Done"];
@@ -2398,7 +2776,7 @@
     endCall();
     const was = tf.classList.contains("on");
     tf.classList.add("on");
-    if (!was) setFull(false);
+    if (!was) setFull(W() <= 768);
     cur = -1;
     pg.style.display = "block";
     tbt.textContent = "Your orders";
@@ -2548,6 +2926,24 @@
     }
   });
   pg.addEventListener("click", (e) => {
+    const mbb = e.target.closest(".mbb");
+    if (mbb) {
+      e.stopPropagation();
+      const k = mbb.dataset.k,
+        st = +mbb.dataset.step;
+      if (k === "d") mbv.d = Math.max(1, Math.min(31, mbv.d + st));
+      else if (k === "m") mbv.m = Math.max(1, Math.min(12, mbv.m + st));
+      else if (k === "si" || k === "sw") mbv[k] = mbNext(mbv[k], st);
+      else if (k === "am") mbv.am = !mbv.am;
+      else if (k === "ugS" || k === "ugB" || k === "ugA") {
+        const c = k.slice(2),
+          n = mbv[k];
+        mbv[k] = st > 0 ? (n <= 0 ? UG[c].min : Math.min(500, n + 1)) : n <= UG[c].min ? 0 : n - 1;
+      } else mbv.b[+k] = Math.max(0, Math.min(100000, mbv.b[+k] + st * 100));
+      mbUpd();
+      calc();
+      return;
+    }
     const w = e.target.closest(".win[data-i]");
     if (w) {
       go(+w.dataset.i);
@@ -2648,7 +3044,7 @@
     q = String(q || "").trim().toLowerCase();
     menuListEl.textContent = "";
     if (!q) {
-      SV.slice(0, 5).forEach((x, i) => menuListEl.appendChild(menuBtn(i, "0" + (i + 1))));
+      SV.slice(0, 6).forEach((x, i) => menuListEl.appendChild(menuBtn(i, "0" + (i + 1))));
       return;
     }
     const words = q.split(/\s+/);
@@ -3653,6 +4049,54 @@
     const lines = [];
     if (!s || !s.q) return lines;
     s.q.forEach((q, j) => {
+      if (q.ug) {
+        ["S", "A", "B"].forEach((c) => {
+          const n = mbv["ug" + c];
+          if (n > 0)
+            lines.push({
+              name: UG[c].n,
+              question: q.t,
+              quantity: n,
+              custom: c === "S",
+              line_total: c === "S" ? "" : ugPrice(c, n),
+            });
+        });
+        return;
+      }
+      if (q.bt) {
+        MBP.forEach((nm, i) => {
+          const v = mbv.b[i];
+          if (v > 0)
+            lines.push({
+              name: nm,
+              question: q.t,
+              quantity: 1,
+              daily: v,
+              days: mbv.d,
+              months: mbv.m,
+              line_total: v * mbv.d * mbv.m,
+            });
+        });
+        return;
+      }
+      if (q.sp) {
+        if (q.sp === "si")
+          lines.push({ name: mbv.si + " items sold now", question: q.t, quantity: mbv.si });
+        else if (q.sp === "sw")
+          lines.push({ name: mbv.sw + " items expected", question: q.t, quantity: mbv.sw });
+        else if (q.sp === "d")
+          lines.push({ name: mbv.d + " days per month", question: q.t, quantity: mbv.d });
+        else if (q.sp === "m")
+          lines.push({ name: mbv.m + (mbv.m > 1 ? " months" : " month"), question: q.t, quantity: mbv.m });
+        else if (q.sp === "am" && mbv.am)
+          lines.push({
+            name: "Personal account manager",
+            question: q.t,
+            quantity: mbv.m,
+            line_total: 10000 * mbv.m,
+          });
+        return;
+      }
       if (q.h) {
         lines.push({ name: "Studio hours", question: q.t, quantity: hrs, hours: hrs });
         return;
@@ -3759,7 +4203,7 @@
     if (c) c.remove();
   }
   function roomWin() {
-    const w = pg.querySelector('.win[data-i="8"]');
+    const w = pg.querySelector('.win[data-i="9"]');
     if (!w) return;
     const d = document.createElement("div");
     d.className = "win";
@@ -4040,7 +4484,7 @@
     });
     pg.querySelector("#rback").onclick = (e) => {
       e.stopPropagation();
-      go(2);
+      go(5);
     };
     draw();
     pg.scrollTop = 0;
@@ -4139,6 +4583,7 @@
       ["Uniforms for my graduating class", fSeniors],
       ["Logo or brand design", fDesign],
       ["Website or online store", fWeb],
+      ["Marketing, ads or UGC", fMarket],
       ["Photo shoot or studio", fPhoto],
       ["I am not sure where to start", fStart],
     ];
@@ -4214,10 +4659,10 @@
   }
   function fSeniors() {
     say(
-      `Seniors uniform is for graduating classes. Every student also gets a free hat. You choose what each student receives (for example a T-shirt at ${pr(2, 0, 0)} or a hoodie at ${pr(2, 0, 3)}), add personal touches like a printed name, and tell us how many students there are. Prices are per student.\nHow many students are in the class?`,
+      `Seniors uniform is for graduating classes. Every student also gets a free hat. You choose what each student receives (for example a T-shirt at ${pr(8, 0, 0)} or a hoodie at ${pr(8, 0, 3)}), add personal touches like a printed name, and tell us how many students there are. Prices are per student.\nHow many students are in the class?`,
       {
-        acts: [["Open the seniors quote", 7]],
-        chips: [
+        acts: [["Open the seniors quote", 8]],
+      chips: [
           ["Under 50", () => fSN(0)],
           ["50 to 100", () => fSN(1)],
           ["Over 100", () => fSN(2)],
@@ -4233,12 +4678,12 @@
       "You get the 10% class discount, the biggest we offer.",
       "No problem, you can change the number in the quote any time. The discount is 5% for 50 to 100 students and 10% for over 100.",
     ][k];
-    const pack = nv(2, 0, 0) + nv(2, 0, 3) + nv(2, 1, 0);
+    const pack = nv(8, 0, 0) + nv(8, 0, 3) + nv(8, 1, 0);
     say(
       tx +
         `\nA simple starter pack: a T-shirt, a hoodie and a printed name comes to ${money(pack)} per student before the discount, plus the free hat.`,
       {
-        acts: [["Open the seniors quote", 7]],
+        acts: [["Open the seniors quote", 8]],
         chips: [
           ["What are the personal touches?", fTouch],
           ["Jerseys and jackets?", fJJ],
@@ -4250,25 +4695,25 @@
   }
   function fTouch() {
     say(
-      `Name printed is ${pr(2, 1, 0)} per student, Name embroidered is ${pr(2, 1, 1)}, and a Metal piece is ${pr(2, 1, 2)}. Embroidery looks more premium, and printing is the cheaper choice.`,
+      `Name printed is ${pr(8, 1, 0)} per student, Name embroidered is ${pr(8, 1, 1)}, and a Metal piece is ${pr(8, 1, 2)}. Embroidery looks more premium, and printing is the cheaper choice.`,
       {
-        acts: [["Open the seniors quote", 7]],
+        acts: [["Open the seniors quote", 8]],
         chips: [["Jerseys and jackets?", fJJ], ["How fast can it be ready?", fRush], ELSE],
       },
     );
   }
   function fJJ() {
     say(
-      `Jerseys are ${pr(2, 0, 2)} and jackets are ${pr(2, 0, 9)} per student. The exact price inside that range depends on the style, and we confirm it after we review your order.`,
+      `Jerseys are ${pr(8, 0, 2)} and jackets are ${pr(8, 0, 9)} per student. The exact price inside that range depends on the style, and we confirm it after we review your order.`,
       {
-        acts: [["Open the seniors quote", 7]],
+        acts: [["Open the seniors quote", 8]],
         chips: [["What are the personal touches?", fTouch], ELSE],
       },
     );
   }
   function fRush() {
     say("Standard delivery takes 3 weeks. Rush delivery adds 5% to the total.", {
-      acts: [["Open the seniors quote", 7]],
+      acts: [["Open the seniors quote", 8]],
       chips: [["What are the personal touches?", fTouch], ELSE],
     });
   }
@@ -4353,7 +4798,7 @@
     say(
       "Book a shoot includes our photographer. You choose the kind of shoot, how long, how many edited photos (10, 25 or 50), extras like a model or styling, and where: our studio or on site.\nPrices show ?* and are confirmed after we review your brief.",
       {
-        acts: [["Open Book a shoot", 5]],
+        acts: [["Open Book a shoot", 6]],
         chips: [
           ["What kinds of shoots are there?", fKinds],
           ["Can I rent just the studio?", fStudio],
@@ -4363,11 +4808,11 @@
     );
   }
   function fStudio() {
-    const q = SV[6].q[0];
+    const q = SV[7].q[0];
     say(
       `Book a studio hires the space on its own at ${money(q.rate)} per hour, with a ${q.min} hour minimum (${money(q.rate * q.min)}). It is open ${fmtT(OPEN)} to ${fmtT(CLOSE)} the next day. You choose Area 1 or Area 2, a date and an exact start time. Extras like a lighting kit, backdrop or studio assistant are priced after review.`,
       {
-        acts: [["Open Book a studio", 6]],
+        acts: [["Open Book a studio", 7]],
         chips: [["Do I need your photographer too?", fShoot], ELSE],
       },
     );
@@ -4376,10 +4821,32 @@
     say(
       "Portrait: people, headshots and personal shoots.\nProduct: your items for a catalog, store or social media.\nEvent: coverage of a day, launch or party.\nBrand and lifestyle: photos that show your brand in real settings.",
       {
-        acts: [["Open Book a shoot", 5]],
+        acts: [["Open Book a shoot", 6]],
         chips: [["I need the photographer", fShoot], ["Just the studio", fStudio], ELSE],
       },
     );
+  }
+  function fMarket() {
+    say("Marketing has two booking paths: Media buying for paid ads across platforms, and UGC for creator videos and photos. Which one do you want?", {
+      acts: [["Open Marketing", 4]],
+      chips: [
+        [
+          "Paid ads / media buying",
+          () => {
+            gClose(true);
+            go(10);
+          },
+        ],
+        [
+          "UGC creators",
+          () => {
+            gClose(true);
+            go(11);
+          },
+        ],
+        ELSE,
+      ],
+    });
   }
   function gRoute(q) {
     const s = q.toLowerCase(),
@@ -4391,6 +4858,8 @@
     if (h(/photo|shoot|camera|portrait|headshot|picture/)) return fPhoto();
     if (h(/senior|graduat|\bclass\b|student|school|\bprom\b|uniform/)) return fSeniors();
     if (h(/logo|identity|graphic|packag/)) return fDesign();
+    if (h(/market|media.?buy|ugc|creator|ad budget|facebook ads|tiktok ads|instagram ads/))
+      return fMarket();
     if (
       h(/\bweb|website|\bsites?\b|store|shop|shopify|landing|\bapps?\b|ecommerce|e-commerce|online/)
     )
@@ -4411,10 +4880,22 @@
     if (h(/^\s*(hi|hello|hey|hola|salam)\b/))
       return say("Hello! What would you like to make or book today?");
     say(
-      "I am not sure I got that. I can help with clothing, uniforms, design, websites and photos. Tap a choice below or tell me what you want to make.",
+      "I am not sure I got that. I can help with clothing, uniforms, design, websites, marketing and photos. Tap a choice below or tell me what you want to make.",
     );
   }
-  const CTX = { 0: fDesign, 1: fClothes, 2: fSeniors, 3: fWeb, 4: fPhoto, 5: fShoot, 6: fStudio };
+  const CTX = {
+    0: fDesign,
+    1: fClothes,
+    2: fPhoto,
+    3: fWeb,
+    4: fMarket,
+    5: fSeniors,
+    6: fShoot,
+    7: fStudio,
+    8: fSeniors,
+    10: fMarket,
+    11: fMarket,
+  };
   function gOpen(ctx) {
     gd.hidden = false;
     mas.classList.add("seen");

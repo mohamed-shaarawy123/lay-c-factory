@@ -148,11 +148,18 @@ img {
 }
 html {
   height: 100%;
+  height: 100dvh;
+  max-width: 100%;
+  overflow-x: hidden;
   scroll-padding-top: env(safe-area-inset-top, 0px);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 body {
   margin: 0;
   height: 100%;
+  height: 100dvh;
+  max-width: 100%;
   background: var(--bg);
   color: var(--fg);
   font:
@@ -161,12 +168,15 @@ body {
     "Segoe UI",
     sans-serif;
   overflow: hidden;
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 #app {
   position: relative;
   width: 100%;
+  max-width: 100%;
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
 }
 #scene {
@@ -174,11 +184,13 @@ body {
   inset: 0;
   z-index: 1;
   touch-action: none;
+  overflow: hidden;
 }
 #scene canvas {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
 }
 header {
   position: absolute;
@@ -238,14 +250,17 @@ header .id {
   top: 0;
   left: 0;
   bottom: 0;
-  width: min(300px, 82%);
+  width: min(300px, 86vw);
+  max-width: 100%;
   box-sizing: border-box;
   background: var(--panel);
-  padding: 72px 16px 24px;
+  padding: max(72px, calc(env(safe-area-inset-top) + 56px)) 16px max(24px, env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 10px;
   overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   transform: translateX(-105%);
   transition: transform 0.2s ease;
 }
@@ -1038,6 +1053,11 @@ footer {
   color: var(--fg);
   white-space: nowrap;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  max-width: min(220px, 46vw);
+}
+.pin .pn {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pin i {
   font:
@@ -1231,6 +1251,57 @@ input {
   padding: 10px;
   border-radius: 8px;
   margin: 12px 0 8px;
+}
+.mbt {
+  width: 100%;
+  border-collapse: collapse;
+}
+.mbt th,
+.mbt td {
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+.mbt th:last-child,
+.mbt td:last-child {
+  text-align: right;
+}
+.mbt small {
+  color: var(--mut);
+  font-weight: 400;
+}
+.mbc,
+.mbr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mbc {
+  justify-content: flex-end;
+}
+.mbb {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fg);
+  cursor: pointer;
+}
+.mbb:hover,
+.mbb:focus-visible {
+  border-color: var(--amber);
+}
+.mbc output,
+.mbr output {
+  min-width: 96px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--fg);
 }
 .wins {
   display: grid;
@@ -1849,15 +1920,20 @@ header {
   z-index: 95;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  box-sizing: border-box;
   background: rgba(15, 42, 138, 0.28);
   pointer-events: auto;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .account[hidden] {
   display: none !important;
 }
 .acc-card {
   width: min(440px, 100%);
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 22px;
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -1999,9 +2075,21 @@ header {
 }
 #tabf.on {
   display: flex;
+  z-index: 86;
+}
+#app:has(#tabf.full) > header,
+#app:has(#tabf.full) > #ctl,
+#app:has(#tabf.full) > footer,
+#app:has(#tabf.full) > #journey,
+#app:has(#tabf.full) > #pins,
+#app:has(#tabf.full) > .mas-note {
+  visibility: hidden;
+  pointer-events: none;
 }
 #tabf.full {
   padding: 0;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 #tabf .fly {
   position: relative;
@@ -2015,6 +2103,12 @@ header {
 #tabf.full .fly {
   width: 100%;
   max-height: 100%;
+}
+#tabf.full .tin {
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  animation: none;
 }
 #tabf .fly:after {
   content: "";
@@ -2136,6 +2230,14 @@ header {
   }
   #page #sum {
     position: static;
+  }
+  #page .mbt th,
+  #page .mbt td {
+    font-size: 12px;
+  }
+  #page .mbc output,
+  #page .mbr output {
+    min-width: 72px;
   }
 }
 @container (max-width:560px) {
@@ -2650,7 +2752,266 @@ header {
     letter-spacing: 4px;
   }
   #mt .call {
-    height: 58vh;
+    height: min(58dvh, 58vh);
     min-height: 240px;
+  }
+}
+
+/* ---- Responsive layout refinements (desktop styles left intact above) ---- */
+@media (max-width: 1024px) {
+  #tabf .fly {
+    width: min(860px, 94%);
+    max-height: min(640px, calc(100dvh - 140px));
+  }
+  .cols {
+    grid-template-columns: 1fr minmax(240px, 280px);
+    gap: 20px;
+  }
+  .wrap {
+    padding: 20px 16px 56px;
+  }
+}
+
+@media (max-width: 768px) {
+  .cols,
+  .wins {
+    grid-template-columns: 1fr;
+  }
+  #sum {
+    position: static;
+  }
+  #tabf {
+    padding: max(56px, calc(env(safe-area-inset-top) + 48px)) 0 max(110px, calc(env(safe-area-inset-bottom) + 96px));
+  }
+  #tabf.full {
+    padding: 0;
+  }
+  #tabf .fly {
+    width: min(100%, calc(100% - 12px));
+    max-height: none;
+    height: 100%;
+  }
+  .tin {
+    padding: 7px;
+    border-radius: 20px;
+  }
+  .tbar {
+    gap: 6px;
+    padding: 8px 10px;
+  }
+  .tbs {
+    display: none;
+  }
+  .bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .bar .back,
+  .bar .ask,
+  .bar-r {
+    width: 100%;
+    margin-left: 0;
+    justify-content: center;
+  }
+  .ask {
+    justify-content: center;
+    min-height: 44px;
+  }
+  .back {
+    min-height: 44px;
+  }
+  fieldset label {
+    min-height: 44px;
+    padding: 12px 12px;
+  }
+  .mbb,
+  .sb {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+  }
+  .stp,
+  .mbr,
+  .mbc {
+    flex-wrap: wrap;
+  }
+  .mbt {
+    width: 100%;
+    table-layout: fixed;
+  }
+  .mbt th:first-child,
+  .mbt td:first-child {
+    width: 42%;
+    word-break: break-word;
+  }
+  .mbt .mbc {
+    flex-wrap: nowrap;
+  }
+  .mbc output,
+  .mbr output {
+    min-width: 64px;
+    font-size: 12px;
+  }
+  .pin {
+    padding: 7px 9px;
+    font-size: 10px;
+    max-width: min(160px, 42vw);
+  }
+  .guide {
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: auto;
+    height: min(78dvh, 620px);
+    max-height: calc(100dvh - 24px);
+  }
+  #mt .r {
+    flex-direction: column;
+  }
+  #mt .call {
+    height: min(52dvh, 420px);
+  }
+  .account {
+    align-items: end;
+    padding: max(10px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+  }
+  .acc-card {
+    width: 100%;
+    padding: 18px 14px;
+    max-height: min(92dvh, 100%);
+    overflow: auto;
+  }
+  .acc-mode button,
+  .acc-actions button {
+    min-height: 44px;
+  }
+  .msr input,
+  .menu .ml button,
+  #msearch {
+    font-size: 16px;
+  }
+  .menu .ml button {
+    min-height: 44px;
+  }
+  #page,
+  #od,
+  #mt {
+    -webkit-overflow-scrolling: touch;
+  }
+  .wrap {
+    max-width: 100%;
+    padding: 14px 12px max(48px, env(safe-area-inset-bottom));
+    box-sizing: border-box;
+  }
+  .hd h1 {
+    font-size: clamp(22px, 7vw, 28px);
+  }
+  .win {
+    min-height: 0;
+    padding: 20px 18px;
+  }
+  #ctl {
+    bottom: max(52px, calc(env(safe-area-inset-bottom) + 44px));
+  }
+  #modes button,
+  #cams button {
+    min-height: 36px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pin .pn {
+    display: none;
+  }
+  .pin {
+    gap: 0;
+    padding: 8px 10px;
+    max-width: none;
+    min-width: 36px;
+    min-height: 36px;
+    justify-content: center;
+  }
+  .pin i {
+    font-size: 11px;
+  }
+  #cams .cap,
+  footer span:last-child {
+    display: none;
+  }
+  #modes {
+    width: 100%;
+  }
+  #modes button {
+    flex: 1 1 auto;
+    text-align: center;
+    padding: 8px 6px;
+    font-size: 10px;
+  }
+  #cams {
+    width: 100%;
+    justify-content: space-between;
+  }
+  #cams button {
+    padding: 6px 5px;
+    font-size: 9px;
+  }
+  .id b {
+    max-width: 38vw;
+  }
+  .tot b {
+    font-size: 22px;
+  }
+  #tabf {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .tin {
+    border-radius: 16px;
+  }
+  #mt .cd b {
+    font-size: 22px;
+    letter-spacing: 3px;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 360px) {
+  header {
+    left: 8px;
+    right: 8px;
+  }
+  .logo {
+    width: 24px;
+    height: 24px;
+  }
+  .id b {
+    font-size: 12px;
+    max-width: 30vw;
+  }
+  #modes button {
+    font-size: 9px;
+    padding: 7px 4px;
+  }
+  .hd h1 {
+    font-size: 20px;
+  }
+  .wrap {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  header {
+    top: 16px;
+    left: 16px;
+    right: 16px;
+  }
+  #ctl {
+    bottom: 64px;
+  }
+  .pin {
+    font-size: 10px;
+    padding: 7px 10px;
   }
 }
