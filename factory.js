@@ -541,6 +541,10 @@
       txt(c, "1 gray beanie", 108, 140, 24, "#e6edff", 500);
     }),
   );
+  // Nudge Designing (Orders) a little right in the overview camera frame
+  sO.position.x += 0.7;
+  sO.position.z -= 0.3;
+  ST[0].base.set(sO.position.x, sO.position.y, sO.position.z);
   // Knitter
   box(sK, 1.7, 0.62, 1.25, 0, 0.58, 0, M.ivory);
   box(sK, 1.5, 0.08, 1.1, 0, 0.92, 0, M.body);
