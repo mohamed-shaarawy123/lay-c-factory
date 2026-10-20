@@ -181,6 +181,7 @@
   }
   let openMeet = null;
   let openOrders = null;
+  let openReviews = null;
   let waveFlag = null;
   // flag on the front-left corner of the base
   const flagG = new THREE.Group();
@@ -222,6 +223,56 @@
     a.needsUpdate = true;
   };
   waveFlag(0);
+  // envelope for customer reviews, on the last empty corner of the base (back-left)
+  const envG = new THREE.Group();
+  envG.position.set(-6.2, 0.235, -3.6);
+  envG.scale.setScalar(1);
+  envG.rotation.y = -0.55;
+  machine.add(envG);
+  const envB = new THREE.Group();
+  envB.position.set(0, 0.05, 0);
+  envB.rotation.x = -Math.PI / 2 + 0.03;
+  envB.rotation.z = 0.12;
+  envG.add(envB);
+  box(envB, 1.3, 0.88, 0.07, 0, 0, 0, M.ivory);
+  box(envB, 1.34, 0.04, 0.09, 0, 0.44, 0, M.edge);
+  box(envB, 1.34, 0.04, 0.09, 0, -0.44, 0, M.edge);
+  box(envB, 0.04, 0.88, 0.09, -0.65, 0, 0, M.edge);
+  box(envB, 0.04, 0.88, 0.09, 0.65, 0, 0, M.edge);
+  {
+    const sh = new THREE.Shape();
+    sh.moveTo(-0.62, 0.42);
+    sh.lineTo(0.62, 0.42);
+    sh.lineTo(0, -0.08);
+    sh.lineTo(-0.62, 0.42);
+    const fg = new THREE.ExtrudeGeometry(sh, { depth: 0.025, bevelEnabled: false }),
+      fl = new THREE.Mesh(fg, M.orange);
+    fl.position.z = 0.036;
+    fl.castShadow = true;
+    envB.add(fl);
+  }
+  const sealM = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.04, 24), M.light);
+  sealM.rotation.x = Math.PI / 2;
+  sealM.position.set(0, -0.08, 0.075);
+  envB.add(sealM);
+  scr(
+    envB,
+    0.9,
+    0.2,
+    0,
+    -0.3,
+    0.039,
+    ctex(540, 120, (c, w, h) => {
+      c.fillStyle = "#f4f7ff";
+      c.fillRect(0, 0, w, h);
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      txt(c, "REVIEWS", w / 2, h / 2, 64, "#0f2a8a", 800);
+    }),
+  );
+  envG.traverse((o) => {
+    if (o.isMesh) o.castShadow = o.receiveShadow = true;
+  });
   // selfie key on the front-right corner of the platform
   const CAMX = 6.0,
     CAMZ = 3.6,
@@ -984,6 +1035,7 @@
     if (camProp && rc.intersectObject(camProp, true).length) return -3;
     if (phG && rc.intersectObject(phG, true).length) return -4;
     if (flagG && rc.intersectObject(flagG, true).length) return -5;
+    if (envG && rc.intersectObject(envG, true).length) return -6;
     const h = rc.intersectObjects(
       ST.map((s) => s.g),
       true,
@@ -1001,9 +1053,10 @@
     if (dragging) return;
     const i = hit(e);
     hov = i;
-    R.domElement.style.cursor = i >= 0 || i === -2 || i === -3 || i === -4 || i === -5 ? "pointer" : "grab";
-    tip.classList.toggle("v", i >= 0 || i === -3 || i === -4 || i === -5);
-    if (i >= 0 || i === -3 || i === -4 || i === -5) {
+    R.domElement.style.cursor =
+      i >= 0 || i === -2 || i === -3 || i === -4 || i === -5 || i === -6 ? "pointer" : "grab";
+    tip.classList.toggle("v", i >= 0 || i === -3 || i === -4 || i === -5 || i === -6);
+    if (i >= 0 || i === -3 || i === -4 || i === -5 || i === -6) {
       tip.querySelector("b").innerHTML =
         i === -3
           ? "<span>•</span>Selfie"
@@ -1011,7 +1064,9 @@
             ? "<span>•</span>Telephone"
             : i === -5
               ? "<span>•</span>Your order"
-              : "<span>0" + (i + 1) + "</span>" + ST[i].name;
+              : i === -6
+                ? "<span>•</span>Reviews"
+                : "<span>0" + (i + 1) + "</span>" + ST[i].name;
       tip.querySelector("p").textContent =
         i === -3
           ? "Take a photo. Everyone can see it in the album."
@@ -1019,7 +1074,9 @@
             ? "Start or join an online meeting."
             : i === -5
               ? "See your order and its stage."
-              : ST[i].desc;
+              : i === -6
+                ? "Read and leave a customer review."
+                : ST[i].desc;
       const r = app.getBoundingClientRect();
       tip.style.left = Math.min(r.width - 250, Math.max(10, e.clientX - r.left + 16)) + "px";
       tip.style.top = Math.max(10, Math.min(r.height - 95, e.clientY - r.top - 60)) + "px";
@@ -1039,10 +1096,11 @@
         const si = SV.findIndex((s) => s.slug === openSlug);
         if (si >= 0) go(si);
       }
-    } else if (i === -2) gOpen(-1);
+    }     else if (i === -2) gOpen(-1);
     else if (i === -3 && openCamera) openCamera();
     else if (i === -4 && openMeet) openMeet();
     else if (i === -5 && openOrders) openOrders();
+    else if (i === -6 && openReviews) openReviews();
   });
   R.domElement.addEventListener("pointerdown", (e) => {
     if (hit(e) === -3) camDown = true;
@@ -2751,6 +2809,201 @@
     } catch (e) {}
   }
   openMeet = openTelephone;
+  const RV = { list: [], star: 0, busy: false };
+  const rvEsc = (x) =>
+    String(x).replace(
+      /[&<>"]/g,
+      (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
+    );
+  function rvStars(n) {
+    const on = Math.max(0, Math.min(5, Number(n) || 0));
+    return (
+      "🍉".repeat(on) +
+      (on < 5 ? '<span class="off">' + "🍉".repeat(5 - on) + "</span>" : "")
+    );
+  }
+  function rvDrawList() {
+    const el = $("#rvl"),
+      avgEl = $("#rva");
+    if (!el || !avgEl) return;
+    const L = RV.list.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    const avg = L.length ? L.reduce((a, r) => a + r.r, 0) / L.length : 0;
+    avgEl.textContent = L.length
+      ? avg.toFixed(1) +
+        " out of 5 from " +
+        L.length +
+        (L.length === 1 ? " review" : " reviews")
+      : "No reviews yet. Be the first!";
+    el.innerHTML = L.map((r) => {
+      const when = r.ts ? new Date(r.ts).toLocaleDateString() : "";
+      return (
+        '<div class="rc"><b>' +
+        rvEsc(r.n || "Customer") +
+        '</b><span class="st" aria-label="' +
+        r.r +
+        ' out of 5">' +
+        rvStars(r.r) +
+        "</span>" +
+        (when ? "<small>" + rvEsc(when) + "</small>" : "") +
+        "<p>" +
+        rvEsc(r.t || "") +
+        "</p></div>"
+      );
+    }).join("");
+  }
+  function rvDrawRating() {
+    const sr = $("#rvs");
+    if (!sr) return;
+    sr.innerHTML = [1, 2, 3, 4, 5]
+      .map(
+        (i) =>
+          '<button type="button" data-s="' +
+          i +
+          '" class="' +
+          (i <= RV.star ? "on" : "") +
+          '" aria-label="' +
+          i +
+          " watermelon" +
+          (i > 1 ? "s" : "") +
+          '" aria-pressed="' +
+          (i === RV.star ? "true" : "false") +
+          '">🍉</button>',
+      )
+      .join("");
+  }
+  async function rvLoad() {
+    const m = $("#rvm");
+    try {
+      const res = await fetch("/api/reviews", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (m) m.textContent = (data && data.error) || "Reviews could not be loaded.";
+        return;
+      }
+      RV.list = Array.isArray(data.reviews) ? data.reviews : [];
+      rvDrawList();
+      if (m && /could not be loaded/i.test(m.textContent || "")) m.textContent = "";
+    } catch (e) {
+      if (m) m.textContent = "Reviews could not be loaded.";
+    }
+  }
+  function rvClose() {
+    closing = false;
+    if (fa) {
+      try {
+        fa.cancel();
+      } catch (e) {}
+    }
+    tf.classList.remove("on");
+    setFull(false);
+    _hide();
+    try {
+      history.replaceState(null, "", location.pathname + location.search);
+    } catch (e) {}
+  }
+  function rvForm() {
+    RV.star = 0;
+    RV.busy = false;
+    const saved = accGet();
+    const name = (saved && saved.name) || "";
+    pg.innerHTML =
+      '<div id="rv"><div class="bx"><h3>Customer reviews</h3><p class="avg" id="rva">Loading reviews…</p>' +
+      '<label class="visually-hidden" for="rvn">Your name</label>' +
+      '<input id="rvn" maxlength="30" placeholder="Your name" autocomplete="name" value="' +
+      rvEsc(name) +
+      '">' +
+      '<div class="sr" id="rvs" role="group" aria-label="Rating, 1 to 5 watermelons"></div>' +
+      '<label class="visually-hidden" for="rvt">Your review</label>' +
+      '<textarea id="rvt" maxlength="400" placeholder="Tell us about your experience with LAY C"></textarea>' +
+      '<button class="sub" id="rvsub" type="button">Send my review</button>' +
+      '<div class="msg" id="rvm" aria-live="polite"></div>' +
+      '<div id="rvl"></div>' +
+      '<button type="button" class="tbtn" id="rvx">Close</button></div></div>';
+    rvDrawRating();
+    rvDrawList();
+    $("#rvs").onclick = (e) => {
+      const b = e.target.closest("[data-s]");
+      if (!b || RV.busy) return;
+      RV.star = +b.dataset.s;
+      rvDrawRating();
+      const m = $("#rvm");
+      if (m && /rating/i.test(m.textContent || "")) m.textContent = "";
+    };
+    $("#rvx").onclick = () => rvClose();
+    $("#rvsub").onclick = async () => {
+      if (RV.busy) return;
+      const n = ($("#rvn").value || "").trim().slice(0, 30);
+      const t = ($("#rvt").value || "").trim().slice(0, 400);
+      const m = $("#rvm");
+      const b = $("#rvsub");
+      if (!n) {
+        m.textContent = "Please enter your name.";
+        $("#rvn").focus();
+        return;
+      }
+      if (!(RV.star >= 1 && RV.star <= 5)) {
+        m.textContent = "Please choose a rating from 1 to 5.";
+        return;
+      }
+      if (!t) {
+        m.textContent = "Please write a few words about your experience.";
+        $("#rvt").focus();
+        return;
+      }
+      RV.busy = true;
+      b.disabled = true;
+      m.textContent = "Sending…";
+      const idem =
+        "rv-" +
+        Date.now().toString(36) +
+        "-" +
+        Math.random().toString(36).slice(2, 8);
+      try {
+        const res = await fetch("/api/reviews", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ n, r: RV.star, t, idempotency_key: idem }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          m.textContent = (data && data.error) || "Sorry, the review could not be saved.";
+          return;
+        }
+        $("#rvt").value = "";
+        RV.star = 0;
+        rvDrawRating();
+        m.textContent = "Thank you! Your review was added.";
+        await rvLoad();
+      } catch (e) {
+        m.textContent = "Sorry, the review could not be saved.";
+      } finally {
+        RV.busy = false;
+        b.disabled = false;
+      }
+    };
+  }
+  function openReviewsUi() {
+    if (closing) {
+      closing = false;
+      if (fa) fa.cancel();
+    }
+    const was = tf.classList.contains("on");
+    tf.classList.add("on");
+    if (!was) setFull(W() <= 768);
+    cur = -1;
+    pg.style.display = "block";
+    tbt.textContent = "Customer reviews";
+    rvForm();
+    rvLoad();
+    syncAccPanel();
+    try {
+      history.replaceState(null, "", location.pathname + location.search);
+    } catch (e) {}
+  }
+  openReviews = openReviewsUi;
+  try {
+    app.openReviews = openReviewsUi;
+  } catch (e) {}
   const ORDER_STAGES = {
     manufacturing: ["Viewing order", "Gathering materials", "Manufacture started", "Printing", "Accessories", "Finishing", "Delivery"],
     seniors: ["Viewing order", "Gathering materials", "Manufacture started", "Printing", "Accessories", "Finishing", "Delivery"],

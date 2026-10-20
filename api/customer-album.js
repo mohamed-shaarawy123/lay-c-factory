@@ -226,7 +226,7 @@ module.exports = async function handler(req, res) {
       let query = supabase
         .from("orders")
         .select("id, customer_name, customer_email, customer_phone, status, total, created_at")
-        .not("status", "in", "(account,photo)")
+        .not("status", "in", "(account,photo,review,meeting)")
         .order("created_at", { ascending: false })
         .limit(40);
       if (q) query = query.or("customer_email.ilike.%" + q + "%,customer_name.ilike.%" + q + "%");
@@ -257,7 +257,14 @@ module.exports = async function handler(req, res) {
           .select("id, customer_name, customer_email, status")
           .eq("id", orderId)
           .maybeSingle();
-        if (order.error || !order.data || order.data.status === "account" || order.data.status === "photo") {
+        if (
+          order.error ||
+          !order.data ||
+          order.data.status === "account" ||
+          order.data.status === "photo" ||
+          order.data.status === "review" ||
+          order.data.status === "meeting"
+        ) {
           return json(res, 404, { ok: false, error: "That order was not found." });
         }
         const created = await supabase
