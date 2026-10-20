@@ -11,6 +11,6 @@
     "@tensorflow/tfjs": "^4.22.0",
     "jpeg-js": "^0.4.4",
     "nsfwjs": "^4.3.0",
-    "pdfkit": "^0.20.2"
+    "pdf-lib": "^1.17.1"
   }
 }
