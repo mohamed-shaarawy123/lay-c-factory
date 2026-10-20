@@ -354,7 +354,7 @@
     RZ = 1.9,
     BY = 0.8,
     A0 = (150 * Math.PI) / 180,
-    STEP = (72 * Math.PI) / 180;
+    STEP = (60 * Math.PI) / 180;
   const ell = (rx, rz, y, n = 72) => {
     const p = [];
     for (let i = 0; i < n; i++) {
@@ -443,6 +443,12 @@
     },
     { name: "Pom-pom", out: "finish", desc: "A fluffy pom-pom is wound, trimmed and sewn on top." },
     {
+      name: "Marketing",
+      out: "market",
+      open: "marketing",
+      desc: "Media buying and UGC. Tap to book ads or creator content.",
+    },
+    {
       name: "Checkout",
       out: "payment",
       desc: "Payment received, tag attached, receipt printed. The machine runs.",
@@ -478,7 +484,7 @@
     );
     ST.push({ ...d, g, gm, i, base: new THREE.Vector3(px, 0.24, pz) });
   });
-  const [sO, sK, sD, sP, sC] = ST.map((s) => s.g);
+  const [sO, sK, sD, sP, sM, sC] = ST.map((s) => s.g);
   // Orders: cabinet
   box(sO, 1.7, 1.5, 0.9, 0, 1.01, -0.25, M.body);
   box(sO, 1.5, 0.12, 1, 0, 1.82, -0.25, M.orange);
@@ -648,6 +654,56 @@
     o.castShadow = true;
     sP.add(o);
   });
+  // Marketing booth: ad dashboard + antenna so the Marketing pin has a real station
+  box(sM, 1.75, 0.55, 1.25, 0, 0.54, 0, M.body);
+  box(sM, 1.85, 0.06, 1.35, 0, 0.85, 0, M.ivory);
+  box(sM, 1.35, 0.9, 0.12, 0, 1.5, -0.45, M.dark);
+  scr(
+    sM,
+    1.22,
+    0.78,
+    0,
+    1.5,
+    -0.385,
+    ctex(512, 320, (c, w, h) => {
+      c.fillStyle = "#10267a";
+      c.fillRect(0, 0, w, h);
+      txt(c, "ADS LIVE", 22, 48, 26, "#9db4ff", 600);
+      txt(c, "MARKETING", 22, 88, 34, "#ffffff", 700);
+      c.fillStyle = "#4169e1";
+      c.fillRect(28, 130, 70, 140);
+      c.fillStyle = "#6f8cff";
+      c.fillRect(118, 170, 70, 100);
+      c.fillStyle = "#9db4ff";
+      c.fillRect(208, 150, 70, 120);
+      c.fillStyle = "#ffffff";
+      c.fillRect(298, 110, 70, 160);
+      c.fillStyle = "#cfdcff";
+      c.fillRect(388, 190, 70, 80);
+      txt(c, "Media · UGC · Reach", 22, 292, 18, "#e6edff", 500);
+    }),
+  );
+  cyl(sM, 0.05, 1.35, 0.7, 1.7, 0.35, M.chrome);
+  const dish = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12, 0, TAU, 0, Math.PI / 2), M.orange);
+  dish.position.set(0.7, 2.35, 0.35);
+  dish.rotation.x = -0.55;
+  dish.castShadow = true;
+  sM.add(dish);
+  box(sM, 0.55, 0.08, 0.4, -0.55, 0.98, 0.35, M.chrome);
+  scr(
+    sM,
+    0.48,
+    0.32,
+    -0.55,
+    1.22,
+    0.42,
+    ctex(240, 160, (c, w, h) => {
+      c.fillStyle = "#0f2a80";
+      c.fillRect(0, 0, w, h);
+      txt(c, "UGC", 24, 70, 42, "#ffffff", 700);
+      txt(c, "4 creators", 24, 112, 20, "#cfdcff", 500);
+    }),
+  );
   // Checkout
   box(sC, 1.9, 0.62, 1.3, 0, 0.58, -0.05, M.ivory);
   box(sC, 1.02, 0.25, 0.9, -0.33, 1.05, -0.03, M.body);
@@ -775,6 +831,7 @@
     ["Knitting the shell", "Knitter · thread becomes a ribbed cap"],
     ["Dyeing it gray", "Dye vat · one dip, full colour"],
     ["Sewing on the pom-pom", "Pom-pom · fluffy finishing"],
+    ["Running the ads", "Marketing · media buying and UGC push the brand"],
     ["Payment received", "Checkout · tag on, coin in"],
   ];
   function goal() {
@@ -967,8 +1024,14 @@
   R.domElement.addEventListener("pointerup", (e) => {
     if (moved) return;
     const i = hit(e);
-    if (i >= 0) focus(i);
-    else if (i === -2) gOpen(-1);
+    if (i >= 0) {
+      focus(i);
+      const openSlug = ST[i] && ST[i].open;
+      if (openSlug) {
+        const si = SV.findIndex((s) => s.slug === openSlug);
+        if (si >= 0) go(si);
+      }
+    } else if (i === -2) gOpen(-1);
     else if (i === -3 && openCamera) openCamera();
     else if (i === -4 && openMeet) openMeet();
     else if (i === -5 && openOrders) openOrders();
@@ -1611,8 +1674,8 @@
     const placed = [];
     pinB.forEach((b, i) => {
       const st = ST[Math.min(i, ST.length - 1)];
+      if (!st) return;
       pv.copy(st.g.position);
-      if (i >= ST.length) pv.x += 1.35;
       pv.y += narrow ? 3.6 : 4.2;
       pv.project(cam);
       let x = (pv.x * 0.5 + 0.5) * aw,
@@ -5732,9 +5795,9 @@
     P.forEach((p, i) => {
       const ph = (t / 26 + i / 6) % 1;
       p.ph = ph;
-      const th = A0 + ph * STEP * 4.5,
+      const th = A0 + ph * STEP * 6,
         d = (th - A0) / STEP,
-        s = d < 1.1 ? 0 : Math.min(4, Math.floor(d - 0.1));
+        s = d < 1.1 ? 0 : Math.min(5, Math.floor(d - 0.1));
       p.d = d;
       p.g.position.set(
         RX * Math.cos(th) * (1 + spread * 0.12),
@@ -5749,7 +5812,7 @@
         p.b.parts.forEach((x) => (x.visible = true));
         p.b.mat.color.setHex(s >= 2 ? GRAY : CREAM);
         p.b.pom.visible = s >= 3;
-        p.tag.visible = s === 4;
+        p.tag.visible = s === 5;
       }
       p.g.visible = mode !== "order" || i === 0;
       p.halo.visible = mode === "order" && i === 0;
@@ -5761,7 +5824,7 @@
     walkUpdate(dt);
     if (mode === "order") {
       const p = P[0],
-        n = Math.min(4, Math.round(p.d));
+        n = Math.min(5, Math.round(p.d));
       if (n !== jPrev) {
         $("#jt").textContent = J[n][0];
         $("#jd").textContent = J[n][1];
