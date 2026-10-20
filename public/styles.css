@@ -457,7 +457,7 @@ header .id {
   z-index: 6;
   width: 44px;
   height: 44px;
-  display: flex;
+  display: none !important;
   align-items: center;
   justify-content: center;
   padding: 0;
