@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="robots" content="noindex,nofollow" />
-    <link rel="stylesheet" href="styles.css?v=admin3" />
+    <link rel="stylesheet" href="styles.css?v=admin4" />
     <style>
       :root {
         --admin-side: min(260px, 86vw);
@@ -31,6 +31,11 @@
         display: grid;
         place-items: center;
         padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+      }
+      /* ID display rules beat the UA [hidden] stylesheet — force hide explicitly. */
+      #gate[hidden],
+      #app[hidden] {
+        display: none !important;
       }
       .login-card {
         width: min(420px, 100%);
@@ -97,9 +102,6 @@
       #app {
         display: grid;
         grid-template-columns: var(--admin-side) 1fr;
-      }
-      #app[hidden] {
-        display: none !important;
       }
       .nav {
         overflow: auto;
@@ -975,16 +977,24 @@
       function enterApp(session) {
         token = session.token;
         email = session.email || "";
-        $("#gate").hidden = true;
-        $("#app").hidden = false;
+        const gate = $("#gate");
+        const app = $("#app");
+        gate.hidden = true;
+        gate.setAttribute("hidden", "");
+        app.hidden = false;
+        app.removeAttribute("hidden");
         $("#who").textContent = "Signed in as " + email;
         go("overview");
       }
 
       function logout(msg) {
         clearSession();
-        $("#app").hidden = true;
-        $("#gate").hidden = false;
+        const gate = $("#gate");
+        const app = $("#app");
+        app.hidden = true;
+        app.setAttribute("hidden", "");
+        gate.hidden = false;
+        gate.removeAttribute("hidden");
         note("#gateNote", msg || "");
       }
 
