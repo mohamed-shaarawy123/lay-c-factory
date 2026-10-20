@@ -236,7 +236,7 @@ module.exports = async function handler(req, res) {
       const codeHash = hashInviteCode(access);
       let inviteRow = null;
       let inviteSource = "table";
-      const invite = await supabase
+      let invite = await supabase
         .from("meeting_invites")
         .select("id, meeting_id, email, expires_at, redeemed_at")
         .eq("code_hash", codeHash)
@@ -258,16 +258,20 @@ module.exports = async function handler(req, res) {
             email: fallback.data.customer_email || it.email,
             expires_at: it.expires_at,
             redeemed_at: it.redeemed_at || null,
+            revoked_at: it.revoked_at || null,
           };
         }
       } else if (invite.error) {
         return json(res, 502, { ok: false, error: invite.error.message || "The invite could not be checked." });
       } else {
-        inviteRow = invite.data;
+        inviteRow = invite.data ? Object.assign({ revoked_at: null }, invite.data) : null;
       }
       if (!inviteRow) return json(res, 404, { ok: false, error: "That access code was not found." });
       if (String(inviteRow.email).toLowerCase() !== email) {
         return json(res, 403, { ok: false, error: "This access code was sent to a different email." });
+      }
+      if (inviteRow.revoked_at) {
+        return json(res, 403, { ok: false, error: "This access code was revoked." });
       }
       if (inviteRow.redeemed_at) {
         return json(res, 403, { ok: false, error: "This access code was already used." });
@@ -684,9 +688,57 @@ module.exports = async function handler(req, res) {
       return json(res, 200, { ok: true, code, id: saved.data.id, link: meetLink(code), name, private: true });
     }
 
+    if (op === "account_directory") {
+      const qDir = text(payload.q, 120).toLowerCase();
+      const accounts = await fetchOrders(supabase, ["account"]);
+      const emailOnly = await fetchOrders(supabase, ["received", "notified", "processing", "done", "room", "photo", "review"]);
+      const map = new Map();
+      accounts.forEach((r) => {
+        const em = String(r.customer_email || "")
+          .trim()
+          .toLowerCase();
+        if (!em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return;
+        map.set(em, {
+          email: em,
+          name: r.customer_name || "",
+          phone: r.customer_phone || "",
+          has_account: true,
+          account_id: r.id,
+        });
+      });
+      emailOnly.forEach((r) => {
+        const em = String(r.customer_email || "")
+          .trim()
+          .toLowerCase();
+        if (!em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return;
+        if (map.has(em)) {
+          const cur = map.get(em);
+          if (!cur.name && r.customer_name) cur.name = r.customer_name;
+          if (!cur.phone && r.customer_phone) cur.phone = r.customer_phone;
+          return;
+        }
+        map.set(em, {
+          email: em,
+          name: r.customer_name || "",
+          phone: r.customer_phone || "",
+          has_account: false,
+          account_id: null,
+        });
+      });
+      let rows = [...map.values()].sort((a, b) => {
+        if (a.has_account !== b.has_account) return a.has_account ? -1 : 1;
+        return String(a.name || a.email).localeCompare(String(b.name || b.email));
+      });
+      if (qDir) {
+        rows = rows.filter((r) => [r.name, r.email, r.phone].join(" ").toLowerCase().includes(qDir));
+      }
+      return json(res, 200, { ok: true, rows: rows.slice(0, 200) });
+    }
+
     if (op === "meet_invite" || op === "meet_invite_send") {
       const id = text(payload.id || payload.meeting_id, 80);
       const email = text(payload.email || payload.customer_email, 160).toLowerCase();
+      const recipientName = text(payload.recipient_name || payload.name, 120);
       const hours = Math.max(1, Math.min(72, Number(payload.expires_hours) || 24));
       if (!/^[0-9a-f-]{36}$/i.test(id)) return json(res, 400, { ok: false, error: "Choose a meeting room." });
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -696,54 +748,56 @@ module.exports = async function handler(req, res) {
       if (meeting.error || !meeting.data) return json(res, 404, { ok: false, error: "That meeting room was not found." });
       const items = itemsOf(meeting.data);
       if (items.closed) return json(res, 400, { ok: false, error: "This meeting is closed." });
+      // Resolve display name from authenticated account when possible.
+      let name = recipientName;
+      let hasAccount = false;
+      const account = await supabase
+        .from("orders")
+        .select("id, customer_name, customer_email")
+        .eq("status", "account")
+        .eq("customer_email", email)
+        .maybeSingle();
+      if (account.data) {
+        hasAccount = true;
+        if (!name) name = account.data.customer_name || "";
+      }
       const access = makeInviteCode();
       const expires = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
       const codeHash = hashInviteCode(access);
-      let inviteId = "";
-      let inviteSource = "table";
-      const saved = await supabase
-        .from("meeting_invites")
+      // Store hashed invites on orders (status=meet_invite) so recipient metadata + revoke work
+      // without requiring a separate public-readable codes table. Plaintext is never persisted.
+      const inviteSource = "orders";
+      const savedInvite = await supabase
+        .from("orders")
         .insert({
-          meeting_id: id,
-          email,
-          code_hash: codeHash,
-          expires_at: expires,
-          created_by: who.customer_email,
+          customer_name: name || "Invite " + email,
+          customer_email: email,
+          customer_phone: "",
+          delivery_address: "",
+          items: {
+            type: "meet_invite",
+            meeting_id: id,
+            email,
+            recipient_name: name || "",
+            has_account: hasAccount,
+            code_hash: codeHash,
+            expires_at: expires,
+            redeemed_at: null,
+            revoked_at: null,
+            created_by: who.customer_email,
+          },
+          total: 0,
+          status: "meet_invite",
         })
         .select("id")
         .single();
-      if (saved.error && /meeting_invites|schema cache|does not exist/i.test(saved.error.message || "")) {
-        inviteSource = "orders";
-        const fallback = await supabase
-          .from("orders")
-          .insert({
-            customer_name: "Invite " + email,
-            customer_email: email,
-            customer_phone: "",
-            delivery_address: "",
-            items: {
-              type: "meet_invite",
-              meeting_id: id,
-              email,
-              code_hash: codeHash,
-              expires_at: expires,
-              redeemed_at: null,
-              created_by: who.customer_email,
-            },
-            total: 0,
-            status: "meet_invite",
-          })
-          .select("id")
-          .single();
-        if (fallback.error || !fallback.data) {
-          return json(res, 502, { ok: false, error: (fallback.error && fallback.error.message) || "The invite was not saved." });
-        }
-        inviteId = fallback.data.id;
-      } else if (saved.error || !saved.data) {
-        return json(res, 502, { ok: false, error: (saved.error && saved.error.message) || "The invite was not saved." });
-      } else {
-        inviteId = saved.data.id;
+      if (savedInvite.error || !savedInvite.data) {
+        return json(res, 502, {
+          ok: false,
+          error: (savedInvite.error && savedInvite.error.message) || "The invite was not saved.",
+        });
       }
+      const inviteId = savedInvite.data.id;
       const roomName = items.name || meeting.data.customer_name || "Lay C meeting";
       const when = new Date(expires).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
       const site = String(process.env.SITE_URL || "https://lay-c-factory.vercel.app").replace(/\/+$/, "");
@@ -767,16 +821,16 @@ module.exports = async function handler(req, res) {
           quantities: "Access code: " + access,
           total_price: "Expires " + when,
           customer_details: email,
-          customer_name: "",
+          customer_name: name || "",
           customer_phone: "",
           customer_email: email,
           client_email: email,
         });
       } catch (err) {
-        if (inviteSource === "table") await supabase.from("meeting_invites").delete().eq("id", inviteId);
-        else await supabase.from("orders").delete().eq("id", inviteId);
+        await supabase.from("orders").delete().eq("id", inviteId);
         return json(res, err.status || 502, { ok: false, error: err.message || "The invite email was not sent." });
       }
+      void inviteSource;
       if (items.active !== true) {
         await supabase
           .from("orders")
@@ -784,51 +838,89 @@ module.exports = async function handler(req, res) {
           .eq("id", id);
       }
       await logAdmin(supabase, who, "meet_invite", { meeting_id: id, email, invite_id: inviteId, source: inviteSource });
-      return json(res, 200, { ok: true, invite_id: inviteId, email, expires_at: expires, sent: true });
+      // Plaintext code returned only once to the authenticated admin response — never stored in DB.
+      return json(res, 200, {
+        ok: true,
+        invite_id: inviteId,
+        email,
+        recipient_name: name || "",
+        has_account: hasAccount,
+        expires_at: expires,
+        sent: true,
+        access_code: access,
+        room_name: roomName,
+        room_code: items.code || "",
+        meeting_id: id,
+      });
+    }
+
+    if (op === "meet_invite_revoke") {
+      const inviteId = text(payload.invite_id || payload.id, 80);
+      const meetingId = text(payload.meeting_id, 80);
+      if (!/^[0-9a-f-]{36}$/i.test(inviteId)) return json(res, 400, { ok: false, error: "Choose an invitation." });
+      const revokedAt = new Date().toISOString();
+      // Prefer orders.meet_invite fallback (stores revoked_at in items).
+      const asOrder = await supabase.from("orders").select("id, status, items, customer_email").eq("id", inviteId).maybeSingle();
+      if (asOrder.data && asOrder.data.status === "meet_invite") {
+        const it = itemsOf(asOrder.data);
+        if (meetingId && it.meeting_id && it.meeting_id !== meetingId) {
+          return json(res, 400, { ok: false, error: "That invitation does not belong to this room." });
+        }
+        const saved = await supabase
+          .from("orders")
+          .update({
+            items: Object.assign({}, it, { revoked_at: revokedAt, expires_at: revokedAt }),
+          })
+          .eq("id", inviteId)
+          .select("id")
+          .single();
+        if (saved.error) return json(res, 502, { ok: false, error: saved.error.message || "Invite was not revoked." });
+        await logAdmin(supabase, who, "meet_invite_revoke", { invite_id: inviteId, email: asOrder.data.customer_email });
+        return json(res, 200, { ok: true, revoked_at: revokedAt });
+      }
+      const past = revokedAt;
+      const upd = await supabase.from("meeting_invites").update({ expires_at: past }).eq("id", inviteId).select("id, email").maybeSingle();
+      if (upd.error && /meeting_invites|schema cache|does not exist/i.test(upd.error.message || "")) {
+        return json(res, 404, { ok: false, error: "That invitation was not found." });
+      }
+      if (upd.error || !upd.data) return json(res, 404, { ok: false, error: "That invitation was not found." });
+      await logAdmin(supabase, who, "meet_invite_revoke", { invite_id: inviteId, email: upd.data.email });
+      return json(res, 200, { ok: true, revoked_at: past });
     }
 
     if (op === "meet_invites") {
       const id = text(payload.id || payload.meeting_id, 80);
       if (!/^[0-9a-f-]{36}$/i.test(id)) return json(res, 400, { ok: false, error: "Choose a meeting room." });
-      const list = await supabase
-        .from("meeting_invites")
-        .select("id, email, expires_at, redeemed_at, created_at, created_by")
-        .eq("meeting_id", id)
+      const inviteStatus = (row) => {
+        if (row.revoked_at) return "revoked";
+        if (row.redeemed_at) return "redeemed";
+        if (row.expires_at && new Date(row.expires_at).getTime() < Date.now()) return "expired";
+        return "sent";
+      };
+      const fallback = await supabase
+        .from("orders")
+        .select("id, customer_name, customer_email, items, created_at")
+        .eq("status", "meet_invite")
+        .eq("items->>meeting_id", id)
         .order("created_at", { ascending: false })
         .limit(100);
-      if (list.error && /meeting_invites|schema cache|does not exist/i.test(list.error.message || "")) {
-        const fallback = await supabase
-          .from("orders")
-          .select("id, customer_email, items, created_at")
-          .eq("status", "meet_invite")
-          .eq("items->>meeting_id", id)
-          .order("created_at", { ascending: false })
-          .limit(100);
-        if (fallback.error) return json(res, 502, { ok: false, error: fallback.error.message || "Invites could not be loaded." });
-        const rows = (fallback.data || []).map((r) => {
-          const it = itemsOf(r);
-          return {
-            id: r.id,
-            email: r.customer_email || it.email || "",
-            created_at: r.created_at,
-            expires_at: it.expires_at,
-            redeemed_at: it.redeemed_at || null,
-            status: it.redeemed_at ? "used" : new Date(it.expires_at).getTime() < Date.now() ? "expired" : "sent",
-            created_by: it.created_by || "",
-          };
-        });
-        return json(res, 200, { ok: true, rows });
-      }
-      if (list.error) return json(res, 502, { ok: false, error: list.error.message || "Invites could not be loaded." });
-      const rows = (list.data || []).map((r) => ({
-        id: r.id,
-        email: r.email,
-        created_at: r.created_at,
-        expires_at: r.expires_at,
-        redeemed_at: r.redeemed_at,
-        status: r.redeemed_at ? "used" : new Date(r.expires_at).getTime() < Date.now() ? "expired" : "sent",
-        created_by: r.created_by || "",
-      }));
+      if (fallback.error) return json(res, 502, { ok: false, error: fallback.error.message || "Invites could not be loaded." });
+      const rows = (fallback.data || []).map((r) => {
+        const it = itemsOf(r);
+        const brief = {
+          id: r.id,
+          email: r.customer_email || it.email || "",
+          name: it.recipient_name || r.customer_name || "",
+          has_account: Boolean(it.has_account),
+          created_at: r.created_at,
+          expires_at: it.expires_at,
+          redeemed_at: it.redeemed_at || null,
+          revoked_at: it.revoked_at || null,
+          created_by: it.created_by || "",
+        };
+        brief.status = inviteStatus(brief);
+        return brief;
+      });
       return json(res, 200, { ok: true, rows });
     }
 

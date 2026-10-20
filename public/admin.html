@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="robots" content="noindex,nofollow" />
-    <link rel="stylesheet" href="styles.css?v=admin5" />
+    <link rel="stylesheet" href="styles.css?v=admin6" />
     <style>
       :root {
         --admin-side: min(260px, 86vw);
@@ -180,7 +180,7 @@
       }
       .cards {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
         gap: 10px;
         margin-bottom: 16px;
       }
@@ -189,17 +189,61 @@
         border-radius: 14px;
         padding: 14px;
         background: rgba(255, 255, 255, 0.9);
+        min-width: 0;
       }
-      .card b {
+      .cards > .card > b,
+      .stat b {
         display: block;
-        font-size: 22px;
+        font-size: clamp(18px, 4vw, 22px);
+        line-height: 1.2;
+        word-break: break-word;
       }
-      .card span {
+      .cards > .card > span,
+      .stat span {
         color: var(--mut);
         font-size: 12px;
       }
+      .profile-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+      .profile-field {
+        min-width: 0;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+      }
+      .profile-field .label {
+        display: block;
+        margin: 0 0 4px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--mut);
+      }
+      .profile-field .value {
+        display: block;
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg);
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      .table-wrap {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 12px;
+      }
       table {
         width: 100%;
+        min-width: 560px;
         border-collapse: collapse;
         font-size: 13px;
         background: rgba(255, 255, 255, 0.92);
@@ -363,7 +407,7 @@
       }
       .tl-item {
         display: grid;
-        grid-template-columns: 72px 1fr auto;
+        grid-template-columns: minmax(64px, 72px) minmax(0, 1fr) auto;
         gap: 10px;
         align-items: start;
         border: 1px solid var(--line);
@@ -371,6 +415,7 @@
         padding: 10px 12px;
         background: rgba(255, 255, 255, 0.95);
         cursor: pointer;
+        min-width: 0;
       }
       .tl-item:hover {
         border-color: var(--blue);
@@ -380,6 +425,70 @@
         font-weight: 700;
         color: var(--navy);
         text-transform: uppercase;
+      }
+      .tl-item b,
+      .tl-item small {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      .code-box {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-top: 10px;
+        padding: 10px 12px;
+        border: 1px dashed var(--blue);
+        border-radius: 12px;
+        background: rgba(65, 105, 225, 0.06);
+      }
+      .code-box code {
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        color: var(--navy);
+        overflow-wrap: anywhere;
+      }
+      .picker {
+        display: grid;
+        gap: 8px;
+      }
+      .picker-list {
+        max-height: min(40vh, 280px);
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+      }
+      .picker-list button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 10px 12px;
+        border: 0;
+        border-bottom: 1px solid var(--line);
+        background: transparent;
+        cursor: pointer;
+        font: inherit;
+      }
+      .picker-list button:hover,
+      .picker-list button.on {
+        background: rgba(65, 105, 225, 0.1);
+      }
+      .picker-list button small {
+        display: block;
+        color: var(--mut);
+      }
+      @media (max-width: 640px) {
+        .tl-item {
+          grid-template-columns: 1fr;
+        }
+        .actions {
+          max-width: none;
+        }
+        table {
+          min-width: 480px;
+        }
       }
       .modal-back {
         position: fixed;
@@ -499,6 +608,7 @@
     <script>
       const $ = (s, r) => (r || document).querySelector(s);
       const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
+      // Prefer scoped queries when a root element is passed.
       const esc = (s) =>
         String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
       const ADMIN_KEY = "lcadmin";
@@ -938,7 +1048,7 @@
             '<select id="fStatus"><option value="orders">All statuses</option><option value="received">received</option><option value="notified">notified</option><option value="processing">processing</option><option value="done">done</option><option value="cancelled">cancelled</option><option value="room">seniors sheets</option></select><select id="fType"><option value="">All types</option><option value="quote">Quotes</option><option value="seniors">Seniors / Excel</option></select><button type="button" class="btn ghost" id="refreshOrders">Refresh</button>',
           ) +
           ((data.rows || []).length
-            ? "<table><thead><tr><th>Order</th><th>Customer</th><th>Type</th><th>Status</th><th>Total</th><th>Actions</th></tr></thead><tbody>" +
+            ? '<div class="table-wrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Type</th><th>Status</th><th>Total</th><th>Actions</th></tr></thead><tbody>' +
               data.rows
                 .map(
                   (r) =>
@@ -979,7 +1089,7 @@
                     "</div></td></tr>",
                 )
                 .join("") +
-              "</tbody></table>" +
+              "</tbody></table></div>" +
               pager(data)
             : '<p class="empty">No orders match this filter.</p>') +
           '<div id="detail"></div>';
@@ -1049,9 +1159,9 @@
         const list =
           activityFilter === "unlinked" ? data.unlinked_photos || [] : data.activity || [];
         $("#panel").innerHTML =
-          '<div class="card"><div class="tools" style="justify-content:space-between"><button type="button" class="btn ghost" id="backCust">← All customers</button><span class="pill">' +
+          '<div class="card"><div class="tools" style="justify-content:space-between;align-items:center"><button type="button" class="btn ghost" id="backCust">← All customers</button><span class="pill">' +
           (p.has_account ? "Authenticated account" : "Email only") +
-          '</span></div><div class="meta" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:10px">' +
+          '</span></div><div class="profile-grid">' +
           [
             ["Name", p.name],
             ["Email", p.email],
@@ -1060,7 +1170,14 @@
             ["Last activity", p.last_at ? when(p.last_at) : "Not provided"],
             ["Last seen", p.last_seen ? when(p.last_seen) : "Not provided"],
           ]
-            .map((x) => "<div><span style=\"display:block;font-size:11px;color:var(--mut)\">" + esc(x[0]) + "</span><b>" + esc(np(x[1])) + "</b></div>")
+            .map(
+              (x) =>
+                '<div class="profile-field"><span class="label">' +
+                esc(x[0]) +
+                '</span><span class="value">' +
+                esc(np(x[1])) +
+                "</span></div>",
+            )
             .join("") +
           '</div><div class="cards" style="margin-top:14px">' +
           [
@@ -1070,7 +1187,7 @@
             ["Meetings", c.meetings],
             ["Unlinked photos", c.unlinked_photos],
           ]
-            .map((x) => '<div class="card"><b>' + esc(x[1] || 0) + "</b><span>" + esc(x[0]) + "</span></div>")
+            .map((x) => '<div class="card stat"><b>' + esc(x[1] || 0) + "</b><span>" + esc(x[0]) + "</span></div>")
             .join("") +
           '</div></div><div class="filters">' +
           filters
@@ -1169,7 +1286,7 @@
           ) +
           '<p class="empty">Photos are managed inside each customer profile. Use Unlinked photos for binder images without a reliable email.</p>' +
           ((data.rows || []).length
-            ? "<table><thead><tr><th></th><th>Customer</th><th>Account</th><th>Activity</th><th>Last seen</th><th></th></tr></thead><tbody>" +
+            ? '<div class="table-wrap"><table><thead><tr><th></th><th>Customer</th><th>Account</th><th>Activity</th><th>Last seen</th><th></th></tr></thead><tbody>' +
               data.rows
                 .map(
                   (c) =>
@@ -1197,7 +1314,7 @@
                     '">View Activity</button></td></tr>',
                 )
                 .join("") +
-              "</tbody></table>" +
+              "</tbody></table></div>" +
               pager(data)
             : '<p class="empty">No customers found.</p>');
         bindTools(showCustomers);
@@ -1254,53 +1371,287 @@
         });
       }
 
+      function copyText(value) {
+        const t = String(value || "");
+        if (!t) return Promise.reject(new Error("Nothing to copy"));
+        if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t);
+        const ta = document.createElement("textarea");
+        ta.value = t;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+        return Promise.resolve();
+      }
+
+      function showInviteResult(sent) {
+        const prev = $("#inviteResultModal");
+        if (prev) prev.remove();
+        const wrap = document.createElement("div");
+        wrap.className = "modal-back";
+        wrap.id = "inviteResultModal";
+        wrap.innerHTML =
+          '<div class="order-doc"><div class="tools" style="justify-content:space-between"><b style="color:var(--navy)">Invitation sent</b><button type="button" class="btn ghost" id="closeInviteRes">Close</button></div>' +
+          '<div class="profile-grid">' +
+          [
+            ["Room", sent.room_name || "—"],
+            ["Room number", sent.room_code || "—"],
+            ["Recipient", (sent.recipient_name ? sent.recipient_name + " · " : "") + (sent.email || "")],
+            ["Account", sent.has_account ? "Authenticated account" : "Manual / email-only"],
+            ["Expires", sent.expires_at ? when(sent.expires_at) : "—"],
+            ["Status", "sent"],
+          ]
+            .map(
+              (x) =>
+                '<div class="profile-field"><span class="label">' +
+                esc(x[0]) +
+                '</span><span class="value">' +
+                esc(x[1]) +
+                "</span></div>",
+            )
+            .join("") +
+          '</div><div class="code-box"><span>Access code</span><code id="shownCode">' +
+          esc(sent.access_code || "") +
+          '</code><button type="button" class="btn" id="copyCode">Copy Code</button></div>' +
+          '<p class="empty">This code is shown once to admins here. It is emailed to the recipient and stored only as a hash.</p></div>';
+        document.body.appendChild(wrap);
+        $("#closeInviteRes", wrap).onclick = () => wrap.remove();
+        wrap.addEventListener("click", (e) => {
+          if (e.target === wrap) wrap.remove();
+        });
+        $("#copyCode", wrap).onclick = async () => {
+          try {
+            await copyText(sent.access_code);
+            setStatus("Access code copied");
+          } catch (err) {
+            alert(err.message);
+          }
+        };
+      }
+
+      async function openRecipientPicker(meetingId, roomLabel) {
+        const prev = $("#recipientModal");
+        if (prev) prev.remove();
+        let selected = null;
+        const dir = await call({ op: "account_directory", q: "" });
+        const wrap = document.createElement("div");
+        wrap.className = "modal-back";
+        wrap.id = "recipientModal";
+        const renderList = (rows) => {
+          const box = $("#pickerList", wrap);
+          if (!box) return;
+          box.innerHTML = (rows || []).length
+            ? rows
+                .map(
+                  (r) =>
+                    '<button type="button" data-email="' +
+                    esc(r.email) +
+                    '" data-name="' +
+                    esc(r.name || "") +
+                    '" data-account="' +
+                    (r.has_account ? "1" : "0") +
+                    '"><b>' +
+                    esc(r.name || r.email) +
+                    '</b><small>' +
+                    esc(r.email) +
+                    (r.has_account ? " · Authenticated account" : " · Email-only record") +
+                    "</small></button>",
+                )
+                .join("")
+            : '<p class="empty" style="padding:12px">No matching customers.</p>';
+          $$("[data-email]", box).forEach((b) =>
+            b.addEventListener("click", () => {
+              $$("[data-email]", box).forEach((x) => x.classList.remove("on"));
+              b.classList.add("on");
+              selected = {
+                email: b.dataset.email,
+                name: b.dataset.name || "",
+                has_account: b.dataset.account === "1",
+              };
+              $("#manualEmail", wrap).value = selected.email;
+              $("#selNote", wrap).textContent =
+                "Selected: " + (selected.name || selected.email) + (selected.has_account ? " (account)" : " (email-only)");
+            }),
+          );
+        };
+        wrap.innerHTML =
+          '<div class="order-doc"><div class="tools" style="justify-content:space-between"><div><b style="color:var(--navy)">Send access code</b><p class="empty" style="margin:4px 0 0">Room: ' +
+          esc(roomLabel || meetingId) +
+          '</p></div><button type="button" class="btn ghost" id="closePicker">Close</button></div>' +
+          '<div class="picker"><label style="font-size:12px;font-weight:600">Search accounts<input id="pickerQ" placeholder="Name or email" style="display:block;width:100%;margin-top:6px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;box-sizing:border-box" /></label>' +
+          '<div class="picker-list" id="pickerList"></div>' +
+          '<p class="empty" id="selNote">Select an authenticated account, or enter a manual email below.</p>' +
+          '<label style="font-size:12px;font-weight:600">Manual email invitation<input id="manualEmail" type="email" placeholder="optional@email.com" style="display:block;width:100%;margin-top:6px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;box-sizing:border-box" /></label>' +
+          '<div class="tools"><button type="button" class="btn" id="sendInviteNow">Send Access Code by Email</button></div>' +
+          '<p class="empty" id="sendInviteErr"></p></div></div>';
+        document.body.appendChild(wrap);
+        renderList(dir.rows || []);
+        $("#closePicker", wrap).onclick = () => wrap.remove();
+        wrap.addEventListener("click", (e) => {
+          if (e.target === wrap) wrap.remove();
+        });
+        let tmr;
+        $("#pickerQ", wrap).addEventListener("input", () => {
+          clearTimeout(tmr);
+          tmr = setTimeout(async () => {
+            const found = await call({ op: "account_directory", q: $("#pickerQ", wrap).value.trim() });
+            renderList(found.rows || []);
+          }, 200);
+        });
+        $("#sendInviteNow", wrap).onclick = async () => {
+          const email = (($("#manualEmail", wrap).value || (selected && selected.email) || "") + "").trim().toLowerCase();
+          const name = selected && selected.email === email ? selected.name : "";
+          $("#sendInviteErr", wrap).textContent = "";
+          try {
+            const sent = await call({
+              op: "meet_invite_send",
+              id: meetingId,
+              email,
+              recipient_name: name,
+            });
+            wrap.remove();
+            setStatus("Invite emailed to " + sent.email);
+            showInviteResult(sent);
+          } catch (err) {
+            $("#sendInviteErr", wrap).textContent = err.message || "Invite was not sent.";
+          }
+        };
+      }
+
+      async function showInvitesForRoom(meetingId, roomLabel) {
+        const list = await call({ op: "meet_invites", id: meetingId });
+        $("#inviteBox").innerHTML =
+          '<div class="card"><div class="tools" style="justify-content:space-between"><b style="font-size:14px;color:var(--navy)">Invitations — ' +
+          esc(roomLabel || "") +
+          '</b><button type="button" class="btn ghost" id="refreshInvites">Refresh</button></div>' +
+          ((list.rows || []).length
+            ? '<div class="table-wrap"><table><thead><tr><th>Recipient</th><th>Status</th><th>Sent</th><th>Expires</th><th></th></tr></thead><tbody>' +
+              list.rows
+                .map(
+                  (r) =>
+                    "<tr><td><b>" +
+                    esc(r.name || "—") +
+                    "</b><small>" +
+                    esc(r.email) +
+                    (r.has_account ? "<br>Authenticated account" : "<br>Email-only / manual") +
+                    '</small></td><td><span class="pill ' +
+                    (r.status === "sent" ? "on" : r.status === "revoked" || r.status === "expired" ? "off" : "") +
+                    '">' +
+                    esc(r.status) +
+                    "</span></td><td>" +
+                    esc(when(r.created_at)) +
+                    "</td><td>" +
+                    esc(when(r.expires_at)) +
+                    (r.redeemed_at ? "<br>Redeemed " + esc(when(r.redeemed_at)) : "") +
+                    (r.revoked_at ? "<br>Revoked " + esc(when(r.revoked_at)) : "") +
+                    '</td><td><div class="actions">' +
+                    (r.status === "sent"
+                      ? '<button type="button" class="btn danger" data-revoke="' +
+                        esc(r.id) +
+                        '">Revoke</button><button type="button" class="btn ghost" data-reissue="' +
+                        esc(r.email) +
+                        '" data-name="' +
+                        esc(r.name || "") +
+                        '">New code</button>'
+                      : r.status === "expired" || r.status === "revoked"
+                        ? '<button type="button" class="btn ghost" data-reissue="' +
+                          esc(r.email) +
+                          '" data-name="' +
+                          esc(r.name || "") +
+                          '">Issue replacement</button>'
+                        : "") +
+                    "</div></td></tr>",
+                )
+                .join("") +
+              "</tbody></table></div>"
+            : '<p class="empty">No invites sent for this room yet.</p>') +
+          "</div>";
+        $("#refreshInvites")?.addEventListener("click", () => showInvitesForRoom(meetingId, roomLabel));
+        $$("[data-revoke]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            if (!confirm("Revoke this invitation?")) return;
+            try {
+              await call({ op: "meet_invite_revoke", invite_id: b.dataset.revoke, meeting_id: meetingId });
+              setStatus("Invitation revoked");
+              showInvitesForRoom(meetingId, roomLabel);
+            } catch (err) {
+              alert(err.message);
+            }
+          }),
+        );
+        $$("[data-reissue]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            try {
+              const sent = await call({
+                op: "meet_invite_send",
+                id: meetingId,
+                email: b.dataset.reissue,
+                recipient_name: b.dataset.name || "",
+              });
+              setStatus("Replacement code emailed");
+              showInviteResult(sent);
+              showInvitesForRoom(meetingId, roomLabel);
+            } catch (err) {
+              alert(err.message);
+            }
+          }),
+        );
+      }
+
       async function showMeetings() {
         const data = await call({ op: "list", status: "meeting", q, page, pageSize: 50 });
         $("#panel").innerHTML =
-          '<div class="card"><b style="font-size:14px">Create private meeting room</b><p class="empty">Rooms stay private until you email an access code to a chosen recipient.</p><div class="form-grid"><label>Name<input id="mName" placeholder="Design review" /></label><label>Date / time<input id="mWhen" type="datetime-local" /></label><label>Duration (min)<input id="mDur" type="number" min="15" value="60" /></label></div><button type="button" class="btn" id="mCreate">Create room</button><p class="empty" id="mNote"></p></div>' +
+          '<div class="card"><b style="font-size:14px;color:var(--navy)">Create private meeting room</b><p class="empty">Rooms stay private until you email an access code to a chosen recipient.</p><div class="form-grid"><label>Name<input id="mName" placeholder="Design review" /></label><label>Date / time<input id="mWhen" type="datetime-local" /></label><label>Duration (min)<input id="mDur" type="number" min="15" value="60" /></label></div><button type="button" class="btn" id="mCreate">Create room</button><p class="empty" id="mNote"></p></div>' +
           tools() +
           ((data.rows || []).length
-            ? "<table><thead><tr><th>Room</th><th>Status</th><th>Send access code</th><th></th></tr></thead><tbody>" +
+            ? '<div class="table-wrap"><table><thead><tr><th>Room</th><th>Status</th><th>Invitations</th><th>Manage</th></tr></thead><tbody>' +
               data.rows
                 .map((r) => {
+                  const label = (r.room_name || r.name || "Room") + " #" + (r.code || "");
                   return (
                     "<tr><td><b>" +
                     esc(r.room_name || r.name) +
                     "</b><small>" +
                     esc(when(r.starts_at || r.created_at)) +
                     (r.duration_min ? " · " + esc(r.duration_min) + " min" : "") +
-                    "<br>Internal id " +
+                    "<br>Room number " +
                     esc(r.code) +
                     "</small></td><td>" +
-                    (r.closed ? '<span class="pill off">Closed</span>' : r.active ? '<span class="pill on">Active</span>' : '<span class="pill off">Private / inactive</span>') +
-                    '</td><td><input data-email-for="' +
+                    (r.closed
+                      ? '<span class="pill off">Closed</span>'
+                      : r.active
+                        ? '<span class="pill on">Active</span>'
+                        : '<span class="pill off">Private / inactive</span>') +
+                    '</td><td><div class="actions"><button type="button" class="btn" data-invite="' +
                     esc(r.id) +
-                    '" placeholder="customer@email.com" style="min-width:180px;padding:8px;border:1px solid var(--line);border-radius:8px" /><button type="button" class="btn" data-invite="' +
-                    esc(r.id) +
+                    '" data-label="' +
+                    esc(label) +
                     '">Send Access Code by Email</button><button type="button" class="btn ghost" data-invites="' +
                     esc(r.id) +
-                    '">Invites</button></td><td><button type="button" class="btn ghost" data-toggle="' +
+                    '" data-label="' +
+                    esc(label) +
+                    '">Invites</button></div></td><td><div class="actions"><button type="button" class="btn ghost" data-toggle="' +
                     esc(r.id) +
                     '" data-active="' +
                     (r.active ? "0" : "1") +
                     '">' +
                     (r.active ? "Deactivate" : "Activate") +
-                    '</button> <button type="button" class="btn ghost" data-close="' +
+                    '</button><button type="button" class="btn ghost" data-close="' +
                     esc(r.id) +
-                    '">Close</button> <button type="button" class="btn danger" data-del="' +
+                    '">Close</button><button type="button" class="btn danger" data-del="' +
                     esc(r.id) +
-                    '">Delete</button></td></tr>'
+                    '">Delete</button></div></td></tr>'
                   );
                 })
                 .join("") +
-              "</tbody></table>" +
+              "</tbody></table></div>" +
               pager(data)
             : '<p class="empty">No meeting rooms yet. Create one above.</p>') +
           '<div id="inviteBox"></div>';
         bindTools(showMeetings);
         $("#mCreate").onclick = async () => {
           try {
-            const created = await call({
+            await call({
               op: "meet_create",
               name: $("#mName").value.trim(),
               starts_at: $("#mWhen").value,
@@ -1308,54 +1659,21 @@
             });
             $("#mNote").textContent =
               "Private room created. Send an access code by email — it is not listed publicly.";
-            void created;
             showMeetings();
           } catch (err) {
             $("#mNote").textContent = err.message;
           }
         };
         $$("[data-invite]").forEach((b) =>
-          b.addEventListener("click", async () => {
-            const input = document.querySelector('[data-email-for="' + b.dataset.invite + '"]');
-            const email = (input && input.value.trim()) || "";
-            try {
-              const sent = await call({ op: "meet_invite_send", id: b.dataset.invite, email });
-              setStatus("Invite sent to " + sent.email);
-              alert("Access code emailed to " + sent.email + ". It expires " + when(sent.expires_at) + ".");
-            } catch (err) {
-              alert(err.message || "Invite was not sent.");
-            }
+          b.addEventListener("click", () => {
+            openRecipientPicker(b.dataset.invite, b.dataset.label).catch((err) => alert(err.message));
           }),
         );
         $$("[data-invites]").forEach((b) =>
-          b.addEventListener("click", async () => {
-            try {
-              const list = await call({ op: "meet_invites", id: b.dataset.invites });
-              $("#inviteBox").innerHTML =
-                '<div class="card"><b style="font-size:14px">Invitations</b>' +
-                ((list.rows || []).length
-                  ? "<table><thead><tr><th>Email</th><th>Status</th><th>Sent</th><th>Expires</th></tr></thead><tbody>" +
-                    list.rows
-                      .map(
-                        (r) =>
-                          "<tr><td>" +
-                          esc(r.email) +
-                          "</td><td><span class=\"pill\">" +
-                          esc(r.status) +
-                          "</span></td><td>" +
-                          esc(when(r.created_at)) +
-                          "</td><td>" +
-                          esc(when(r.expires_at)) +
-                          (r.redeemed_at ? "<br>Used " + esc(when(r.redeemed_at)) : "") +
-                          "</td></tr>",
-                      )
-                      .join("") +
-                    "</tbody></table>"
-                  : '<p class="empty">No invites sent for this room yet.</p>') +
-                "</div>";
-            } catch (err) {
+          b.addEventListener("click", () => {
+            showInvitesForRoom(b.dataset.invites, b.dataset.label).catch((err) => {
               $("#inviteBox").innerHTML = '<p class="empty">' + esc(err.message) + "</p>";
-            }
+            });
           }),
         );
         $$("[data-toggle]").forEach((b) =>
@@ -1564,7 +1882,7 @@
           if (document.hidden) return;
           if (sec === "orders") showOrders().catch(() => {});
           else if (sec === "meetings") showMeetings().catch(() => {});
-        }, 20000);
+        }, 12000);
       }
 
       async function go(next) {
