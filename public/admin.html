@@ -1,77 +1,71 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <title>Admin — Lay C Factory</title>
-    <meta charset="utf8" />
+    <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <link rel="stylesheet" href="styles.css?v=admin2" />
+    <meta name="robots" content="noindex,nofollow" />
+    <link rel="stylesheet" href="styles.css?v=admin3" />
     <style>
+      :root {
+        --admin-side: min(260px, 86vw);
+      }
       html,
       body {
         height: 100%;
+        margin: 0;
         overflow: hidden;
-        background: var(--bg);
+        background: linear-gradient(160deg, #f7f9ff 0%, #eef2ff 45%, #ffffff 100%);
+        color: var(--fg);
+        font:
+          14px system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
       }
-      .stage {
-        position: fixed;
-        inset: 0;
-        right: min(380px, 58%);
-      }
-      .stage iframe {
-        width: 100%;
+      #gate,
+      #app {
         height: 100%;
-        border: 0;
-        display: block;
-        background: var(--bg);
       }
-      .side {
-        position: fixed;
-        top: 0;
-        right: 0;
-        bottom: 0;
-        width: min(380px, 58%);
-        z-index: 30;
-        box-sizing: border-box;
-        overflow: auto;
-        padding: 22px 16px 28px;
-        background: var(--panel);
-        border-left: 1px solid var(--line);
-        box-shadow: -12px 0 40px rgba(15, 42, 138, 0.12);
+      #gate {
+        display: grid;
+        place-items: center;
+        padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
       }
-      .side h1 {
-        margin: 8px 0 6px;
-        font-size: 22px;
+      .login-card {
+        width: min(420px, 100%);
+        padding: 28px 22px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 20px 50px rgba(15, 42, 138, 0.12);
       }
-      .side p {
-        margin: 0 0 12px;
+      .login-card h1 {
+        margin: 0 0 6px;
+        font-size: clamp(22px, 4vw, 28px);
+      }
+      .login-card p {
+        margin: 0 0 18px;
         color: var(--mut);
       }
-      form,
-      .card {
-        background: var(--bg);
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        padding: 14px;
-        margin: 12px 0;
-      }
-      label {
+      .login-card label {
         display: block;
         margin: 0 0 12px;
         font-size: 12px;
         font-weight: 600;
       }
-      input {
+      .login-card input {
         display: block;
         width: 100%;
         box-sizing: border-box;
         margin-top: 6px;
-        padding: 10px 12px;
+        padding: 11px 12px;
         border: 1px solid var(--line);
         border-radius: 10px;
         font: inherit;
-        background: #fff;
       }
-      button {
+      .login-card button,
+      .btn {
         padding: 10px 14px;
         border: 0;
         border-radius: 10px;
@@ -80,116 +74,342 @@
         font-weight: 600;
         cursor: pointer;
       }
-      button.danger {
-        background: #fff;
-        color: #b42318;
-        border: 1px solid #b42318;
-      }
-      .note {
-        min-height: 1.2em;
-        font-weight: 600;
-      }
-      .tabs {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin: 12px 0;
-      }
-      .tabs button {
+      .btn.ghost {
         background: #fff;
         color: var(--fg);
         border: 1px solid var(--line);
       }
-      .tabs button.on {
-        background: var(--amber);
-        color: var(--on);
+      .btn.danger {
+        background: #fff;
+        color: #b42318;
+        border: 1px solid #b42318;
+      }
+      .btn:disabled {
+        opacity: 0.55;
+        cursor: wait;
+      }
+      .note {
+        min-height: 1.2em;
+        margin-top: 10px;
+        font-weight: 600;
+        color: #b42318;
+      }
+      #app {
+        display: grid;
+        grid-template-columns: var(--admin-side) 1fr;
+      }
+      #app[hidden] {
+        display: none !important;
+      }
+      .nav {
+        overflow: auto;
+        border-right: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.88);
+        padding: max(14px, env(safe-area-inset-top)) 12px max(14px, env(safe-area-inset-bottom));
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .brand b {
+        font-size: 15px;
+      }
+      .nav button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        margin: 0 0 6px;
+        padding: 10px 12px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--fg);
+        font: inherit;
+        cursor: pointer;
+      }
+      .nav button.on {
+        background: rgba(65, 105, 225, 0.12);
+        border-color: var(--line);
+        font-weight: 600;
+      }
+      .who {
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+        font-size: 12px;
+        color: var(--mut);
+        word-break: break-all;
+      }
+      .main {
+        overflow: auto;
+        padding: max(16px, env(safe-area-inset-top)) clamp(12px, 2vw, 22px) max(24px, env(safe-area-inset-bottom));
+      }
+      .topbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      .topbar h2 {
+        margin: 0;
+        font-size: clamp(20px, 3vw, 26px);
+      }
+      .tools {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 0 0 14px;
+      }
+      .tools input,
+      .tools select {
+        padding: 9px 11px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font: inherit;
+        background: #fff;
+        min-width: min(180px, 100%);
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px;
+        background: rgba(255, 255, 255, 0.9);
+      }
+      .card b {
+        display: block;
+        font-size: 22px;
+      }
+      .card span {
+        color: var(--mut);
+        font-size: 12px;
       }
       table {
         width: 100%;
         border-collapse: collapse;
         font-size: 13px;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
       }
       th,
       td {
         text-align: left;
-        padding: 8px 4px;
+        padding: 10px 8px;
         border-bottom: 1px solid var(--line);
         vertical-align: top;
+      }
+      th {
+        background: rgba(65, 105, 225, 0.08);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--mut);
       }
       td small {
         display: block;
         color: var(--mut);
       }
+      .pager {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-top: 12px;
+      }
       .empty {
         color: var(--mut);
+        padding: 18px 0;
       }
-      .top {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-      }
-      .mic {
-        width: 42px;
-        height: 42px;
-        padding: 0;
-        border-radius: 12px;
-        display: grid;
-        place-items: center;
-      }
-      .mic svg {
-        display: block;
-      }
-      .code {
-        font: 700 22px ui-monospace, monospace;
-        letter-spacing: 3px;
-        color: var(--amber);
-      }
-      a.open {
+      .pill {
         display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .pill.on {
+        background: rgba(22, 163, 74, 0.12);
+        color: #15803d;
+      }
+      .pill.off {
+        background: rgba(180, 35, 24, 0.08);
+        color: #b42318;
+      }
+      .detail {
+        margin-top: 14px;
+        white-space: pre-wrap;
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+        max-height: 320px;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        background: #fff;
+      }
+      .thumb {
+        width: 64px;
+        height: 64px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #fff;
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .form-grid label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .form-grid input {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
         margin-top: 6px;
-        color: var(--amber);
-        font-weight: 700;
+        padding: 9px 11px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font: inherit;
+      }
+      .menu-toggle {
+        display: none;
+      }
+      @media (max-width: 860px) {
+        #app.on {
+          grid-template-columns: 1fr;
+        }
+        .nav {
+          position: fixed;
+          z-index: 40;
+          inset: 0 auto 0 0;
+          width: var(--admin-side);
+          transform: translateX(-105%);
+          transition: transform 0.2s ease;
+          box-shadow: 12px 0 40px rgba(15, 42, 138, 0.16);
+        }
+        .nav.open {
+          transform: none;
+        }
+        .menu-toggle {
+          display: inline-flex;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="stage"><iframe src="/" title="Lay C Factory"></iframe></div>
-    <aside class="side">
-      <div class="top">
-        <h1>Admin</h1>
-        <button type="button" id="mkmeet" class="mic" hidden aria-label="Generate a meeting code" title="Generate a meeting code">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h4v4H7z"/><path d="M9 7v3a6 6 0 0 0 6 6h2"/><path d="M15 14l2 2 2-2"/><path d="M6 21h8"/></svg>
-        </button>
-      </div>
-      <p id="who">Sign in with the admin email to manage accounts, photos, orders and rooms.</p>
-      <form id="login">
+    <div id="gate">
+      <form class="login-card" id="login">
+        <h1>Lay C Admin</h1>
+        <p>Sign in with an authorized admin account. There is no public registration for this panel.</p>
         <label>Email<input id="email" type="email" autocomplete="username" required /></label>
         <label>Password<input id="pass" type="password" autocomplete="current-password" minlength="6" required /></label>
-        <button type="submit">Log in</button>
+        <button type="submit">Sign in</button>
+        <p class="note" id="gateNote"></p>
       </form>
-      <section id="desk" hidden>
-        <div class="tabs" id="tabs">
-          <button type="button" data-status="account" class="on">Accounts</button>
-          <button type="button" data-status="photo">Photos</button>
-          <button type="button" data-status="room">Rooms</button>
-          <button type="button" data-status="meeting">Meetings</button>
-          <button type="button" data-status="received">Orders</button>
+    </div>
+
+    <div id="app" hidden>
+      <aside class="nav" id="nav">
+        <div class="brand">
+          <b>Lay C Admin</b>
+          <button type="button" class="btn ghost" id="navClose" hidden>Close</button>
         </div>
-        <div class="card" id="list"></div>
-      </section>
-      <p class="note" id="note"></p>
-    </aside>
+        <nav id="sections">
+          <button type="button" data-sec="overview" class="on">Overview</button>
+          <button type="button" data-sec="orders">Orders</button>
+          <button type="button" data-sec="exports">Excel exports</button>
+          <button type="button" data-sec="customers">Customers</button>
+          <button type="button" data-sec="meetings">Meeting rooms</button>
+          <button type="button" data-sec="photos">Photo binder</button>
+          <button type="button" data-sec="albums">Family albums</button>
+          <button type="button" data-sec="reviews">Reviews</button>
+          <button type="button" data-sec="rooms">Order sheets</button>
+          <button type="button" data-sec="logs">Activity logs</button>
+          <button type="button" data-sec="settings">Admin settings</button>
+        </nav>
+        <div class="who">
+          <div id="who">Signed in</div>
+          <button type="button" class="btn ghost" id="logout" style="margin-top: 10px; width: 100%">Log out</button>
+          <a class="btn ghost" href="/" style="display: block; margin-top: 8px; text-align: center; text-decoration: none">Open website</a>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="topbar">
+          <div style="display: flex; gap: 8px; align-items: center">
+            <button type="button" class="btn ghost menu-toggle" id="menuOpen">Menu</button>
+            <h2 id="title">Overview</h2>
+          </div>
+          <span id="statusLine" class="pill">Ready</span>
+        </div>
+        <div id="panel"></div>
+      </main>
+    </div>
+
     <script>
-      const $ = (s) => document.querySelector(s);
+      const $ = (s, r) => (r || document).querySelector(s);
+      const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
       const esc = (s) =>
-        String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      const ADMIN_KEY = "lcadmin";
+      const titles = {
+        overview: "Overview",
+        orders: "Orders",
+        exports: "Excel exports",
+        customers: "Customer emails and accounts",
+        meetings: "Meeting rooms",
+        photos: "Photo binder",
+        albums: "Family photo album",
+        reviews: "Reviews",
+        rooms: "Order room sheets",
+        logs: "Reports and activity logs",
+        settings: "Admin settings",
+      };
       let token = "";
       let email = "";
-      let rows = [];
-      let status = "account";
-      function note(t) {
-        $("#note").textContent = t || "";
+      let sec = "overview";
+      let page = 1;
+      let q = "";
+      let selected = null;
+
+      function note(el, t) {
+        const n = $(el);
+        if (n) n.textContent = t || "";
+      }
+      function setStatus(t) {
+        $("#statusLine").textContent = t || "Ready";
+      }
+      function saveSession(data) {
+        localStorage.setItem(
+          ADMIN_KEY,
+          JSON.stringify({
+            email: data.email || email,
+            name: data.name || "",
+            token: data.token || token,
+          }),
+        );
+      }
+      function clearSession() {
+        localStorage.removeItem(ADMIN_KEY);
+        token = "";
+        email = "";
       }
       async function call(body) {
         const res = await fetch("/api/admin", {
@@ -198,54 +418,581 @@
           body: JSON.stringify(Object.assign({ token }, body)),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.ok) throw new Error(data.error || "The admin request failed.");
+        if (!res.ok || !data.ok) {
+          const err = new Error(data.error || "The admin request failed.");
+          err.status = res.status;
+          throw err;
+        }
         return data;
       }
-      function paint() {
-        const shown = rows.filter((row) =>
-          status === "received" ? row.status !== "account" && row.status !== "photo" && row.status !== "room" && row.status !== "meeting" : row.status === status,
+      function when(v) {
+        if (!v) return "—";
+        const d = new Date(v);
+        return isNaN(d) ? String(v) : d.toLocaleString();
+      }
+      function pager(data) {
+        if (!data || !data.pages) return "";
+        return (
+          '<div class="pager"><button type="button" class="btn ghost" data-page="' +
+          Math.max(1, (data.page || 1) - 1) +
+          '" ' +
+          (data.page <= 1 ? "disabled" : "") +
+          ">Prev</button><span>Page " +
+          esc(data.page) +
+          " / " +
+          esc(data.pages) +
+          " · " +
+          esc(data.total) +
+          " rows</span><button type="button" class="btn ghost" data-page="' +
+          Math.min(data.pages, (data.page || 1) + 1) +
+          '" ' +
+          (data.page >= data.pages ? "disabled" : "") +
+          ">Next</button></div>"
         );
-        if (!shown.length) {
-          $("#list").innerHTML = '<p class="empty">Nothing is stored in this list.</p>';
-          return;
-        }
-        $("#list").innerHTML =
-          "<table><tbody>" +
-          shown
-            .map((row) => {
-              const meet = row.status === "meeting";
-              const extra = meet ? "" : row.code ? "Room " + row.code : row.status;
-              const self = row.status === "account" && row.email === email;
-              return (
-                "<tr><td><b" +
-                (meet ? ' class="code"' : "") +
-                ">" +
-                esc(meet ? row.code || row.name : row.name || row.email || "Record") +
-                "</b><small>" +
-                (meet
-                  ? 'Share this code. <a class="open" href="https://meet.ffmuc.net/LAYC-' +
-                    esc(row.code) +
-                    '" target="_blank" rel="noopener">Open the meeting</a><br>'
-                  : esc(row.email) + (row.phone ? " · " + esc(row.phone) : "") + "<br>" + esc(extra) + (row.total ? " · " + esc(row.total) + " L.E" : "") + "<br>") +
-                esc(row.created_at ? new Date(row.created_at).toLocaleString() : "") +
-                "</small></td><td>" +
-                (self ? "" : '<button type="button" class="danger" data-id="' + esc(row.id) + '"' + (meet ? ' data-kind="meeting"' : "") + ">" + (meet ? "End" : "Delete") + "</button>") +
-                "</td></tr>"
-              );
-            })
+      }
+      function tools(extra) {
+        return (
+          '<div class="tools"><input id="q" placeholder="Search" value="' +
+          esc(q) +
+          '" /><button type="button" class="btn" id="find">Search</button>' +
+          (extra || "") +
+          "</div>"
+        );
+      }
+      function bindTools(reload) {
+        $("#find")?.addEventListener("click", () => {
+          q = $("#q").value.trim();
+          page = 1;
+          reload();
+        });
+        $("#q")?.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            q = $("#q").value.trim();
+            page = 1;
+            reload();
+          }
+        });
+        $$("[data-page]").forEach((b) =>
+          b.addEventListener("click", () => {
+            page = Number(b.dataset.page) || 1;
+            reload();
+          }),
+        );
+      }
+      function downloadCsv(filename, csv) {
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = filename || "lay-c-export.csv";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+
+      async function showOverview() {
+        const data = await call({ op: "overview" });
+        const t = data.totals || {};
+        $("#panel").innerHTML =
+          '<div class="cards">' +
+          [
+            ["Orders", t.orders],
+            ["Accounts", t.accounts],
+            ["Photos", t.photos],
+            ["Meetings", t.meetings],
+            ["Reviews", t.reviews],
+            ["Sheets", t.rooms],
+          ]
+            .map((x) => '<div class="card"><b>' + esc(x[1] || 0) + "</b><span>" + esc(x[0]) + "</span></div>")
             .join("") +
-          "</tbody></table>";
+          "</div><div class=\"card\"><b style=\"font-size:14px\">Recent activity</b>" +
+          ((data.recent || []).length
+            ? "<table><thead><tr><th>When</th><th>Type</th><th>Customer</th><th>Total</th></tr></thead><tbody>" +
+              data.recent
+                .map(
+                  (r) =>
+                    "<tr><td>" +
+                    esc(when(r.created_at)) +
+                    "</td><td><span class=\"pill\">" +
+                    esc(r.status) +
+                    "</span></td><td>" +
+                    esc(r.name || r.email || "—") +
+                    "<small>" +
+                    esc(r.email) +
+                    "</small></td><td>" +
+                    esc(r.total || "—") +
+                    "</td></tr>",
+                )
+                .join("") +
+              "</tbody></table>"
+            : '<p class="empty">No records yet.</p>') +
+          "</div>";
       }
-      async function load() {
-        const data = await call({ op: "list" });
-        email = data.email || email;
-        rows = data.rows || [];
+
+      async function showOrders() {
+        const status = $("#fStatus")?.value || "";
+        const data = await call({ op: "orders", q, page, pageSize: 25, status: status || "orders" });
+        $("#panel").innerHTML =
+          tools(
+            '<select id="fStatus"><option value="orders">All order statuses</option><option value="received">received</option><option value="notified">notified</option><option value="processing">processing</option><option value="done">done</option><option value="cancelled">cancelled</option></select><button type="button" class="btn ghost" id="expOrders">Export Excel CSV</button>',
+          ) +
+          ((data.rows || []).length
+            ? "<table><thead><tr><th>Date</th><th>Customer</th><th>Status</th><th>Total</th><th></th></tr></thead><tbody>" +
+              data.rows
+                .map(
+                  (r) =>
+                    "<tr><td>" +
+                    esc(when(r.created_at)) +
+                    "</td><td><b>" +
+                    esc(r.name || "Customer") +
+                    "</b><small>" +
+                    esc(r.email) +
+                    (r.phone ? " · " + esc(r.phone) : "") +
+                    "</small></td><td><span class=\"pill\">" +
+                    esc(r.status) +
+                    "</span><small>" +
+                    esc(r.service || "") +
+                    "</small></td><td>" +
+                    esc(r.total || "—") +
+                    "</td><td><button type=\"button\" class=\"btn ghost\" data-open=\"" +
+                    esc(r.id) +
+                    "\">Open</button></td></tr>",
+                )
+                .join("") +
+              "</tbody></table>" +
+              pager(data)
+            : '<p class="empty">No orders match this filter.</p>') +
+          '<div id="detail"></div>';
+        if ($("#fStatus") && status) $("#fStatus").value = status;
+        bindTools(showOrders);
+        $("#fStatus")?.addEventListener("change", () => {
+          page = 1;
+          showOrders();
+        });
+        $("#expOrders")?.addEventListener("click", async () => {
+          const exp = await call({ op: "export", kind: "orders", q });
+          downloadCsv(exp.filename, exp.csv);
+          setStatus("Exported " + exp.rows + " rows");
+        });
+        $$("[data-open]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            const row = await call({ op: "get", id: b.dataset.open });
+            selected = row.row;
+            $("#detail").innerHTML =
+              '<div class="card"><div class="tools"><select id="newStatus"><option>received</option><option>notified</option><option>processing</option><option>done</option><option>cancelled</option></select><input id="adminNote" placeholder="Admin note" /><button type="button" class="btn" id="saveStatus">Update status</button><button type="button" class="btn danger" id="delOrder">Delete</button></div><div class="detail">' +
+              esc(JSON.stringify(selected, null, 2)) +
+              "</div></div>";
+            $("#newStatus").value = selected.status;
+            $("#saveStatus").onclick = async () => {
+              await call({ op: "update_status", id: selected.id, status: $("#newStatus").value, note: $("#adminNote").value });
+              setStatus("Status updated");
+              showOrders();
+            };
+            $("#delOrder").onclick = async () => {
+              if (!confirm("Delete this order?")) return;
+              await call({ op: "delete", id: selected.id });
+              setStatus("Deleted");
+              showOrders();
+            };
+          }),
+        );
+      }
+
+      async function showExports() {
+        $("#panel").innerHTML =
+          '<div class="card"><p>Download Excel-compatible CSV files from live Supabase data. Each export is recorded in activity logs.</p><div class="tools">' +
+          ["orders", "customers", "reviews", "meetings"]
+            .map((k) => '<button type="button" class="btn" data-kind="' + k + '">Export ' + k + "</button>")
+            .join("") +
+          '</div><p class="empty" id="expNote"></p></div>';
+        $$("[data-kind]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            b.disabled = true;
+            try {
+              const exp = await call({ op: "export", kind: b.dataset.kind });
+              downloadCsv(exp.filename, exp.csv);
+              $("#expNote").textContent = "Downloaded " + exp.filename + " (" + exp.rows + " rows).";
+            } catch (err) {
+              $("#expNote").textContent = err.message;
+            } finally {
+              b.disabled = false;
+            }
+          }),
+        );
+      }
+
+      async function showCustomers() {
+        const data = await call({ op: "customers", q, page, pageSize: 25 });
+        $("#panel").innerHTML =
+          tools('<button type="button" class="btn ghost" id="expCust">Export</button>') +
+          ((data.rows || []).length
+            ? "<table><thead><tr><th>Customer</th><th>Account</th><th>Activity</th><th>Last seen</th></tr></thead><tbody>" +
+              data.rows
+                .map(
+                  (c) =>
+                    "<tr><td><b>" +
+                    esc(c.name || "—") +
+                    "</b><small>" +
+                    esc(c.email) +
+                    (c.phone ? " · " + esc(c.phone) : "") +
+                    "</small></td><td>" +
+                    (c.has_account ? '<span class="pill on">Account</span>' : '<span class="pill">Email only</span>') +
+                    "</td><td><small>Orders " +
+                    esc(c.orders) +
+                    " · Photos " +
+                    esc(c.photos) +
+                    " · Reviews " +
+                    esc(c.reviews) +
+                    "</small></td><td>" +
+                    esc(when(c.last_at)) +
+                    "</td></tr>",
+                )
+                .join("") +
+              "</tbody></table>" +
+              pager(data)
+            : '<p class="empty">No customers found.</p>');
+        bindTools(showCustomers);
+        $("#expCust")?.addEventListener("click", async () => {
+          const exp = await call({ op: "export", kind: "customers" });
+          downloadCsv(exp.filename, exp.csv);
+        });
+      }
+
+      async function showMeetings() {
+        const data = await call({ op: "list", status: "meeting", q, page, pageSize: 50 });
+        $("#panel").innerHTML =
+          '<div class="card"><b style="font-size:14px">Create meeting room</b><div class="form-grid"><label>Name<input id="mName" placeholder="Design review" /></label><label>Date / time<input id="mWhen" type="datetime-local" /></label><label>Duration (min)<input id="mDur" type="number" min="15" value="60" /></label></div><button type="button" class="btn" id="mCreate">Create room</button><p class="empty" id="mNote"></p></div>' +
+          tools() +
+          ((data.rows || []).length
+            ? "<table><thead><tr><th>Room</th><th>Code / link</th><th>Status</th><th></th></tr></thead><tbody>" +
+              data.rows
+                .map((r) => {
+                  const link = "https://meet.ffmuc.net/LAYC-" + esc(r.code);
+                  return (
+                    "<tr><td><b>" +
+                    esc(r.room_name || r.name) +
+                    "</b><small>" +
+                    esc(when(r.starts_at || r.created_at)) +
+                    (r.duration_min ? " · " + esc(r.duration_min) + " min" : "") +
+                    "</small></td><td><b>" +
+                    esc(r.code) +
+                    '</b><small><a href="' +
+                    link +
+                    '" target="_blank" rel="noopener">Open link</a></small></td><td>' +
+                    (r.closed ? '<span class="pill off">Closed</span>' : r.active ? '<span class="pill on">Active</span>' : '<span class="pill off">Inactive</span>') +
+                    '</td><td><button type="button" class="btn ghost" data-copy="' +
+                    link +
+                    '">Copy link</button> <button type="button" class="btn ghost" data-toggle="' +
+                    esc(r.id) +
+                    '" data-active="' +
+                    (r.active ? "0" : "1") +
+                    '">' +
+                    (r.active ? "Deactivate" : "Activate") +
+                    '</button> <button type="button" class="btn ghost" data-close="' +
+                    esc(r.id) +
+                    '">Close</button> <button type="button" class="btn danger" data-del="' +
+                    esc(r.id) +
+                    '">Delete</button></td></tr>'
+                  );
+                })
+                .join("") +
+              "</tbody></table>" +
+              pager(data)
+            : '<p class="empty">No meeting rooms yet. Create one above.</p>');
+        bindTools(showMeetings);
+        $("#mCreate").onclick = async () => {
+          try {
+            const created = await call({
+              op: "meet_create",
+              name: $("#mName").value.trim(),
+              starts_at: $("#mWhen").value,
+              duration_min: Number($("#mDur").value) || 60,
+            });
+            $("#mNote").textContent = "Created code " + created.code + ". Customers can join from Telephone → Join a Room.";
+            showMeetings();
+          } catch (err) {
+            $("#mNote").textContent = err.message;
+          }
+        };
+        $$("[data-copy]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(b.dataset.copy);
+              setStatus("Link copied");
+            } catch (e) {
+              setStatus(b.dataset.copy);
+            }
+          }),
+        );
+        $$("[data-toggle]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            await call({ op: "meet_update", id: b.dataset.toggle, active: b.dataset.active === "1" });
+            showMeetings();
+          }),
+        );
+        $$("[data-close]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            await call({ op: "meet_update", id: b.dataset.close, closed: true, active: false });
+            showMeetings();
+          }),
+        );
+        $$("[data-del]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            if (!confirm("Delete this meeting room?")) return;
+            await call({ op: "delete", id: b.dataset.del });
+            showMeetings();
+          }),
+        );
+      }
+
+      async function showPhotos() {
+        const data = await call({ op: "photos", q, page, pageSize: 24 });
+        $("#panel").innerHTML =
+          tools() +
+          ((data.rows || []).length
+            ? "<table><thead><tr><th>Photo</th><th>Owner</th><th>Visibility</th><th></th></tr></thead><tbody>" +
+              data.rows
+                .map(
+                  (r) =>
+                    "<tr><td>" +
+                    (r.thumb ? '<img class="thumb" src="' + esc(r.thumb) + '" alt="" />' : "—") +
+                    "</td><td><b>" +
+                    esc(r.name || "—") +
+                    "</b><small>" +
+                    esc(r.email) +
+                    "<br>" +
+                    esc(when(r.created_at)) +
+                    "</small></td><td>" +
+                    (r.shared ? '<span class="pill on">Family album</span>' : '<span class="pill">Private binder</span>') +
+                    (r.moderated ? "<small>Moderated</small>" : "") +
+                    '</td><td><button type="button" class="btn danger" data-del="' +
+                    esc(r.id) +
+                    '">Remove</button></td></tr>',
+                )
+                .join("") +
+              "</tbody></table>" +
+              pager(data)
+            : '<p class="empty">No binder photos yet.</p>');
+        bindTools(showPhotos);
+        $$("[data-del]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            if (!confirm("Remove this photo record?")) return;
+            await call({ op: "delete", id: b.dataset.del });
+            showPhotos();
+          }),
+        );
+      }
+
+      async function showAlbums() {
+        const data = await call({ op: "albums", q, page, pageSize: 25 });
+        $("#panel").innerHTML =
+          tools('<a class="btn ghost" href="/desk.html">Open album desk</a>') +
+          ((data.rows || []).length
+            ? "<table><thead><tr><th>Album</th><th>Photos</th><th>Order</th><th>Created</th></tr></thead><tbody>" +
+              data.rows
+                .map(
+                  (a) =>
+                    "<tr><td><b>" +
+                    esc(a.name) +
+                    "</b></td><td>" +
+                    esc(a.photo_count) +
+                    "</td><td><small>" +
+                    esc(a.order_id) +
+                    "</small></td><td>" +
+                    esc(when(a.created_at)) +
+                    "</td></tr>",
+                )
+                .join("") +
+              "</tbody></table>" +
+              pager(data)
+            : '<p class="empty">No family albums yet. Create links from the album desk.</p>');
+        bindTools(showAlbums);
+      }
+
+      async function showReviews() {
+        const data = await call({ op: "reviews", q, page, pageSize: 25 });
+        $("#panel").innerHTML =
+          tools('<button type="button" class="btn ghost" id="expRev">Export</button>') +
+          ((data.rows || []).length
+            ? "<table><thead><tr><th>Review</th><th>Rating</th><th>Status</th><th></th></tr></thead><tbody>" +
+              data.rows
+                .map(
+                  (r) =>
+                    "<tr><td><b>" +
+                    esc(r.name || "Customer") +
+                    "</b><small>" +
+                    esc(r.review) +
+                    "<br>" +
+                    esc(when(r.created_at)) +
+                    "</small></td><td>" +
+                    esc(r.rating || "—") +
+                    "/5</td><td>" +
+                    (r.hidden ? '<span class="pill off">Hidden</span>' : '<span class="pill on">Public</span>') +
+                    '</td><td><button type="button" class="btn ghost" data-hide="' +
+                    esc(r.id) +
+                    '" data-val="' +
+                    (r.hidden ? "0" : "1") +
+                    '">' +
+                    (r.hidden ? "Show" : "Hide") +
+                    '</button> <button type="button" class="btn danger" data-rm="' +
+                    esc(r.id) +
+                    '">Remove</button></td></tr>',
+                )
+                .join("") +
+              "</tbody></table>" +
+              pager(data)
+            : '<p class="empty">No reviews yet.</p>');
+        bindTools(showReviews);
+        $("#expRev")?.addEventListener("click", async () => {
+          const exp = await call({ op: "export", kind: "reviews" });
+          downloadCsv(exp.filename, exp.csv);
+        });
+        $$("[data-hide]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            await call({ op: "review_moderate", id: b.dataset.hide, hidden: b.dataset.val === "1" });
+            showReviews();
+          }),
+        );
+        $$("[data-rm]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            if (!confirm("Remove this review?")) return;
+            await call({ op: "review_moderate", id: b.dataset.rm, remove: true });
+            showReviews();
+          }),
+        );
+      }
+
+      async function showRooms() {
+        const data = await call({ op: "list", status: "room", q, page, pageSize: 25 });
+        $("#panel").innerHTML =
+          tools() +
+          '<p class="empty">These are seniors / order sheet passwords (not video meetings).</p>' +
+          ((data.rows || []).length
+            ? "<table><thead><tr><th>Sheet</th><th>Code</th><th>Customer</th><th></th></tr></thead><tbody>" +
+              data.rows
+                .map(
+                  (r) =>
+                    "<tr><td>" +
+                    esc(r.name) +
+                    "<small>" +
+                    esc(when(r.created_at)) +
+                    "</small></td><td><b>" +
+                    esc(r.code) +
+                    "</b></td><td>" +
+                    esc(r.email || "—") +
+                    '</td><td><button type="button" class="btn danger" data-del="' +
+                    esc(r.id) +
+                    '">Delete</button></td></tr>',
+                )
+                .join("") +
+              "</tbody></table>" +
+              pager(data)
+            : '<p class="empty">No order sheets stored.</p>');
+        bindTools(showRooms);
+        $$("[data-del]").forEach((b) =>
+          b.addEventListener("click", async () => {
+            if (!confirm("Delete this sheet?")) return;
+            await call({ op: "delete", id: b.dataset.del });
+            showRooms();
+          }),
+        );
+      }
+
+      async function showLogs() {
+        const data = await call({ op: "logs", q, page, pageSize: 40 });
+        $("#panel").innerHTML =
+          tools() +
+          ((data.rows || []).length
+            ? "<table><thead><tr><th>When</th><th>Admin</th><th>Action</th><th>Detail</th></tr></thead><tbody>" +
+              data.rows
+                .map(
+                  (r) =>
+                    "<tr><td>" +
+                    esc(when(r.created_at)) +
+                    "</td><td>" +
+                    esc(r.email) +
+                    "</td><td><span class=\"pill\">" +
+                    esc(r.action) +
+                    "</span></td><td><small>" +
+                    esc(JSON.stringify(r.detail || {})) +
+                    "</small></td></tr>",
+                )
+                .join("") +
+              "</tbody></table>" +
+              pager(data)
+            : '<p class="empty">No admin actions logged yet.</p>');
+        bindTools(showLogs);
+      }
+
+      async function showSettings() {
+        const data = await call({ op: "settings" });
+        $("#panel").innerHTML =
+          '<div class="card"><p><b>Signed in as</b><br>' +
+          esc(data.email) +
+          "</p><p><b>Auth model</b><br>" +
+          esc(data.auth) +
+          " (allowlisted staff email + server-verified account token)</p><p><b>Meeting provider</b><br>" +
+          esc(data.meeting_provider) +
+          "</p><ul>" +
+          (data.notes || []).map((n) => "<li>" + esc(n) + "</li>").join("") +
+          "</ul><p>Configure <code>STAFF_EMAILS</code> and Supabase service-role keys on the server only. Never put secrets in this page.</p></div>";
+      }
+
+      const screens = {
+        overview: showOverview,
+        orders: showOrders,
+        exports: showExports,
+        customers: showCustomers,
+        meetings: showMeetings,
+        photos: showPhotos,
+        albums: showAlbums,
+        reviews: showReviews,
+        rooms: showRooms,
+        logs: showLogs,
+        settings: showSettings,
+      };
+
+      async function go(next) {
+        sec = next || sec;
+        page = sec === next ? page : 1;
+        if (arguments.length && next) page = 1;
+        $("#title").textContent = titles[sec] || sec;
+        $$("#sections button").forEach((b) => b.classList.toggle("on", b.dataset.sec === sec));
+        $("#nav").classList.remove("open");
+        setStatus("Loading…");
+        try {
+          await screens[sec]();
+          setStatus("Ready");
+        } catch (err) {
+          if (err.status === 403) {
+            logout(err.message);
+            return;
+          }
+          $("#panel").innerHTML = '<p class="empty">' + esc(err.message || "Could not load this section.") + "</p>";
+          setStatus("Error");
+        }
+      }
+
+      function enterApp(session) {
+        token = session.token;
+        email = session.email || "";
+        $("#gate").hidden = true;
+        $("#app").hidden = false;
         $("#who").textContent = "Signed in as " + email;
-        paint();
+        go("overview");
       }
+
+      function logout(msg) {
+        clearSession();
+        $("#app").hidden = true;
+        $("#gate").hidden = false;
+        note("#gateNote", msg || "");
+      }
+
       $("#login").addEventListener("submit", async (e) => {
         e.preventDefault();
-        note("");
+        note("#gateNote", "");
+        const btn = $("#login button");
+        btn.disabled = true;
         try {
           const res = await fetch("/api/account", {
             method: "POST",
@@ -258,85 +1005,43 @@
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok || !data.ok) throw new Error(data.error || "Log in failed.");
+          if (!data.staff) throw new Error("This account is not authorized for admin access.");
           token = data.token;
           email = data.customer_email || "";
-          localStorage.setItem(
-            "lcaccount",
-            JSON.stringify({
-              name: data.customer_name || "",
-              email: email,
-              phone: data.customer_phone || "",
-              token: token,
-            }),
-          );
+          saveSession({ token, email, name: data.customer_name || "" });
+          // Confirm server-side admin gate before showing dashboard.
+          await call({ op: "session" });
           $("#pass").value = "";
-          $("#login").hidden = true;
-          $("#desk").hidden = false;
-          $("#mkmeet").hidden = false;
-          await load();
+          enterApp({ token, email });
         } catch (err) {
-          note(err.message || "Log in failed.");
-        }
-      });
-      $("#tabs").addEventListener("click", (e) => {
-        const b = e.target.closest("button[data-status]");
-        if (!b) return;
-        status = b.dataset.status;
-        $("#tabs").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
-        paint();
-      });
-      $("#list").addEventListener("click", async (e) => {
-        const b = e.target.closest("button[data-id]");
-        if (!b) return;
-        if (!confirm(b.dataset.kind === "meeting" ? "End this meeting code?" : "Delete this record?")) return;
-        note("");
-        try {
-          await call({ op: "delete", id: b.dataset.id });
-          await load();
-          note("Deleted.");
-        } catch (err) {
-          note(err.message || "It was not deleted.");
-        }
-      });
-      $("#mkmeet").addEventListener("click", async () => {
-        note("");
-        $("#mkmeet").disabled = true;
-        try {
-          const data = await call({ op: "meet" });
-          status = "meeting";
-          $("#tabs").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.status === "meeting"));
-          await load();
-          note("Meeting code " + (data.code || "") + ". Share it to join.");
-        } catch (err) {
-          note(err.message || "The meeting code was not created.");
+          clearSession();
+          note("#gateNote", err.message || "Log in failed.");
         } finally {
-          $("#mkmeet").disabled = false;
+          btn.disabled = false;
         }
       });
-      const frame = document.querySelector("iframe");
-      const showSite = () => {
-        try {
-          const box = frame.contentDocument && frame.contentDocument.getElementById("account");
-          if (box) box.hidden = true;
-        } catch (e) {}
-      };
-      frame.addEventListener("load", showSite);
-      showSite();
-      const saved = JSON.parse(localStorage.getItem("lcaccount") || "null");
-      if (saved && saved.token) {
+
+      $("#sections").addEventListener("click", (e) => {
+        const b = e.target.closest("button[data-sec]");
+        if (b) go(b.dataset.sec);
+      });
+      $("#logout").onclick = () => logout("Signed out.");
+      $("#menuOpen").onclick = () => $("#nav").classList.add("open");
+      $("#navClose").onclick = () => $("#nav").classList.remove("open");
+      $("#navClose").hidden = false;
+
+      (async () => {
+        const saved = JSON.parse(localStorage.getItem(ADMIN_KEY) || "null");
+        if (!saved || !saved.token) return;
         token = saved.token;
         email = saved.email || "";
-        $("#login").hidden = true;
-        $("#desk").hidden = false;
-        $("#mkmeet").hidden = false;
-        load().catch((err) => {
-          token = "";
-          $("#login").hidden = false;
-          $("#desk").hidden = true;
-          $("#mkmeet").hidden = true;
-          note(err.message || "Sign in with the admin email.");
-        });
-      }
+        try {
+          await call({ op: "session" });
+          enterApp(saved);
+        } catch (err) {
+          logout(err.message || "Sign in again with an admin account.");
+        }
+      })();
     </script>
   </body>
 </html>

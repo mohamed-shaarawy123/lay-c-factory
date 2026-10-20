@@ -910,24 +910,26 @@
     const w = W(),
       h = H();
     if (!w || !h) return;
-    mobile = w <= 900;
-    R.setPixelRatio(Math.min(devicePixelRatio || 1, mobile ? 1.5 : 1.75));
+    // Continuous space factor (0 cramped → 1 roomy) instead of a hard width cutoff.
+    const room = Math.max(0, Math.min(1, (Math.min(w, h * 1.35) - 360) / 540));
+    mobile = room < 0.55;
+    R.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5 + 0.25 * room));
     R.setSize(w, h, false);
     const canvas = R.domElement;
     canvas.style.width = "100%";
     canvas.style.height = "100%";
     cam.aspect = w / h;
     // Keep a little top bias on tall phones so the machine sits under the header.
-    const yOff = mobile ? Math.min(h * 0.04, 28) : h * 0.05;
+    const yOff = Math.min(h * (0.035 + 0.015 * room), 18 + 14 * room);
     cam.setViewOffset(w, h, 0, yOff, w, h);
     cam.updateProjectionMatrix();
     const th = 2 * Math.tan((cam.fov * Math.PI) / 360);
-    const aspectPad = mobile ? 0.84 : 0.92;
-    const heightPad = mobile ? 0.62 : 0.7;
+    const aspectPad = 0.84 + 0.08 * room;
+    const heightPad = 0.62 + 0.08 * room;
     baseD = Math.max(13.5 / (th * cam.aspect * aspectPad), 10.5 / (th * heightPad));
-    if (mobile) baseD = Math.max(baseD, 16);
+    baseD = Math.max(baseD, 13.5 + 2.5 * (1 - room));
     ctrl.maxDistance = Math.max(55, baseD * 1.6);
-    ctrl.minDistance = mobile ? 8.5 : 7;
+    ctrl.minDistance = 7 + 1.5 * (1 - room);
     goal();
     if (!sized) {
       sized = true;
@@ -1733,29 +1735,31 @@
     const aw = W(),
       ah = H();
     if (!aw || !ah || !pinB.length) return;
-    const narrow = aw <= 700;
-    const padX = narrow ? 36 : 70;
-    const padTop = narrow ? 64 : 80;
-    const padBot = narrow ? Math.max(150, ah * 0.28) : 190;
+    const room = Math.max(0, Math.min(1, (Math.min(aw, ah * 1.35) - 360) / 540));
+    const padX = 36 + 34 * room;
+    const padTop = 56 + 24 * room;
+    const padBot = Math.max(140 + 50 * room, ah * (0.22 + 0.06 * (1 - room)));
     const placed = [];
+    const sepX = 42 + 12 * room;
+    const sepY = 24 + 4 * room;
     pinB.forEach((b, i) => {
       const st = ST[Math.min(i, ST.length - 1)];
       if (!st) return;
       pv.copy(st.g.position);
-      pv.y += narrow ? 3.6 : 4.2;
+      pv.y += 3.6 + 0.6 * room;
       pv.project(cam);
       let x = (pv.x * 0.5 + 0.5) * aw,
         y = (-pv.y * 0.5 + 0.5) * ah;
       x = Math.max(padX, Math.min(aw - padX, x));
       y = Math.max(padTop, Math.min(ah - padBot, y));
-      // Nudge overlapping pins on small screens so labels stay tappable.
-      if (narrow) {
+      // Nudge overlapping pins when space is tight so labels stay tappable.
+      if (room < 0.75) {
         for (let n = 0; n < 8; n++) {
           let hit = false;
           for (let j = 0; j < placed.length; j++) {
             const p = placed[j];
-            if (Math.abs(x - p.x) < 54 && Math.abs(y - p.y) < 28) {
-              y = p.y + (y >= p.y ? 28 : -28);
+            if (Math.abs(x - p.x) < sepX && Math.abs(y - p.y) < sepY) {
+              y = p.y + (y >= p.y ? sepY : -sepY);
               y = Math.max(padTop, Math.min(ah - padBot, y));
               hit = true;
               break;
@@ -1772,10 +1776,12 @@
       pv.project(cam);
       let bx = (pv.x * 0.5 + 0.5) * aw,
         by = (-pv.y * 0.5 + 0.5) * ah;
-      bx = Math.max(26, Math.min(aw - 26, bx));
-      by = Math.max(26, Math.min(ah - 26, by));
+      const edge = 18 + 8 * room;
+      bx = Math.max(edge, Math.min(aw - edge, bx));
+      by = Math.max(edge, Math.min(ah - edge, by));
+      const gap = 44 + 10 * room;
       camBtnEl.style.transform = "translate(" + bx + "px," + (by - 18) + "px) translate(-50%,-50%)";
-      if (albBtnEl) albBtnEl.style.transform = "translate(" + (bx + 54) + "px," + (by - 18) + "px) translate(-50%,-50%)";
+      if (albBtnEl) albBtnEl.style.transform = "translate(" + (bx + gap) + "px," + (by - 18) + "px) translate(-50%,-50%)";
     }
   }
   // STUDIO CALENDAR. Demo availability only: Fridays are closed and other days are booked by a repeatable pattern.
@@ -2575,6 +2581,13 @@
     tz.setAttribute("aria-label", f ? "Shrink back to the tablet" : "Zoom in to full screen");
     syncAccPanel();
   }
+  function preferTabFull() {
+    const w = W(),
+      h = H();
+    if (!w || !h) return true;
+    // Prefer full tablet when the floating frame would be cramped by width or height.
+    return Math.min(w / 860, h / 640) < 0.92;
+  }
   function pinFrom(i) {
     const b = pinB[i];
     if (!b || !b.style.transform) return null;
@@ -2595,7 +2608,7 @@
     const was = tf.classList.contains("on");
     tf.classList.add("on");
     // Phones: open the tablet full-screen so forms stay readable and tappable.
-    if (!was) setFull(W() <= 768);
+    if (!was) setFull(preferTabFull());
     _show(i);
     const s = SV[i],
       n = s.par != null ? s.par : i;
@@ -2693,9 +2706,9 @@
   function mtHome(err) {
     endCall();
     pg.innerHTML =
-      '<div id="mt"><div class="bx"><h3>Telephone</h3><p>Start an online meeting, or join one with the code its host gave you.</p><input id="mn" placeholder="Your name" maxlength="24" autocomplete="name" value="' +
+      '<div id="mt"><div class="bx"><h3>Telephone</h3><p>Join a room created by Lay C. Enter the code you were given, or pick an available room below.</p><input id="mn" placeholder="Your name" maxlength="24" autocomplete="name" value="' +
       mtEsc(mtName()) +
-      '"><div class="r"><button type="button" class="p" id="mh">Start a meeting</button></div><div class="r"><input id="mc" placeholder="Meeting code" inputmode="numeric" maxlength="6" autocomplete="off"><button type="button" class="g" id="mj">Join</button></div><div class="er" id="me">' +
+      '"><div class="r"><input id="mc" placeholder="Room code" inputmode="numeric" maxlength="6" autocomplete="off"><button type="button" class="p" id="mj">Join a Room</button></div><div id="mlist" class="r" style="flex-direction:column;align-items:stretch;gap:8px"></div><div class="er" id="me">' +
       mtEsc(err || "") +
       '</div><div class="r"><button type="button" class="g" id="mx">Close</button></div></div></div>';
     const readName = () => {
@@ -2703,25 +2716,17 @@
       return MT.name;
     };
     $("#mx").onclick = () => mtClose();
-    $("#mh").onclick = () => {
+    const joinCode = (c) => {
       if (!readName()) {
         $("#me").textContent = "Enter your name.";
         return;
       }
-      const n = crypto.getRandomValues(new Uint32Array(1))[0] % 900000;
-      mtOpen(true, String(100000 + n));
-    };
-    $("#mj").onclick = () => {
-      if (!readName()) {
-        $("#me").textContent = "Enter your name.";
-        return;
-      }
-      const c = $("#mc").value.replace(/\D/g, "");
+      c = String(c || "").replace(/\D/g, "");
       if (c.length !== 6) {
         $("#me").textContent = "Enter the 6-digit code.";
         return;
       }
-      $("#me").textContent = "Looking for the meeting…";
+      $("#me").textContent = "Looking for the room…";
       fetch("/api/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2730,15 +2735,46 @@
         .then((res) => res.json().then((data) => ({ res, data })))
         .then(({ res, data }) => {
           if (!res.ok || !data.ok) {
-            $("#me").textContent = (data && data.error) || "No meeting found with that code.";
+            $("#me").textContent = (data && data.error) || "No available room found with that code.";
             return;
           }
           mtOpen(false, c);
         })
         .catch(() => {
-          $("#me").textContent = "The meeting could not be checked.";
+          $("#me").textContent = "The room could not be checked.";
         });
     };
+    $("#mj").onclick = () => joinCode($("#mc").value);
+    fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ op: "available" }),
+    })
+      .then((res) => res.json().then((data) => ({ res, data })))
+      .then(({ res, data }) => {
+        const box = $("#mlist");
+        if (!box) return;
+        const rooms = (data && data.rooms) || [];
+        if (!res.ok || !data.ok || !rooms.length) {
+          box.innerHTML = "<p class=\"er\" style=\"margin:0\">No open rooms right now. Ask Lay C for a code.</p>";
+          return;
+        }
+        box.innerHTML = rooms
+          .map(
+            (r) =>
+              '<button type="button" class="g" data-code="' +
+              mtEsc(r.code) +
+              '"><b>' +
+              mtEsc(r.name || "Room " + r.code) +
+              "</b><br><small>Code " +
+              mtEsc(r.code) +
+              (r.starts_at ? " · " + mtEsc(r.starts_at) : "") +
+              "</small></button>",
+          )
+          .join("");
+        box.querySelectorAll("[data-code]").forEach((b) => (b.onclick = () => joinCode(b.dataset.code)));
+      })
+      .catch(() => {});
   }
   async function mtOpen(host, code) {
     MT.host = host;
@@ -2747,7 +2783,7 @@
     pg.innerHTML =
       '<div id="mt"><div class="bx"><h3>Telephone</h3>' +
       (host
-        ? '<div class="cd"><small>Meeting code. Share it with the people you invite.</small><b>' + mtEsc(code) + "</b></div>"
+        ? '<div class="cd"><small>Room code</small><b>' + mtEsc(code) + "</b></div>"
         : "<p>You joined as " + mtEsc(MT.name) + ".</p>") +
       '<div class="call" id="mv"></div><p class="er" id="me">Opening the meeting…</p><div class="r"><a class="g" id="mlink" href="https://meet.ffmuc.net/' +
       room +
@@ -2798,7 +2834,7 @@
     }
     const was = tf.classList.contains("on");
     tf.classList.add("on");
-    if (!was) setFull(W() <= 768);
+    if (!was) setFull(preferTabFull());
     cur = -1;
     pg.style.display = "block";
     tbt.textContent = "Telephone";
@@ -2989,7 +3025,7 @@
     }
     const was = tf.classList.contains("on");
     tf.classList.add("on");
-    if (!was) setFull(W() <= 768);
+    if (!was) setFull(preferTabFull());
     cur = -1;
     pg.style.display = "block";
     tbt.textContent = "Customer reviews";
@@ -3100,7 +3136,7 @@
     endCall();
     const was = tf.classList.contains("on");
     tf.classList.add("on");
-    if (!was) setFull(W() <= 768);
+    if (!was) setFull(preferTabFull());
     cur = -1;
     pg.style.display = "block";
     tbt.textContent = "Your orders";
@@ -5276,7 +5312,7 @@
       gCtx = ctx;
       CTX[ctx]();
     }
-    if (innerWidth > 760) setTimeout(() => gin.focus({ preventScroll: true }), 0);
+    if (Math.min(W() / 760, H() / 500) >= 1) setTimeout(() => gin.focus({ preventScroll: true }), 0);
   }
   function gClose(quiet) {
     gd.hidden = true;

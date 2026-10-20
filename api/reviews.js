@@ -79,7 +79,10 @@ module.exports = async function handler(req, res) {
       if (list.error) {
         return json(res, 502, { ok: false, error: list.error.message || "Reviews could not be loaded." });
       }
-      const reviews = (list.data || []).map(mapReview).filter(Boolean);
+      const reviews = (list.data || [])
+        .filter((row) => !(row.items && row.items.hidden))
+        .map(mapReview)
+        .filter(Boolean);
       return json(res, 200, { ok: true, reviews });
     }
 
