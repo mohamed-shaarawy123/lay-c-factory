@@ -318,12 +318,12 @@
   </head>
   <body>
     <div id="gate">
-      <form class="login-card" id="login">
+      <form class="login-card" id="login" action="#" method="post">
         <h1>Lay C Admin</h1>
         <p>Sign in with an authorized admin account. There is no public registration for this panel.</p>
         <label>Email<input id="email" type="email" autocomplete="username" required /></label>
         <label>Password<input id="pass" type="password" autocomplete="current-password" minlength="6" required /></label>
-        <button type="submit">Sign in</button>
+        <button type="submit" id="loginBtn">Sign in</button>
         <p class="note" id="gateNote"></p>
       </form>
     </div>
@@ -445,7 +445,7 @@
           esc(data.pages) +
           " · " +
           esc(data.total) +
-          " rows</span><button type="button" class="btn ghost" data-page="' +
+          ' rows</span><button type="button" class="btn ghost" data-page="' +
           Math.min(data.pages, (data.page || 1) + 1) +
           '" ' +
           (data.page >= data.pages ? "disabled" : "") +
