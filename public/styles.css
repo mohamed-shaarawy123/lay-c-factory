@@ -2648,6 +2648,26 @@ header {
 #od .ost.n b {
   color: var(--amber);
 }
+#od .ost.g i {
+  border-color: #d4af37;
+  color: #b8860b;
+}
+#od .ost.g b {
+  color: #8a6a12;
+}
+#od .ost.g.d i {
+  background: #d4af37;
+  border-color: #d4af37;
+  color: #fff;
+}
+#od .ost.g.n i {
+  border-color: #d4af37;
+  color: #b8860b;
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.28);
+}
+#od .ost.g.n b {
+  color: #8a6a12;
+}
 #od .hint,
 #od .er {
   font-size: 12px;

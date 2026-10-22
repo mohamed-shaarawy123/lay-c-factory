@@ -3092,7 +3092,8 @@
         "</b>";
       html += stages
         .map((name, i) => {
-          const cls = i < ix || fin ? "d" : i === ix ? "n" : "";
+          const gold = i === 6 && name === "Deployment & Launch";
+          const cls = (i < ix || fin ? "d" : i === ix ? "n" : "") + (gold ? " g" : "");
           return '<div class="ost ' + cls + '"><i>' + (i < ix || fin ? "✓" : i + 1) + "</i><div><b>" + esc(name) + "</b></div></div>";
         })
         .join("");

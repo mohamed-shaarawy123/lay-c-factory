@@ -589,6 +589,23 @@
         color: #5c6b94;
         font-size: 12px;
       }
+      .trk.g i {
+        border-color: #d4af37;
+        color: #b8860b;
+      }
+      .trk.g b {
+        color: #8a6a12;
+      }
+      .trk.g.d i {
+        background: #d4af37;
+        border-color: #d4af37;
+        color: #fff;
+      }
+      .trk.g.n i {
+        border-color: #d4af37;
+        color: #b8860b;
+        box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.28);
+      }
     </style>
   </head>
   <body>
@@ -1906,7 +1923,8 @@
             const done = !!order.complete || i < stage;
             const active = !order.complete && i === stage;
             const status = done ? "Completed" : active ? "In Progress" : "Pending";
-            const cls = done ? "trk d" : active ? "trk n" : "trk";
+            const gold = i === 6 && name === "Deployment & Launch";
+            const cls = (done ? "trk d" : active ? "trk n" : "trk") + (gold ? " g" : "");
             return (
               '<div class="' +
               cls +
