@@ -693,47 +693,55 @@
   box(sP, 1.7, 0.55, 1.3, 0, 0.54, 0, M.body);
   box(sP, 1.8, 0.06, 1.4, 0, 0.85, 0, M.ivory);
   const hoopE = new THREE.Group();
-  hoopE.position.set(0, 0.93, 0.1);
+  hoopE.position.set(0, 1.05, 0.1);
   sP.add(hoopE);
-  const hr = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.04, 8, 32), M.chrome);
+  const hr = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.07, 12, 40), M.orange);
   hr.rotation.x = Math.PI / 2;
   hoopE.add(hr);
-  cyl(hoopE, 0.37, 0.02, 0, 0, 0, M.ivory);
-  const emE = scr(hoopE, 0.42, 0.21, 0, 0.016, 0, embTex);
+  const hr2 = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.035, 10, 36), M.chrome);
+  hr2.rotation.x = Math.PI / 2;
+  hr2.position.y = 0.04;
+  hoopE.add(hr2);
+  cyl(hoopE, 0.3, 0.04, 0, 0.02, 0, M.ivory);
+  const emE = scr(hoopE, 0.46, 0.24, 0, 0.05, 0, embTex);
   emE.rotation.x = -Math.PI / 2;
-  box(sP, 0.24, 1.5, 0.3, 0, 1.6, -0.5, M.dark);
-  box(sP, 0.28, 0.26, 0.8, 0, 2.2, -0.15, M.orange);
+  box(sP, 0.16, 1.15, 0.16, 0, 1.5, -0.62, M.body);
+  box(sP, 0.22, 0.14, 0.85, 0, 2.05, -0.22, M.chrome);
   const eNeedle = new THREE.Group();
-  eNeedle.position.set(0, 1.6, 0.1);
+  eNeedle.position.set(0, 1.55, 0.1);
   sP.add(eNeedle);
-  cyl(eNeedle, 0.025, 0.55, 0, 0, 0, M.chrome);
-  cyl(eNeedle, 0.07, 0.16, 0, 0.35, 0, M.dark);
-  cyl(sP, 0.12, 0.34, -0.55, 1.5, -0.5, M.orange);
-  cyl(sP, 0.12, 0.34, 0.55, 1.5, -0.5, M.chrome);
+  cyl(eNeedle, 0.035, 0.72, 0, 0, 0, M.body);
+  cyl(eNeedle, 0.09, 0.14, 0, 0.38, 0, M.orange);
+  cyl(sP, 0.16, 0.08, -0.58, 0.96, -0.42, M.orange);
+  cyl(sP, 0.1, 0.42, -0.58, 1.2, -0.42, M.ivory);
+  cyl(sP, 0.16, 0.08, 0.58, 0.96, -0.42, M.chrome);
+  cyl(sP, 0.1, 0.42, 0.58, 1.2, -0.42, M.body);
   // Media buying booth: pom-pom winder, the shape under pin 05 in the reference
   box(sM, 1.7, 0.55, 1.3, 0, 0.54, 0, M.body);
   box(sM, 1.8, 0.06, 1.4, 0, 0.85, 0, M.ivory);
-  cyl(sM, 0.06, 0.9, -0.45, 1.35, -0.2, M.chrome);
+  cyl(sM, 0.07, 0.85, -0.42, 1.28, -0.15, M.body);
+  cyl(sM, 0.16, 0.06, -0.42, 0.92, -0.15, M.orange);
   const spinPom = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(0.34, 2),
-    m(GRAY, 0, 0.95, { flatShading: true }),
+    new THREE.IcosahedronGeometry(0.36, 2),
+    m(CREAM, 0, 0.95, { flatShading: true }),
   );
-  spinPom.position.set(-0.45, 1.3, 0.2);
+  spinPom.position.set(-0.42, 1.72, -0.05);
   spinPom.castShadow = true;
   sM.add(spinPom);
   const cutter = new THREE.Group();
-  cutter.position.set(0.45, 1.1, 0.1);
+  cutter.position.set(0.42, 1.15, 0.12);
   sM.add(cutter);
-  cyl(cutter, 0.4, 0.03, 0, 0, 0, M.chrome);
-  cyl(cutter, 0.1, 0.08, 0, 0, 0, M.dark);
+  cyl(cutter, 0.38, 0.05, 0, 0, 0, M.orange);
+  cyl(cutter, 0.16, 0.08, 0, 0.02, 0, M.ivory);
+  cyl(cutter, 0.05, 0.55, 0, 0.28, 0, M.chrome);
   [
-    [0.6, 0.96, -0.4],
-    [0.35, 0.96, -0.45],
-    [0.55, 0.96, -0.1],
-  ].forEach((p) => {
+    [0.62, 0.98, -0.38],
+    [0.28, 0.98, -0.48],
+    [0.55, 0.98, 0.05],
+  ].forEach((p, i) => {
     const o = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(0.12, 1),
-      m(GRAY, 0, 0.95, { flatShading: true }),
+      new THREE.IcosahedronGeometry(0.13, 1),
+      m(i === 1 ? CREAM : OR, 0.05, 0.85, { flatShading: true }),
     );
     o.position.set(...p);
     o.castShadow = true;
@@ -6131,6 +6139,9 @@
       );
       b.scale.setScalar(1 - u * 0.7);
     });
+    eNeedle.position.y = 1.45 + Math.max(0, Math.sin(t * 9)) * 0.22;
+    hoopE.position.x = Math.sin(t * 2.2) * 0.12;
+    hoopE.position.z = 0.1 + Math.cos(t * 1.7) * 0.08;
     spinPom.rotation.y = t * 2;
     spinPom.scale.setScalar(0.85 + (Math.sin(tact) + 1) * 0.12);
     cutter.rotation.y = t * 6;
