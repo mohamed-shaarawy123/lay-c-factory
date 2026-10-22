@@ -556,6 +556,39 @@
           display: inline-flex;
         }
       }
+      .trk {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #e6ebf7;
+      }
+      .trk i {
+        flex: none;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 2px solid #c5d0ea;
+        display: grid;
+        place-items: center;
+        font: 700 11px system-ui;
+        font-style: normal;
+        color: #6b7aa3;
+      }
+      .trk.d i {
+        background: #4169e1;
+        border-color: #4169e1;
+        color: #fff;
+      }
+      .trk.n i {
+        border-color: #4169e1;
+        color: #4169e1;
+        box-shadow: 0 0 0 4px rgba(65, 105, 225, 0.18);
+      }
+      .trk .meta {
+        color: #5c6b94;
+        font-size: 12px;
+      }
     </style>
   </head>
   <body>
@@ -579,9 +612,9 @@
         <nav id="sections">
           <button type="button" data-sec="overview" class="on">Overview</button>
           <button type="button" data-sec="orders">Orders</button>
+          <button type="button" data-sec="tracking">Order Tracking Management</button>
           <button type="button" data-sec="customers">Customers</button>
           <button type="button" data-sec="meetings">Meeting rooms</button>
-          <button type="button" data-sec="albums">Family albums</button>
           <button type="button" data-sec="reviews">Reviews</button>
           <button type="button" data-sec="rooms">Order sheets</button>
           <button type="button" data-sec="logs">Activity logs</button>
@@ -615,6 +648,7 @@
       const titles = {
         overview: "Overview",
         orders: "Orders",
+        tracking: "Order Tracking Management",
         customers: "Customers",
         meetings: "Meeting rooms",
         albums: "Family photo album",
@@ -1221,7 +1255,7 @@
                     (a.rating != null ? " · " + esc(a.rating) + "/5" : "") +
                     (a.review ? "<br>" + esc(String(a.review).slice(0, 140)) : "") +
                     (a.kind === "photo"
-                      ? "<br>" + (a.shared ? "Family album" : "Private binder") + (a.moderated ? " · Moderated" : "")
+                      ? "<br>Private binder" + (a.moderated ? " · Moderated" : "")
                       : "") +
                     "</small></div><div>" +
                     (a.thumb ? '<img class="thumb" src="' + esc(a.thumb) + '" alt="" />' : a.total != null && a.total !== "" ? esc(a.total) : "") +
@@ -1253,7 +1287,7 @@
               else if (kind === "photo") {
                 const ph = await call({ op: "photo_get", id });
                 alert(
-                  (ph.photo.shared ? "Family album" : "Private binder") +
+                  "Private binder" +
                     "\n" +
                     (ph.photo.name || "") +
                     "\n" +
@@ -1342,7 +1376,7 @@
                       "<small>" +
                       esc(r.email || "No email") +
                       "</small></td><td>" +
-                      (r.shared ? '<span class="pill on">Family album</span>' : '<span class="pill">Private binder</span>') +
+                      '<span class="pill">Private binder</span>' +
                       "</td><td>" +
                       esc(when(r.created_at)) +
                       '</td><td><button type="button" class="btn danger" data-del="' +
@@ -1413,7 +1447,7 @@
           '</div><div class="code-box"><span>Access code</span><code id="shownCode">' +
           esc(sent.access_code || "") +
           '</code><button type="button" class="btn" id="copyCode">Copy Code</button></div>' +
-          '<p class="empty">This code is shown once to admins here. It is emailed to the recipient and stored only as a hash.</p></div>';
+          '<p class="empty">This code is sent to the signed-in website account you chose. It is not sent by Gmail. When that person opens Telephone while signed in, the code fills in.</p></div>';
         document.body.appendChild(wrap);
         $("#closeInviteRes", wrap).onclick = () => wrap.remove();
         wrap.addEventListener("click", (e) => {
@@ -1480,9 +1514,9 @@
           '</p></div><button type="button" class="btn ghost" id="closePicker">Close</button></div>' +
           '<div class="picker"><label style="font-size:12px;font-weight:600">Search accounts<input id="pickerQ" placeholder="Name or email" style="display:block;width:100%;margin-top:6px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;box-sizing:border-box" /></label>' +
           '<div class="picker-list" id="pickerList"></div>' +
-          '<p class="empty" id="selNote">Select an authenticated account, or enter a manual email below.</p>' +
-          '<label style="font-size:12px;font-weight:600">Manual email invitation<input id="manualEmail" type="email" placeholder="optional@email.com" style="display:block;width:100%;margin-top:6px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;box-sizing:border-box" /></label>' +
-          '<div class="tools"><button type="button" class="btn" id="sendInviteNow">Send Access Code by Email</button></div>' +
+          '<p class="empty" id="selNote">Choose a website account. The code goes to that signed-in account, not to Gmail.</p>' +
+          '<label style="font-size:12px;font-weight:600">Account email<input id="manualEmail" type="email" placeholder="The signed-up email" style="display:block;width:100%;margin-top:6px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;box-sizing:border-box" /></label>' +
+          '<div class="tools"><button type="button" class="btn" id="sendInviteNow">Send access code to this account</button></div>' +
           '<p class="empty" id="sendInviteErr"></p></div></div>';
         document.body.appendChild(wrap);
         renderList(dir.rows || []);
@@ -1509,8 +1543,9 @@
               email,
               recipient_name: name,
             });
+            if (!sent.sent) throw new Error("The access code was not sent to that account.");
             wrap.remove();
-            setStatus("Invite emailed to " + sent.email);
+            setStatus("Access code sent to the signed-in account " + sent.email);
             showInviteResult(sent);
           } catch (err) {
             $("#sendInviteErr", wrap).textContent = err.message || "Invite was not sent.";
@@ -1588,7 +1623,8 @@
                 email: b.dataset.reissue,
                 recipient_name: b.dataset.name || "",
               });
-              setStatus("Replacement code emailed");
+              if (!sent.sent) throw new Error("The access code was not sent to that account.");
+              setStatus("Replacement code sent to the signed-in account");
               showInviteResult(sent);
               showInvitesForRoom(meetingId, roomLabel);
             } catch (err) {
@@ -1601,7 +1637,7 @@
       async function showMeetings() {
         const data = await call({ op: "list", status: "meeting", q, page, pageSize: 50 });
         $("#panel").innerHTML =
-          '<div class="card"><b style="font-size:14px;color:var(--navy)">Create private meeting room</b><p class="empty">Rooms stay private until you email an access code to a chosen recipient.</p><div class="form-grid"><label>Name<input id="mName" placeholder="Design review" /></label><label>Date / time<input id="mWhen" type="datetime-local" /></label><label>Duration (min)<input id="mDur" type="number" min="15" value="60" /></label></div><button type="button" class="btn" id="mCreate">Create room</button><p class="empty" id="mNote"></p></div>' +
+          '<div class="card"><b style="font-size:14px;color:var(--navy)">Create private meeting room</b><p class="empty">Rooms stay private until you send an access code to a signed-in website account.</p><div class="form-grid"><label>Name<input id="mName" placeholder="Design review" /></label><label>Date / time<input id="mWhen" type="datetime-local" /></label><label>Duration (min)<input id="mDur" type="number" min="15" value="60" /></label></div><button type="button" class="btn" id="mCreate">Create room</button><p class="empty" id="mNote"></p></div>' +
           tools() +
           ((data.rows || []).length
             ? '<div class="table-wrap"><table><thead><tr><th>Room</th><th>Status</th><th>Invitations</th><th>Manage</th></tr></thead><tbody>' +
@@ -1626,7 +1662,7 @@
                     esc(r.id) +
                     '" data-label="' +
                     esc(label) +
-                    '">Send Access Code by Email</button><button type="button" class="btn ghost" data-invites="' +
+                    '">Send access code to account</button><button type="button" class="btn ghost" data-invites="' +
                     esc(r.id) +
                     '" data-label="' +
                     esc(label) +
@@ -1719,7 +1755,7 @@
                 .join("") +
               "</tbody></table>" +
               pager(data)
-            : '<p class="empty">No family albums yet. Create links from the album desk.</p>');
+            : '<p class="empty">No customer albums yet. Create links from the album desk.</p>');
         bindTools(showAlbums);
       }
 
@@ -1862,12 +1898,118 @@
           "</ul><p>Configure <code>STAFF_EMAILS</code> and Supabase service-role keys on the server only. Never put secrets in this page.</p></div>";
       }
 
+      function paintTrackOrder(order) {
+        const stages = Array.isArray(order.stages) ? order.stages : [];
+        const stage = Number.isInteger(order.stage) ? order.stage : 0;
+        const rows = stages
+          .map((name, i) => {
+            const done = !!order.complete || i < stage;
+            const active = !order.complete && i === stage;
+            const status = done ? "Completed" : active ? "In Progress" : "Pending";
+            const cls = done ? "trk d" : active ? "trk n" : "trk";
+            return (
+              '<div class="' +
+              cls +
+              '"><i>' +
+              (done ? "✓" : i + 1) +
+              "</i><div><b>" +
+              esc(name) +
+              '</b><div class="meta">' +
+              status +
+              "</div></div></div>"
+            );
+          })
+          .join("");
+        $("#panel").innerHTML =
+          '<p><button type="button" class="btn ghost" id="trackBack">Back to orders</button></p>' +
+          '<div class="card"><p><b>' +
+          esc(order.title || "Order") +
+          "</b><br>" +
+          esc(order.name || "") +
+          (order.email ? " · " + esc(order.email) : "") +
+          "<br>" +
+          esc(order.id) +
+          " · " +
+          esc(when(order.created_at)) +
+          "</p><p>Current stage: <b>" +
+          esc(order.current || "") +
+          "</b> · Progress " +
+          esc(order.progress || 0) +
+          "%</p>" +
+          rows +
+          (order.complete
+            ? '<p>This order is complete.</p>'
+            : '<p><button type="button" class="btn" id="markStage">Mark as Complete</button></p>') +
+          '<p id="trackNote"></p></div>';
+        $("#trackBack").onclick = () => {
+          showTracking().then(() => setStatus("Ready")).catch((err) => {
+            $("#panel").innerHTML = '<p class="empty">' + esc(err.message || "Could not load this section.") + "</p>";
+            setStatus("Error");
+          });
+        };
+        const mark = $("#markStage");
+        if (!mark) return;
+        mark.onclick = async () => {
+          mark.disabled = true;
+          note("#trackNote", "Saving…");
+          try {
+            const saved = await call({ op: "order_tracking_advance", id: order.id, stage });
+            if (!saved.order) throw new Error("The stage was not saved.");
+            note("#trackNote", "");
+            setStatus("Stage saved.");
+            paintTrackOrder(saved.order);
+          } catch (err) {
+            mark.disabled = false;
+            note("#trackNote", err.message || "The stage was not saved.");
+            setStatus("Error");
+          }
+        };
+      }
+
+      async function showTracking() {
+        const data = await call({ op: "order_tracking" });
+        const rows = data.orders || [];
+        const body = rows.length
+          ? rows
+              .map(
+                (order) =>
+                  "<tr><td>" +
+                  esc(String(order.id || "").slice(0, 8)) +
+                  "</td><td>" +
+                  esc(order.name || "—") +
+                  (order.email ? "<br>" + esc(order.email) : "") +
+                  "</td><td>" +
+                  esc(order.title || "—") +
+                  "</td><td>" +
+                  esc(when(order.created_at)) +
+                  "</td><td>" +
+                  esc(order.current || "—") +
+                  "</td><td>" +
+                  esc(order.progress || 0) +
+                  '%</td><td><button type="button" class="btn" data-track="' +
+                  esc(order.id) +
+                  '">Manage stages</button></td></tr>',
+              )
+              .join("")
+          : '<tr><td colspan="7">No orders yet.</td></tr>';
+        $("#panel").innerHTML =
+          '<div class="card"><table><thead><tr><th>Order</th><th>Customer</th><th>Project</th><th>Date</th><th>Current stage</th><th>Progress</th><th></th></tr></thead><tbody>' +
+          body +
+          "</tbody></table></div>";
+        $$("[data-track]", $("#panel")).forEach((btn) => {
+          btn.onclick = () => {
+            const order = rows.find((row) => row.id === btn.getAttribute("data-track"));
+            if (order) paintTrackOrder(order);
+          };
+        });
+      }
+
       const screens = {
         overview: showOverview,
         orders: showOrders,
+        tracking: showTracking,
         customers: showCustomers,
         meetings: showMeetings,
-        albums: showAlbums,
         reviews: showReviews,
         rooms: showRooms,
         logs: showLogs,

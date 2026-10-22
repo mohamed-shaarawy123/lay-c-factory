@@ -1,14 +1,13 @@
-const { randomInt, randomBytes, createHash } = require("crypto");
+const { randomInt, randomBytes, createHash, createCipheriv, createDecipheriv } = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { createClient } = require("@supabase/supabase-js");
 const { readPayload } = require("../lib/body");
 const { requireAdmin, logAdmin, meetLink } = require("../lib/admin-auth");
 const { signedExcelUrl, orderToExcelCsv } = require("../lib/order-excel");
+const { trackingState, stageIndex } = require("../lib/order-stages");
 const { buildOrderDocument } = require("../lib/order-document");
 const { renderOrderPdf } = require("../lib/order-pdf");
-const { sendEmail } = require("../lib/email");
-
 const redeemAttempts = new Map();
 
 function loadEnv() {
@@ -70,7 +69,7 @@ function orderTypeOf(row) {
 
 function orderBrief(row) {
   const items = itemsOf(row);
-  const secretKeys = ["pass", "salt", "token", "image", "thumb"];
+  const secretKeys = ["pass", "salt", "token", "image", "thumb", "code_hash", "code_seal"];
   const safeItems = {};
   Object.keys(items).forEach((k) => {
     if (secretKeys.includes(k) || k === "rows" || k === "lines") return;
@@ -122,6 +121,63 @@ function hashInviteCode(code) {
 
 function makeInviteCode() {
   return randomBytes(5).toString("hex"); // 10 hex chars
+}
+
+function inviteKey() {
+  const secret = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+  if (!secret) return null;
+  return createHash("sha256").update("layc-invite-v1:" + secret).digest();
+}
+
+function sealCode(code) {
+  const key = inviteKey();
+  if (!key) return "";
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const enc = Buffer.concat([cipher.update(String(code), "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([iv, tag, enc]).toString("base64url");
+}
+
+function openSeal(box) {
+  try {
+    const key = inviteKey();
+    if (!key || !box) return "";
+    const buf = Buffer.from(String(box), "base64url");
+    if (buf.length < 29) return "";
+    const iv = buf.subarray(0, 12);
+    const tag = buf.subarray(12, 28);
+    const enc = buf.subarray(28);
+    const decipher = createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(enc), decipher.final()]).toString("utf8");
+  } catch (e) {
+    return "";
+  }
+}
+
+async function inviteFromOrders(supabase, codeHash) {
+  const filtered = await supabase
+    .from("orders")
+    .select("id, customer_email, customer_name, items")
+    .eq("status", "meet_invite")
+    .eq("items->>code_hash", codeHash)
+    .limit(1);
+  if (!filtered.error && filtered.data && filtered.data[0] && itemsOf(filtered.data[0]).code_hash === codeHash) {
+    return { row: filtered.data[0], error: null };
+  }
+  if (filtered.error && !/column|operator|json|schema/i.test(filtered.error.message || "")) {
+    return { row: null, error: filtered.error };
+  }
+  const scan = await supabase
+    .from("orders")
+    .select("id, customer_email, customer_name, items, created_at")
+    .eq("status", "meet_invite")
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (scan.error) return { row: null, error: scan.error };
+  const hit = (scan.data || []).find((row) => itemsOf(row).code_hash === codeHash) || null;
+  return { row: hit, error: null };
 }
 
 function rateLimited(key, limit, windowMs) {
@@ -199,6 +255,27 @@ async function fetchOrders(supabase, statuses) {
   return data || [];
 }
 
+const TRACK_STATUSES = ["received", "notified", "processing", "done"];
+
+function trackingBrief(row) {
+  const items = itemsOf(row);
+  const track = trackingState(items.slug || "", items.stage);
+  return {
+    id: row.id,
+    name: row.customer_name || "",
+    email: row.customer_email || "",
+    title: items.service || track.slug || "Order",
+    slug: track.slug,
+    created_at: row.created_at,
+    status: row.status,
+    stage: track.stage,
+    stages: track.stages,
+    complete: track.complete,
+    current: track.current,
+    progress: track.progress,
+  };
+}
+
 module.exports = async function handler(req, res) {
   try {
     loadEnv();
@@ -236,37 +313,38 @@ module.exports = async function handler(req, res) {
       const codeHash = hashInviteCode(access);
       let inviteRow = null;
       let inviteSource = "table";
-      let invite = await supabase
+      const invite = await supabase
         .from("meeting_invites")
         .select("id, meeting_id, email, expires_at, redeemed_at")
         .eq("code_hash", codeHash)
         .maybeSingle();
-      if (invite.error && /meeting_invites|schema cache|does not exist/i.test(invite.error.message || "")) {
+      const tableMissing = invite.error && /meeting_invites|schema cache|does not exist/i.test(invite.error.message || "");
+      if (invite.error && !tableMissing) {
+        return json(res, 502, { ok: false, error: invite.error.message || "The invite could not be checked." });
+      }
+      if (!tableMissing && invite.data) {
+        inviteRow = Object.assign({ revoked_at: null }, invite.data);
+      } else {
+        // Invites are saved on orders (status=meet_invite). A live meeting_invites
+        // table with no matching row must not hide that record.
         inviteSource = "orders";
-        const fallback = await supabase
-          .from("orders")
-          .select("id, customer_email, items, created_at")
-          .eq("status", "meet_invite")
-          .eq("items->>code_hash", codeHash)
-          .maybeSingle();
-        if (fallback.error) return json(res, 502, { ok: false, error: fallback.error.message || "The invite could not be checked." });
-        if (fallback.data) {
-          const it = itemsOf(fallback.data);
+        const fallback = await inviteFromOrders(supabase, codeHash);
+        if (fallback.error) {
+          return json(res, 502, { ok: false, error: fallback.error.message || "The invite could not be checked." });
+        }
+        if (fallback.row) {
+          const it = itemsOf(fallback.row);
           inviteRow = {
-            id: fallback.data.id,
+            id: fallback.row.id,
             meeting_id: it.meeting_id,
-            email: fallback.data.customer_email || it.email,
+            email: fallback.row.customer_email || it.email,
             expires_at: it.expires_at,
             redeemed_at: it.redeemed_at || null,
             revoked_at: it.revoked_at || null,
           };
         }
-      } else if (invite.error) {
-        return json(res, 502, { ok: false, error: invite.error.message || "The invite could not be checked." });
-      } else {
-        inviteRow = invite.data ? Object.assign({ revoked_at: null }, invite.data) : null;
       }
-      if (!inviteRow) return json(res, 404, { ok: false, error: "That access code was not found." });
+      if (!inviteRow) return json(res, 404, { ok: false, error: "That access code was not found. Check the code and the email it was sent to." });
       if (String(inviteRow.email).toLowerCase() !== email) {
         return json(res, 403, { ok: false, error: "This access code was sent to a different email." });
       }
@@ -326,6 +404,49 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    // Signed-in recipient only. The code is never returned without their account token.
+    if (op === "my_invite") {
+      const token = text(payload.token, 80);
+      if (token.length < 16) return json(res, 401, { ok: false, error: "Sign in to load your access code." });
+      const account = await supabase
+        .from("orders")
+        .select("id, customer_email, customer_name, items")
+        .eq("status", "account")
+        .eq("items->>token", token)
+        .maybeSingle();
+      if (account.error || !account.data) {
+        return json(res, 401, { ok: false, error: "Sign in to load your access code." });
+      }
+      const email = String(account.data.customer_email || "").trim().toLowerCase();
+      const list = await supabase
+        .from("orders")
+        .select("id, customer_name, items, created_at")
+        .eq("status", "meet_invite")
+        .eq("customer_email", email)
+        .order("created_at", { ascending: false })
+        .limit(8);
+      if (list.error) return json(res, 502, { ok: false, error: "Your invite could not be loaded." });
+      const now = Date.now();
+      const row = (list.data || []).find((r) => {
+        const it = itemsOf(r);
+        if (!it.code_seal || it.revoked_at || it.redeemed_at) return false;
+        return new Date(it.expires_at).getTime() >= now;
+      });
+      if (!row) return json(res, 200, { ok: true, pending: false });
+      const it = itemsOf(row);
+      const access = openSeal(it.code_seal);
+      if (!access || hashInviteCode(access) !== it.code_hash) {
+        return json(res, 200, { ok: true, pending: false });
+      }
+      return json(res, 200, {
+        ok: true,
+        pending: true,
+        access_code: access,
+        email,
+        name: it.recipient_name || account.data.customer_name || "",
+      });
+    }
+
     const who = await requireAdmin(supabase, text(payload.token, 80));
     if (!who) return json(res, 403, { ok: false, error: "Sign in with an authorized admin account." });
 
@@ -365,6 +486,52 @@ module.exports = async function handler(req, res) {
           all: rows.length,
         },
       });
+    }
+
+    if (op === "order_tracking") {
+      const raw = await fetchOrders(supabase, TRACK_STATUSES);
+      const rows = raw
+        .filter((row) => TRACK_STATUSES.includes(row.status))
+        .map(trackingBrief)
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+      return json(res, 200, { ok: true, orders: rows });
+    }
+
+    if (op === "order_tracking_advance") {
+      const id = text(payload.id, 80);
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json(res, 400, { ok: false, error: "That order was not found." });
+      const row = await supabase
+        .from("orders")
+        .select("id, customer_name, customer_email, status, created_at, items")
+        .eq("id", id)
+        .maybeSingle();
+      if (row.error || !row.data || !TRACK_STATUSES.includes(row.data.status)) {
+        return json(res, 404, { ok: false, error: "That order was not found." });
+      }
+      const items = itemsOf(row.data);
+      const current = stageIndex(items.stage);
+      const track = trackingState(items.slug || "", current);
+      if (track.complete) return json(res, 400, { ok: false, error: "This order is already complete." });
+      const expected = Number(payload.stage);
+      if (!Number.isInteger(expected) || expected !== current) {
+        return json(res, 409, { ok: false, error: "This order was already updated. Refresh and try again." });
+      }
+      const nextItems = Object.assign({}, items, {
+        stage: current + 1,
+        updated_at: new Date().toISOString(),
+      });
+      const saved = await supabase.from("orders").update({ items: nextItems }).eq("id", id).eq("items->>stage", String(current)).select("id, items, status, created_at, customer_name, customer_email").maybeSingle();
+      if (saved.error) return json(res, 502, { ok: false, error: "The stage was not saved." });
+      if (!saved.data) {
+        const missing = items.stage == null && current === 0;
+        if (!missing) return json(res, 409, { ok: false, error: "This order was already updated. Refresh and try again." });
+        const first = await supabase.from("orders").update({ items: nextItems }).eq("id", id).is("items->>stage", null).select("id, items, status, created_at, customer_name, customer_email").maybeSingle();
+        if (first.error || !first.data) return json(res, 409, { ok: false, error: "This order was already updated. Refresh and try again." });
+        await logAdmin(supabase, who, "order_tracking", { id, stage: current + 1 });
+        return json(res, 200, { ok: true, order: trackingBrief(first.data) });
+      }
+      await logAdmin(supabase, who, "order_tracking", { id, stage: current + 1 });
+      return json(res, 200, { ok: true, order: trackingBrief(saved.data) });
     }
 
     if (op === "list" || op === "orders") {
@@ -770,19 +937,27 @@ module.exports = async function handler(req, res) {
       if (meeting.error || !meeting.data) return json(res, 404, { ok: false, error: "That meeting room was not found." });
       const items = itemsOf(meeting.data);
       if (items.closed) return json(res, 400, { ok: false, error: "This meeting is closed." });
-      // Resolve display name from authenticated account when possible.
+      // The code is delivered to this website account, not by Gmail.
       let name = recipientName;
-      let hasAccount = false;
       const account = await supabase
         .from("orders")
-        .select("id, customer_name, customer_email")
+        .select("id, customer_name, customer_email, items")
         .eq("status", "account")
         .eq("customer_email", email)
         .maybeSingle();
-      if (account.data) {
-        hasAccount = true;
-        if (!name) name = account.data.customer_name || "";
+      if (account.error) return json(res, 502, { ok: false, error: account.error.message || "That account could not be checked." });
+      if (!account.data) {
+        return json(res, 400, {
+          ok: false,
+          error: "Choose an account that is signed up on the website. The code is sent to that signed-in account, not by Gmail.",
+        });
       }
+      const accountItems = itemsOf(account.data);
+      if (!accountItems.token) {
+        return json(res, 400, { ok: false, error: "That account has not signed in on the website yet." });
+      }
+      if (!name) name = account.data.customer_name || "";
+      const hasAccount = true;
       const access = makeInviteCode();
       const expires = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
       const codeHash = hashInviteCode(access);
@@ -803,6 +978,7 @@ module.exports = async function handler(req, res) {
             recipient_name: name || "",
             has_account: hasAccount,
             code_hash: codeHash,
+            code_seal: sealCode(access),
             expires_at: expires,
             redeemed_at: null,
             revoked_at: null,
@@ -821,37 +997,6 @@ module.exports = async function handler(req, res) {
       }
       const inviteId = savedInvite.data.id;
       const roomName = items.name || meeting.data.customer_name || "Lay C meeting";
-      const when = new Date(expires).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
-      const site = String(process.env.SITE_URL || "https://lay-c-factory.vercel.app").replace(/\/+$/, "");
-      const summary =
-        "Lay C Factory meeting invite\n\n" +
-        "Meeting: " +
-        roomName +
-        "\nYour access code: " +
-        access +
-        "\nExpires: " +
-        when +
-        "\n\nOpen " +
-        site +
-        ", choose Telephone → Join a Room, then enter this email and access code.";
-      try {
-        await sendEmail({
-          to_email: email,
-          service: "Meeting invite",
-          order_summary: summary,
-          products: roomName,
-          quantities: "Access code: " + access,
-          total_price: "Expires " + when,
-          customer_details: email,
-          customer_name: name || "",
-          customer_phone: "",
-          customer_email: email,
-          client_email: email,
-        });
-      } catch (err) {
-        await supabase.from("orders").delete().eq("id", inviteId);
-        return json(res, err.status || 502, { ok: false, error: err.message || "The invite email was not sent." });
-      }
       void inviteSource;
       if (items.active !== true) {
         await supabase
@@ -869,6 +1014,7 @@ module.exports = async function handler(req, res) {
         has_account: hasAccount,
         expires_at: expires,
         sent: true,
+        delivery: "account",
         access_code: access,
         room_name: roomName,
         room_code: items.code || "",

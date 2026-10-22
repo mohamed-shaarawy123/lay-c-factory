@@ -159,75 +159,52 @@ module.exports = async function handler(req, res) {
         }
         const items = one.data.items;
         const own = one.data.customer_email === who.customer_email;
-        const visible = isFamilyAlbumVisible(items);
-        if (!own && (isPrivatePref || mineCount < 1 || !visible)) {
-          return json(res, 403, {
-            ok: false,
-            error: "Take a camera photo on a shared album before opening someone else's picture.",
-          });
-        }
-        if (!own && !visible) {
+        if (!own) {
           return json(res, 403, { ok: false, error: "That picture is private." });
         }
-        const caps = ownerCapabilities(items, own);
         return json(res, 200, {
           ok: true,
           photo: {
             id: one.data.id,
             email: one.data.customer_email,
             name: one.data.customer_name,
-            image: own || visible ? items.image || items.thumb || "" : "",
+            image: items.image || items.thumb || "",
             thumb: items.thumb || "",
             ts: items.ts || 0,
-            shared: visible,
-            private: isPrivatePhoto(items),
-            publish_locked: caps.publish_locked,
-            can_delete: caps.can_delete,
-            can_publish: caps.can_publish,
-            own,
+            shared: false,
+            private: true,
+            publish_locked: false,
+            can_delete: true,
+            can_publish: false,
+            own: true,
           },
         });
       }
-      let query = supabase
-        .from("orders")
-        .select("id, customer_email, customer_name, created_at, items")
-        .eq("status", "photo")
-        .order("created_at", { ascending: false })
-        .limit(80);
       let locked = false;
       let reason = "";
+      let rows = [];
       if (!who) {
         locked = true;
-        reason = "Sign in with your email to see albums.";
-      } else if (wantMine) {
-        query = query.eq("customer_email", who.customer_email);
-      } else if (isPrivatePref) {
-        locked = true;
-        reason = "Your album is private, so you cannot see other albums.";
-      } else if (mineCount < 1) {
-        locked = true;
-        reason = "Take a photo with the camera before you can see other albums.";
-      }
-      let rows = [];
-      if (!locked) {
-        const list = await query;
+        reason = "Sign in with your email to see your photo binder.";
+      } else {
+        const list = await supabase
+          .from("orders")
+          .select("id, customer_email, customer_name, created_at, items")
+          .eq("status", "photo")
+          .eq("customer_email", who.customer_email)
+          .order("created_at", { ascending: false })
+          .limit(80);
         if (list.error) return json(res, 502, { ok: false, error: list.error.message || "The album could not be opened." });
         rows = list.data || [];
       }
       const whoEmail = who ? who.customer_email : "";
-      const photos = rows
-        .filter((row) => {
-          const items = row.items || {};
-          if (wantMine) return row.customer_email === whoEmail;
-          return isFamilyAlbumVisible(items);
-        })
-        .map((row) => photoBrief(row, whoEmail));
+      const photos = rows.map((row) => photoBrief(row, whoEmail));
       return json(res, 200, {
         ok: true,
         photos,
         mine: mineCount,
         locked,
-        private: isPrivatePref,
+        private: true,
         reason,
       });
     }
@@ -244,13 +221,8 @@ module.exports = async function handler(req, res) {
     // Account-level preference only. Never reverses already-public photos.
     if (payload.privacy === true || payload.privacy === false || action === "privacy") {
       const wantPrivate = payload.privacy === true || payload.privacy === "true";
-      if (!wantPrivate && payload.confirm_public !== true && payload.confirm_public !== "true") {
-        return json(res, 400, {
-          ok: false,
-          needs_confirm: true,
-          error:
-            "Confirm public sharing. Photos shared publicly stay in the family album permanently. You will not be able to make them private or delete them later.",
-        });
+      if (!wantPrivate) {
+        return json(res, 400, { ok: false, error: "The family album has been removed. Photos stay in your private binder." });
       }
       const prev = who.items && typeof who.items === "object" ? who.items : {};
       const saved = await supabase
@@ -274,41 +246,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (action === "publish") {
-      const id = text(payload.id, 80);
-      if (!/^[0-9a-f-]{36}$/i.test(id)) return json(res, 400, { ok: false, error: "That picture was not found." });
-      if (payload.confirm !== true && payload.confirm !== "true") {
-        return json(res, 400, {
-          ok: false,
-          needs_confirm: true,
-          error:
-            "Confirm publication. Once this photo is public in the family album, you cannot make it private or delete it.",
-        });
-      }
-      const one = await supabase
-        .from("orders")
-        .select("id, customer_email, items, status")
-        .eq("id", id)
-        .eq("status", "photo")
-        .maybeSingle();
-      if (one.error || !one.data) return json(res, 404, { ok: false, error: "That picture was not found." });
-      if (one.data.customer_email !== who.customer_email) {
-        return json(res, 403, { ok: false, error: "Only the owner can publish this photo." });
-      }
-      const items = one.data.items || {};
-      if (items.rejected === true || items.moderated === false) {
-        return json(res, 400, { ok: false, error: "This photo was not approved for the family album." });
-      }
-      if (isPublishLocked(items) || isFamilyAlbumVisible(items)) {
-        return json(res, 403, {
-          ok: false,
-          error: "This photo is already public and cannot be changed back to private.",
-          publish_locked: true,
-        });
-      }
-      const next = markPublished(items);
-      const saved = await supabase.from("orders").update({ items: next }).eq("id", id).select("id").single();
-      if (saved.error) return json(res, 502, { ok: false, error: saved.error.message || "The photo was not published." });
-      return json(res, 200, { ok: true, id, shared: true, publish_locked: true });
+      return json(res, 400, { ok: false, error: "The family album has been removed. Photos stay in your private binder." });
     }
 
     if (action === "unpublish" || action === "make_private") {
@@ -331,17 +269,6 @@ module.exports = async function handler(req, res) {
       if (one.error || !one.data) return json(res, 404, { ok: false, error: "That picture was not found." });
       if (one.data.customer_email !== who.customer_email) {
         return json(res, 403, { ok: false, error: "Only the owner can delete a private photo." });
-      }
-      const items = one.data.items || {};
-      if (isPublishLocked(items) || isFamilyAlbumVisible(items)) {
-        return json(res, 403, {
-          ok: false,
-          error: "Public photos cannot be deleted from the binder or family album.",
-          publish_locked: true,
-        });
-      }
-      if (!isPrivatePhoto(items) && items.shared !== false) {
-        return json(res, 403, { ok: false, error: "Only private photos can be deleted by the owner." });
       }
       const gone = await supabase.from("orders").delete().eq("id", id).eq("customer_email", who.customer_email).select("id");
       if (gone.error || !(gone.data || []).length) {
@@ -367,8 +294,7 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    const preferPrivate = Boolean(who.items && who.items.private);
-    let items = {
+    const items = markPrivate({
       type: "photo",
       image: check.dataUrl || image,
       thumb,
@@ -376,12 +302,7 @@ module.exports = async function handler(req, res) {
       source: "camera",
       moderated: true,
       rejected: false,
-    };
-    if (preferPrivate) {
-      items = markPrivate(items);
-    } else {
-      items = markPublished(items);
-    }
+    });
 
     const saved = await supabase
       .from("orders")
@@ -404,9 +325,9 @@ module.exports = async function handler(req, res) {
       id: saved.data.id,
       email: who.customer_email,
       accepted: true,
-      shared: !preferPrivate,
-      publish_locked: !preferPrivate,
-      private: preferPrivate,
+      shared: false,
+      publish_locked: false,
+      private: true,
     });
   } catch (err) {
     return json(res, err.status || 500, { ok: false, error: err.message || "The album was not saved." });

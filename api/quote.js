@@ -2,6 +2,7 @@ const { createClient } = require("@supabase/supabase-js");
 const fs = require("fs");
 const path = require("path");
 const { priceOrder } = require("../lib/catalog");
+const { trackingState } = require("../lib/order-stages");
 const { readPayload } = require("../lib/body");
 
 const TO = "eyadellithy80@gmail.com";
@@ -160,17 +161,21 @@ module.exports = async function handler(req, res) {
     if (list.error) return json(res, 502, { ok: false, error: list.error.message || "Your orders could not be loaded." });
     const orders = (list.data || []).map((row) => {
       const items = row.items && typeof row.items === "object" ? row.items : {};
-      const stage = Number.isInteger(items.stage) ? items.stage : null;
+      const track = trackingState(items.slug || "", items.stage);
       return {
         id: row.id,
         title: items.service || "Order",
-        slug: items.slug || "",
+        slug: track.slug,
         lines: Array.isArray(items.lines) ? items.lines : [],
         extra: items.extra || "",
         total: row.total,
         status: row.status,
         created_at: row.created_at,
-        stage,
+        stage: track.stage,
+        stages: track.stages,
+        complete: track.complete,
+        current: track.current,
+        progress: track.progress,
       };
     });
     return json(res, 200, { ok: true, orders });
@@ -206,6 +211,7 @@ module.exports = async function handler(req, res) {
     extra: String(payload.extra || "")
       .trim()
       .slice(0, 2000),
+    stage: 0,
     updated_at: new Date().toISOString(),
   };
   const row = {

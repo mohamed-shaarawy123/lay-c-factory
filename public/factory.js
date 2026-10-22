@@ -1047,9 +1047,9 @@
                 : "<span>0" + (i + 1) + "</span>" + ST[i].name;
       tip.querySelector("p").textContent =
         i === -3
-          ? "Take a photo. Everyone can see it in the album."
+          ? "Take a photo. It stays in your private binder."
           : i === -4
-            ? "Join a private room with your emailed access code."
+            ? "Join a private room with the access code for your signed-in account."
             : i === -5
               ? "See your order and its stage."
               : i === -6
@@ -2652,7 +2652,7 @@
     return s ? (s.par != null ? s.par : cur) : 0;
   }
   // TELEPHONE. A 6-digit code is the Jitsi room name. No API key is required.
-  const MT = { name: "", code: "", host: false, api: null };
+  const MT = { name: "", code: "", host: false, api: null, poll: 0, filled: "" };
   function endCall() {
     if (MT.api) {
       try {
@@ -2679,15 +2679,46 @@
       document.head.appendChild(s);
     });
   }
+  function stopInvitePoll() {
+    if (MT.poll) {
+      clearInterval(MT.poll);
+      MT.poll = 0;
+    }
+  }
+  async function pullInvite() {
+    const saved = accGet() || {};
+    const codeEl = $("#mc");
+    if (!saved.token || !codeEl) return;
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op: "my_invite", token: saved.token }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok || !data.pending || !data.access_code || !$("#mc")) return;
+      const mailEl = $("#meail");
+      const nameEl = $("#mn");
+      if (mailEl && data.email && !mailEl.value.trim()) mailEl.value = data.email;
+      if (nameEl && data.name && !nameEl.value.trim()) nameEl.value = data.name;
+      if (codeEl.value.trim() !== data.access_code) {
+        codeEl.value = data.access_code;
+        MT.filled = data.access_code;
+        const note = $("#me");
+        if (note) note.textContent = "Your access code was filled in. Press Join a Room.";
+      }
+    } catch (e) {}
+  }
   function mtHome(err) {
     endCall();
+    stopInvitePoll();
     const saved = accGet() || {};
     pg.innerHTML =
-      '<div id="mt"><div class="bx"><h3>Telephone</h3><p>Join a private room with the email and access code Lay C sent you.</p><input id="mn" placeholder="Your name" maxlength="24" autocomplete="name" value="' +
+      '<div id="mt"><div class="bx"><h3>Telephone</h3><p>Sign in with the account that was chosen. The access code fills in here. It is not sent by Gmail.</p><input id="mn" placeholder="Your name" maxlength="24" autocomplete="name" value="' +
       mtEsc(mtName()) +
-      '"><input id="meail" type="email" placeholder="Email that received the invite" autocomplete="email" value="' +
+      '"><input id="meail" type="email" placeholder="The email you are signed in with" autocomplete="email" value="' +
       mtEsc(saved.email || "") +
-      '"><div class="r"><input id="mc" placeholder="Access code from email" maxlength="40" autocomplete="one-time-code"><button type="button" class="p" id="mj">Join a Room</button></div><div class="er" id="me">' +
+      '"><div class="r"><input id="mc" placeholder="Access code for your account" maxlength="40" autocomplete="one-time-code"><button type="button" class="p" id="mj">Join a Room</button></div><div class="er" id="me">' +
       mtEsc(err || "") +
       '</div><div class="r"><button type="button" class="g" id="mx">Close</button></div></div></div>';
     const readName = () => {
@@ -2703,11 +2734,11 @@
       const email = ($("#meail").value || "").trim().toLowerCase();
       const access = ($("#mc").value || "").trim();
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        $("#me").textContent = "Enter the email address that received the invite.";
+        $("#me").textContent = "Enter the email you are signed in with.";
         return;
       }
       if (access.length < 8) {
-        $("#me").textContent = "Enter the access code from your email.";
+        $("#me").textContent = "Enter the access code for your signed-in account.";
         return;
       }
       $("#me").textContent = "Checking your invite…";
@@ -2725,11 +2756,16 @@
           mtOpen(false, data.room || data.link, data);
         })
         .catch(() => {
-          $("#me").textContent = "The invite could not be checked.";
+          $("#me").textContent = "The invite could not be checked. Try again in a moment.";
         });
     };
+    if (saved.token) {
+      pullInvite();
+      MT.poll = setInterval(pullInvite, 4000);
+    }
   }
   async function mtOpen(host, roomName, meta) {
+    stopInvitePoll();
     MT.host = host;
     const room = String(roomName || "").replace(/^https?:\/\/meet\.ffmuc\.net\//, "") || "LAYC-000000";
     MT.code = room.replace(/^LAYC-/, "");
@@ -2767,6 +2803,8 @@
     }
   }
   function mtClose() {
+    stopOrderPoll();
+    stopInvitePoll();
     endCall();
     closing = false;
     if (fa) {
@@ -3038,10 +3076,10 @@
     if (err) html += '<p class="er">' + esc(err) + "</p>";
     else if (!orders.length) html += "<p>You have no order yet. Pick a service, build your request and tap Request.</p>";
     orders.forEach((order) => {
-      const stages = orderStages(order.slug);
-      const known = Number.isInteger(order.stage);
-      const ix = known ? Math.max(0, Math.min(stages.length - 1, order.stage)) : 0;
-      const fin = known && order.stage >= stages.length;
+      const stages = Array.isArray(order.stages) && order.stages.length ? order.stages : orderStages(order.slug);
+      const stage = Number.isInteger(order.stage) && order.stage >= 0 ? order.stage : 0;
+      const fin = stage >= stages.length;
+      const ix = fin ? stages.length - 1 : Math.min(stage, stages.length - 1);
       html +=
         '<article class="ord"><b>' +
         esc(order.title || "Order") +
@@ -3052,7 +3090,6 @@
         "</pre><b>" +
         (fin ? "Order complete" : "Now: " + esc(stages[ix])) +
         "</b>";
-      if (!known) html += '<p class="hint">Only the placed order is saved. Later stages are not stored yet, so this stays on Viewing order.</p>';
       html += stages
         .map((name, i) => {
           const cls = i < ix || fin ? "d" : i === ix ? "n" : "";
@@ -3066,19 +3103,28 @@
     const close = $("#odx");
     if (close) close.onclick = () => mtClose();
   }
-  async function loadOrders() {
+  let orderPoll = null;
+  function stopOrderPoll() {
+    if (orderPoll) {
+      clearInterval(orderPoll);
+      orderPoll = null;
+    }
+  }
+  async function loadOrders(quiet) {
     const acc = accGet();
     if (!acc || !acc.token) {
       paintOrders([], "Log in to see the orders saved for your email.");
       return;
     }
-    pg.innerHTML = '<div id="od"><div class="bx"><h3>Your orders</h3><p>Loading your orders…</p></div></div>';
+    if (!quiet) pg.innerHTML = '<div id="od"><div class="bx"><h3>Your orders</h3><p>Loading your orders…</p></div></div>';
     try {
       const res = await fetch("/api/quote?token=" + encodeURIComponent(acc.token));
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.error || "Your orders could not be loaded.");
+      if (quiet && !$("#od")) return;
       paintOrders(data.orders || [], "");
     } catch (err) {
+      if (quiet && $("#od")) return;
       paintOrders([], (err && err.message) || "Your orders could not be loaded.");
     }
   }
@@ -3094,7 +3140,15 @@
     cur = -1;
     pg.style.display = "block";
     tbt.textContent = "Your orders";
+    stopOrderPoll();
     loadOrders();
+    orderPoll = setInterval(() => {
+      if (!tf.classList.contains("on") || !$("#od")) {
+        stopOrderPoll();
+        return;
+      }
+      loadOrders(true);
+    }, 8000);
     syncAccPanel();
     try {
       history.replaceState(null, "", location.pathname + location.search);
@@ -3550,7 +3604,7 @@
     alb.type = "button";
     alb.className = "albbtn";
     alb.hidden = true;
-    alb.setAttribute("aria-label", "Open the public photo album");
+    alb.setAttribute("aria-label", "Open your photo binder");
     alb.innerHTML =
       '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M21 16l-5-4-4 3-2-2-5 5"/></svg>';
     appEl.appendChild(alb);
@@ -3646,7 +3700,7 @@
       const acc = accGet() || {};
       const q = new URLSearchParams();
       if (acc.token) q.set("token", acc.token);
-      if (tab === "mine") q.set("mine", "1");
+      q.set("mine", "1");
       const res = await fetch("/api/album?" + q.toString(), { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.error || "The album could not be opened.");
@@ -3759,13 +3813,7 @@
           ICON +
           "</div><h2>Welcome to the Lay C family</h2><p>Take a picture and we will keep it in the photo binder. It stays connected to " +
           (acc.email ? esc(acc.email) : "the email you sign in with") +
-          ". Only a legal photo from the camera can be saved. A picture from your files cannot be added, and a photo that breaks the rules is not saved.</p>" +
-          (acc.token
-            ? '<label class="shr"><input type="checkbox" id="shon"' +
-              (albumMeta.private ? "" : " checked") +
-              "> Also share my pictures in the family album, where everyone who took a picture can see them. Leave this off and you cannot see other albums.</label>" +
-              '<p class="sst" id="shhint">Public photos stay in the family album permanently. After a photo is public, you cannot make it private or delete it. Private photos can still be deleted or published later.</p>'
-            : "") +
+          ". Only a legal photo from the camera can be saved. A picture from your files cannot be added, and a photo that breaks the rules is not saved. Photos stay in your private binder.</p>" +
           '<button type="button" class="cp" data-a="cam">Take a picture</button>' +
           (count ? '<button type="button" class="cs" data-a="album">Open the photo binder (' + count + ")</button>" : "") +
           (acc.token ? "" : '<button type="button" class="cs" data-a="signin">Sign in</button>') +
@@ -3808,56 +3856,37 @@
           count +
           ')</button><button type="button" class="cs" data-a="cam">Take another picture</button></div>';
       } else if (next === "album") {
-        const all = tab !== "mine";
+        tab = "mine";
         let body = '<p class="em">No pictures yet.</p>';
         let n = 0;
         try {
           const photos = await albumList();
-          if (all) badge(albumMeta.mine || 0);
-          n = all ? albumMeta.mine || photos.length : photos.length;
+          badge(albumMeta.mine || photos.length || 0);
+          n = photos.length;
           body = photos.length
             ? grid(photos)
-            : '<p class="em">' +
-              esc(albumMeta.reason || (all ? "No shared pictures yet." : "Your binder is empty. Take a picture with the camera.")) +
-              "</p>";
+            : '<p class="em">' + esc(albumMeta.reason || "Your binder is empty. Take a picture with the camera.") + "</p>";
         } catch (ex) {
           body = '<p class="em">' + esc(ex.message || "The album could not be opened.") + "</p>";
         }
-        const unlocked = (albumMeta.mine || 0) > 0;
-        if (all && !unlocked) {
-          body = '<p class="em">Take a picture to unlock the family album and see pictures from everyone.</p>';
-        }
-        box.classList.toggle("prot", all && unlocked);
+        box.classList.remove("prot");
         box.innerHTML =
           '<div class="cbox ca"><button type="button" class="cx" data-a="close" aria-label="Close">&times;</button><div class="ah"><b>Lay C photo binder</b><span>' +
           n +
           " photo" +
           (n === 1 ? "" : "s") +
-          '</span></div><div class="tabs">' +
-          (unlocked
-            ? '<button type="button" data-a="tab" data-t="all" aria-pressed="' + all + '">Everyone\'s album</button>'
-            : "") +
-          '<button type="button" data-a="tab" data-t="mine" aria-pressed="' +
-          !all +
-          '">My pictures</button></div><div class="bind"><div class="rings" aria-hidden="true"></div><div class="pgs">' +
+          '</span></div><div class="bind"><div class="rings" aria-hidden="true"></div><div class="pgs">' +
           body +
           '</div></div><div class="abar"><button type="button" class="cp" data-a="cam">Take a picture</button></div></div>';
         return;
       } else if (next === "view" && arg) {
         const actions =
           '<div class="row"><button type="button" class="cs" data-a="album">Back to binder</button>' +
-          (arg.can_publish
-            ? '<button type="button" class="cp" data-a="publish" data-id="' + esc(arg.id) + '">Make public</button>'
-            : "") +
-          (arg.can_delete
+          (arg.own
             ? '<button type="button" class="cs" data-a="delphoto" data-id="' + esc(arg.id) + '">Delete</button>'
             : "") +
           "</div>" +
-          (arg.publish_locked || arg.shared
-            ? '<p class="sst">This photo is public in the family album. It cannot be made private or deleted.</p>'
-            : arg.own
-              ? '<p class="sst">Private binder photo. You may delete it or publish it permanently to the family album.</p>'
-              : "");
+          (arg.own ? '<p class="sst">Private binder photo. Only you can see it.</p>' : "");
         box.innerHTML =
           '<div class="cbox cv2"><button type="button" class="cx" data-a="album" aria-label="Close">&times;</button><div class="ph"><img src="' +
           esc(arg.image || arg.thumb) +
@@ -3869,7 +3898,7 @@
           esc(when(arg.ts)) +
           " · " +
           esc(arg.email) +
-          (arg.shared ? " · Family album" : arg.own ? " · Private" : "") +
+          (arg.own ? " · Private" : "") +
           "</p>" +
           actions +
           "</div>";
@@ -3899,13 +3928,10 @@
       last = {
         thumb,
         ts: Date.now(),
-        note: data.publish_locked
-          ? "Accepted and shared publicly with " +
-            (acc.email || "your email") +
-            ". This photo stays in the family album permanently and cannot be made private or deleted."
-          : "Accepted and saved privately to " +
-            (acc.email || "your email") +
-            ". You can delete it or publish it to the family album later. Once public, it cannot be undone.",
+        note:
+          "Accepted and saved privately to " +
+          (acc.email || "your email") +
+          ". Only you can see it in your binder.",
       };
       await setView("saved", last);
     }
@@ -3924,7 +3950,7 @@
     alb.onclick = async () => {
       if (!count) return;
       box.hidden = false;
-      tab = "all";
+      tab = "mine";
       await setView("album");
     };
     box.addEventListener("click", async (e) => {
@@ -3940,7 +3966,7 @@
         if (needAccount()) return;
         setView("camera");
       } else if (a === "album") {
-        tab = "all";
+        tab = "mine";
         setView("album");
       } else if (a === "back") setView(count ? "album" : "welcome");
       else if (a === "signin") {
@@ -3999,18 +4025,7 @@
         const res = await fetch("/api/album?id=" + encodeURIComponent(t.dataset.id) + (acc.token ? "&token=" + encodeURIComponent(acc.token) : ""));
         const data = await res.json().catch(() => ({}));
         if (data.photo) setView("view", data.photo);
-      } else if (a === "publish" && t.dataset.id) {
-        if (!confirm("Publish this photo to the family album? Once public, you cannot make it private or delete it.")) return;
-        const acc = accGet() || {};
-        const res = await fetch("/api/album", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: acc.token, action: "publish", id: t.dataset.id, confirm: true }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.ok) { alert(data.error || "The photo was not published."); return; }
-        await refreshCount();
-        setView("album");
+        else alert((data && data.error) || "That picture was not found.");
       } else if (a === "delphoto" && t.dataset.id) {
         if (!confirm("Delete this private photo from your binder? This cannot be undone.")) return;
         const acc = accGet() || {};
@@ -4024,34 +4039,6 @@
         await refreshCount();
         setView("album");
       }
-    });
-    box.addEventListener("change", async (e) => {
-      if (e.target.id !== "shon") return;
-      if (needAccount()) {
-        e.target.checked = !albumMeta.private;
-        return;
-      }
-      const share = e.target.checked;
-      if (share) {
-        const ok = confirm("Share new photos publicly? Public photos stay permanent and cannot later be made private or deleted. Already-public photos stay public.");
-        if (!ok) { e.target.checked = false; return; }
-      }
-      const acc = accGet() || {};
-      const res = await fetch("/api/album", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: acc.token, privacy: !share, confirm_public: share ? true : undefined }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
-        e.target.checked = !albumMeta.private;
-        const hint = box.querySelector("#shhint") || box.querySelector("p");
-        if (hint) hint.textContent = data.error || "The album setting was not saved.";
-        return;
-      }
-      albumMeta.private = !share;
-      const hint = box.querySelector("#shhint");
-      if (hint && data.note) hint.textContent = data.note;
     });
     refreshCount();
   }
