@@ -530,7 +530,7 @@
         c.fillStyle = "#0f2a80";
         c.fillRect(0, 0, w, h);
         txt(c, "0" + (i + 1), 22, 50, 38, "#4169e1", 600);
-        txt(c, d.name.toUpperCase(), 100, 48, 34, "#d7d9d7", 600);
+        txt(c, (i === 3 ? "EMBROIDERY" : i === 4 ? "POM-POM" : d.name).toUpperCase(), 100, 48, 34, "#d7d9d7", 600);
       }),
     );
     ST.push({ ...d, g, gm, i, base: new THREE.Vector3(px, 0.24, pz) });
@@ -680,20 +680,50 @@
   mini.pom.visible = false;
   mini.parts.forEach((p) => (p.castShadow = false));
   hang.add(mini.g);
-  // Pom-pom
+  // Web developing booth: embroidery hoop, the shape under pin 04 in the reference
+  const embTex = ctex(128, 64, (c, w, h) => {
+    c.fillStyle = "#4169e1";
+    c.fillRect(0, 0, w, h);
+    c.strokeStyle = "#ffd24a";
+    c.lineWidth = 3;
+    c.setLineDash([6, 4]);
+    c.strokeRect(5, 5, w - 10, h - 10);
+    txt(c, "LC", 34, 46, 38, "#ffd24a", 800);
+  });
   box(sP, 1.7, 0.55, 1.3, 0, 0.54, 0, M.body);
   box(sP, 1.8, 0.06, 1.4, 0, 0.85, 0, M.ivory);
-  cyl(sP, 0.06, 0.9, -0.45, 1.35, -0.2, M.chrome);
+  const hoopE = new THREE.Group();
+  hoopE.position.set(0, 0.93, 0.1);
+  sP.add(hoopE);
+  const hr = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.04, 8, 32), M.chrome);
+  hr.rotation.x = Math.PI / 2;
+  hoopE.add(hr);
+  cyl(hoopE, 0.37, 0.02, 0, 0, 0, M.ivory);
+  const emE = scr(hoopE, 0.42, 0.21, 0, 0.016, 0, embTex);
+  emE.rotation.x = -Math.PI / 2;
+  box(sP, 0.24, 1.5, 0.3, 0, 1.6, -0.5, M.dark);
+  box(sP, 0.28, 0.26, 0.8, 0, 2.2, -0.15, M.orange);
+  const eNeedle = new THREE.Group();
+  eNeedle.position.set(0, 1.6, 0.1);
+  sP.add(eNeedle);
+  cyl(eNeedle, 0.025, 0.55, 0, 0, 0, M.chrome);
+  cyl(eNeedle, 0.07, 0.16, 0, 0.35, 0, M.dark);
+  cyl(sP, 0.12, 0.34, -0.55, 1.5, -0.5, M.orange);
+  cyl(sP, 0.12, 0.34, 0.55, 1.5, -0.5, M.chrome);
+  // Media buying booth: pom-pom winder, the shape under pin 05 in the reference
+  box(sM, 1.7, 0.55, 1.3, 0, 0.54, 0, M.body);
+  box(sM, 1.8, 0.06, 1.4, 0, 0.85, 0, M.ivory);
+  cyl(sM, 0.06, 0.9, -0.45, 1.35, -0.2, M.chrome);
   const spinPom = new THREE.Mesh(
     new THREE.IcosahedronGeometry(0.34, 2),
     m(GRAY, 0, 0.95, { flatShading: true }),
   );
   spinPom.position.set(-0.45, 1.3, 0.2);
   spinPom.castShadow = true;
-  sP.add(spinPom);
+  sM.add(spinPom);
   const cutter = new THREE.Group();
   cutter.position.set(0.45, 1.1, 0.1);
-  sP.add(cutter);
+  sM.add(cutter);
   cyl(cutter, 0.4, 0.03, 0, 0, 0, M.chrome);
   cyl(cutter, 0.1, 0.08, 0, 0, 0, M.dark);
   [
@@ -707,62 +737,8 @@
     );
     o.position.set(...p);
     o.castShadow = true;
-    sP.add(o);
+    sM.add(o);
   });
-  // Marketing booth: ad dashboard + antenna so the Marketing pin has a real station
-  box(sM, 1.75, 0.55, 1.25, 0, 0.54, 0, M.body);
-  box(sM, 1.85, 0.06, 1.35, 0, 0.85, 0, M.ivory);
-  box(sM, 1.35, 0.9, 0.12, 0, 1.5, -0.45, M.dark);
-  scr(
-    sM,
-    1.22,
-    0.78,
-    0,
-    1.5,
-    -0.385,
-    ctex(512, 320, (c, w, h) => {
-      c.fillStyle = "#10267a";
-      c.fillRect(0, 0, w, h);
-      txt(c, "ADS LIVE", 22, 48, 26, "#9db4ff", 600);
-      txt(c, "MARKETING", 22, 88, 34, "#ffffff", 700);
-      c.fillStyle = "#4169e1";
-      c.fillRect(28, 130, 70, 140);
-      c.fillStyle = "#6f8cff";
-      c.fillRect(118, 170, 70, 100);
-      c.fillStyle = "#9db4ff";
-      c.fillRect(208, 150, 70, 120);
-      c.fillStyle = "#ffffff";
-      c.fillRect(298, 110, 70, 160);
-      c.fillStyle = "#cfdcff";
-      c.fillRect(388, 190, 70, 80);
-      txt(c, "Media · UGC · Reach", 22, 292, 18, "#e6edff", 500);
-    }),
-  );
-  cyl(sM, 0.05, 1.35, 0.7, 1.7, 0.35, M.chrome);
-  const dish = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12, 0, TAU, 0, Math.PI / 2), M.orange);
-  dish.position.set(0.7, 2.35, 0.35);
-  dish.rotation.x = -0.55;
-  dish.castShadow = true;
-  sM.add(dish);
-  box(sM, 0.55, 0.08, 0.4, -0.55, 0.98, 0.35, M.chrome);
-  scr(
-    sM,
-    0.48,
-    0.32,
-    -0.55,
-    1.22,
-    0.42,
-    ctex(240, 160, (c, w, h) => {
-      c.fillStyle = "#0f2a80";
-      c.fillRect(0, 0, w, h);
-      txt(c, "UGC", 24, 70, 42, "#ffffff", 700);
-      txt(c, "4 creators", 24, 112, 20, "#cfdcff", 500);
-    }),
-  );
-  // Nudge Marketing a little left in the overview camera frame
-  sM.position.x -= 0.7;
-  sM.position.z += 0.3;
-  ST[4].base.set(sM.position.x, sM.position.y, sM.position.z);
   // Checkout
   box(sC, 1.9, 0.62, 1.3, 0, 0.58, -0.05, M.ivory);
   box(sC, 1.02, 0.25, 0.9, -0.33, 1.05, -0.03, M.body);
