@@ -442,6 +442,27 @@ header .id {
 .mdod:hover {
   filter: brightness(1.08);
 }
+.mcs {
+  flex: none;
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--fg);
+  text-decoration: none;
+}
+.mcs b {
+  display: block;
+  font-size: 12px;
+}
+.mcs span {
+  display: block;
+  margin-top: 4px;
+  font: 700 14px ui-monospace, monospace;
+  letter-spacing: 0.4px;
+  color: var(--amber);
+}
 .shr {
   display: flex;
   gap: 10px;
