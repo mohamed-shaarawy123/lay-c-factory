@@ -198,7 +198,7 @@ module.exports = async function handler(req, res) {
   }
 
   const customer_name = text(payload.customer_name, 120);
-  const customer_email = text(payload.customer_email, 160);
+  let customer_email = text(payload.customer_email, 160).toLowerCase();
   const customer_phone = text(payload.customer_phone, 40);
   const delivery_address = text(payload.delivery_address, 500);
   const items = {
@@ -229,6 +229,22 @@ module.exports = async function handler(req, res) {
     supabase = supabaseAdmin();
   } catch (err) {
     return json(res, err.status || 500, { ok: false, error: err.message });
+  }
+
+  const accountToken = text(payload.token, 80);
+  if (accountToken.length >= 16) {
+    const who = await supabase
+      .from("orders")
+      .select("customer_email, customer_name, customer_phone")
+      .eq("status", "account")
+      .eq("items->>token", accountToken)
+      .maybeSingle();
+    if (who.data && who.data.customer_email) {
+      customer_email = String(who.data.customer_email).trim().toLowerCase();
+      row.customer_email = customer_email;
+      if (!row.customer_name && who.data.customer_name) row.customer_name = who.data.customer_name;
+      if (!row.customer_phone && who.data.customer_phone) row.customer_phone = who.data.customer_phone;
+    }
   }
 
   if (key) {

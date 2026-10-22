@@ -3073,7 +3073,7 @@
   function paintOrders(orders, err) {
     const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
     let html = '<div id="od"><div class="bx"><h3>Your orders</h3>';
-    if (err) html += '<p class="er">' + esc(err) + "</p>";
+    if (err) html += '<p class="er">' + esc(err) + '</p><button type="button" id="odlogin">Sign in</button>';
     else if (!orders.length) html += "<p>You have no order yet. Pick a service, build your request and tap Request.</p>";
     orders.forEach((order) => {
       const stages = Array.isArray(order.stages) && order.stages.length ? order.stages : orderStages(order.slug);
@@ -3110,16 +3110,39 @@
       orderPoll = null;
     }
   }
+  function bindOrderLogin(stale) {
+    const btn = $("#odlogin");
+    if (!btn) return;
+    btn.onclick = () => {
+      const saved = stale || accGet() || {};
+      mtClose();
+      openAcc(openOrderList, "signup");
+      const name = $("#accname");
+      const email = $("#accemail");
+      const phone = $("#accphone");
+      if (name && saved.name) name.value = saved.name;
+      if (email && saved.email) email.value = saved.email;
+      if (phone && saved.phone) phone.value = saved.phone;
+    };
+  }
   async function loadOrders(quiet) {
     const acc = accGet();
-    if (!acc || !acc.token) {
-      paintOrders([], "Log in to see the orders saved for your email.");
+    if (!acc || !acc.token || String(acc.token).length < 16) {
+      paintOrders([], "Sign in with the email you used for the order. The order is saved to that email.");
+      bindOrderLogin(acc);
       return;
     }
     if (!quiet) pg.innerHTML = '<div id="od"><div class="bx"><h3>Your orders</h3><p>Loading your orders…</p></div></div>';
     try {
       const res = await fetch("/api/quote?token=" + encodeURIComponent(acc.token));
       const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        const stale = { name: acc.name, email: acc.email, phone: acc.phone };
+        accSet(null);
+        paintOrders([], "That sign-in expired. Sign in again with the same email. Your order is saved to that email.");
+        bindOrderLogin(stale);
+        return;
+      }
       if (!res.ok || !data.ok) throw new Error(data.error || "Your orders could not be loaded.");
       if (quiet && !$("#od")) return;
       paintOrders(data.orders || [], "");
@@ -4547,6 +4570,7 @@
           customer_name: acc.name || "",
           customer_email: acc.email || "",
           customer_phone: acc.phone || "",
+          token: acc.token || "",
           delivery_address: "",
           email_fields: fields,
         }),
