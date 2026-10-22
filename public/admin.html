@@ -102,54 +102,88 @@
         color: #b42318;
       }
       #app {
-        display: grid;
-        grid-template-columns: var(--admin-side) 1fr;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
       }
       .nav {
-        overflow: auto;
-        border-right: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.88);
-        padding: max(14px, env(safe-area-inset-top)) 12px max(14px, env(safe-area-inset-bottom));
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-width: 100%;
+        overflow: visible;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.94);
+        padding: max(10px, env(safe-area-inset-top)) clamp(10px, 2vw, 18px) 10px;
       }
       .brand {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
         gap: 8px;
-        margin-bottom: 14px;
+        margin: 0;
+        min-width: 0;
       }
       .brand b {
         font-size: 15px;
       }
-      .nav button {
-        display: block;
-        width: 100%;
-        text-align: left;
-        margin: 0 0 6px;
-        padding: 10px 12px;
+      #sections {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        max-width: 100%;
+      }
+      #sections button {
+        display: inline-flex;
+        align-items: center;
+        flex: none;
+        width: auto;
+        margin: 0;
+        padding: 8px 12px;
         border: 1px solid transparent;
-        border-radius: 10px;
+        border-radius: 999px;
         background: transparent;
         color: var(--fg);
         font: inherit;
+        white-space: nowrap;
         cursor: pointer;
       }
-      .nav button.on {
+      #sections button.on {
         background: rgba(65, 105, 225, 0.12);
         border-color: var(--line);
         font-weight: 600;
       }
       .who {
-        margin-top: 14px;
-        padding-top: 12px;
-        border-top: 1px solid var(--line);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        max-width: 100%;
         font-size: 12px;
         color: var(--mut);
-        word-break: break-all;
+      }
+      .who #who {
+        max-width: min(320px, 100%);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .main {
+        flex: 1;
+        min-width: 0;
+        min-height: 0;
         overflow: auto;
-        padding: max(16px, env(safe-area-inset-top)) clamp(12px, 2vw, 22px) max(24px, env(safe-area-inset-bottom));
+        padding: 16px clamp(12px, 2vw, 22px) max(24px, env(safe-area-inset-bottom));
+      }
+      #panel {
+        min-width: 0;
+        max-width: 100%;
       }
       .topbar {
         display: flex;
@@ -533,27 +567,20 @@
         border-radius: 10px;
         font: inherit;
       }
-      .menu-toggle {
-        display: none;
-      }
-      @media (max-width: 860px) {
-        #app.on {
-          grid-template-columns: 1fr;
+      @media (max-width: 720px) {
+        #sections button {
+          padding: 8px 10px;
+          font-size: 13px;
         }
-        .nav {
-          position: fixed;
-          z-index: 40;
-          inset: 0 auto 0 0;
-          width: var(--admin-side);
-          transform: translateX(-105%);
-          transition: transform 0.2s ease;
-          box-shadow: 12px 0 40px rgba(15, 42, 138, 0.16);
+        .who {
+          justify-content: flex-start;
         }
-        .nav.open {
-          transform: none;
+        .who #who {
+          flex-basis: 100%;
+          max-width: 100%;
         }
-        .menu-toggle {
-          display: inline-flex;
+        .topbar h2 {
+          font-size: 20px;
         }
       }
       .trk {
@@ -624,9 +651,13 @@
       <aside class="nav" id="nav">
         <div class="brand">
           <b>Lay C Admin</b>
-          <button type="button" class="btn ghost" id="navClose" hidden>Close</button>
+          <div class="who">
+            <div id="who">Signed in</div>
+            <button type="button" class="btn ghost" id="logout">Log out</button>
+            <a class="btn ghost" href="/" style="text-decoration: none">Open website</a>
+          </div>
         </div>
-        <nav id="sections">
+        <nav id="sections" aria-label="Admin sections">
           <button type="button" data-sec="overview" class="on">Overview</button>
           <button type="button" data-sec="orders">Orders</button>
           <button type="button" data-sec="tracking">Order Tracking Management</button>
@@ -637,16 +668,10 @@
           <button type="button" data-sec="logs">Activity logs</button>
           <button type="button" data-sec="settings">Admin settings</button>
         </nav>
-        <div class="who">
-          <div id="who">Signed in</div>
-          <button type="button" class="btn ghost" id="logout" style="margin-top: 10px; width: 100%">Log out</button>
-          <a class="btn ghost" href="/" style="display: block; margin-top: 8px; text-align: center; text-decoration: none">Open website</a>
-        </div>
       </aside>
       <main class="main">
         <div class="topbar">
-          <div style="display: flex; gap: 8px; align-items: center">
-            <button type="button" class="btn ghost menu-toggle" id="menuOpen">Menu</button>
+          <div style="display: flex; gap: 8px; align-items: center; min-width: 0">
             <h2 id="title">Overview</h2>
           </div>
           <span id="statusLine" class="pill">Ready</span>
@@ -2177,9 +2202,6 @@
         if (b) go(b.dataset.sec);
       });
       $("#logout").onclick = () => logout("Signed out.");
-      $("#menuOpen").onclick = () => $("#nav").classList.add("open");
-      $("#navClose").onclick = () => $("#nav").classList.remove("open");
-      $("#navClose").hidden = false;
 
       (async () => {
         const saved = JSON.parse(localStorage.getItem(ADMIN_KEY) || "null");
