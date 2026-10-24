@@ -753,7 +753,8 @@ header .id {
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
   transform: rotate(-2deg);
 }
-.ph img {
+.ph img,
+.ph canvas.shot {
   display: block;
   width: 100%;
   border-radius: 2px;
@@ -2893,12 +2894,12 @@ header {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 2px solid var(--line);
+  border: 2px solid #4169e1;
   display: grid;
   place-items: center;
   font: 700 11px system-ui;
   font-style: normal;
-  color: #6b7aa3;
+  color: #4169e1;
 }
 #od .ost.d i {
   background: var(--amber);
@@ -2911,30 +2912,25 @@ header {
   box-shadow: 0 0 0 4px rgba(65, 105, 225, 0.18);
 }
 #od .ost b {
-  color: #10267a;
-}
-#od .ost.n b {
-  color: var(--amber);
-}
-#od .ost.g i {
-  border-color: #d4af37;
-  color: #b8860b;
+  color: #4169e1;
 }
 #od .ost.g b {
-  color: #8a6a12;
+  display: inline;
+  font-weight: 700;
+  background: linear-gradient(90deg, #f6d56a 0%, #e0b03a 48%, #c8962a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
-#od .ost.g.d i {
-  background: #d4af37;
-  border-color: #d4af37;
-  color: #fff;
+#od .ost .sp {
+  margin-left: 4px;
+  color: #e2b43a;
+  font-size: 13px;
+  line-height: 1;
 }
-#od .ost.g.n i {
-  border-color: #d4af37;
-  color: #b8860b;
-  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.28);
-}
-#od .ost.g.n b {
-  color: #8a6a12;
+#od .ost .sp + .sp {
+  margin-left: 2px;
+  font-size: 10px;
 }
 #od .hint,
 #od .er {

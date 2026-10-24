@@ -595,12 +595,12 @@
         width: 22px;
         height: 22px;
         border-radius: 50%;
-        border: 2px solid #c5d0ea;
+        border: 2px solid #4169e1;
         display: grid;
         place-items: center;
         font: 700 11px system-ui;
         font-style: normal;
-        color: #6b7aa3;
+        color: #4169e1;
       }
       .trk.d i {
         background: #4169e1;
@@ -613,25 +613,29 @@
         box-shadow: 0 0 0 4px rgba(65, 105, 225, 0.18);
       }
       .trk .meta {
-        color: #5c6b94;
+        color: #4169e1;
         font-size: 12px;
       }
-      .trk.g i {
-        border-color: #d4af37;
-        color: #b8860b;
+      .trk b {
+        color: #4169e1;
       }
       .trk.g b {
-        color: #8a6a12;
+        display: inline;
+        font-weight: 700;
+        background: linear-gradient(90deg, #f6d56a 0%, #e0b03a 48%, #c8962a 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
       }
-      .trk.g.d i {
-        background: #d4af37;
-        border-color: #d4af37;
-        color: #fff;
+      .trk .sp {
+        margin-left: 4px;
+        color: #e2b43a;
+        font-size: 13px;
+        line-height: 1;
       }
-      .trk.g.n i {
-        border-color: #d4af37;
-        color: #b8860b;
-        box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.28);
+      .trk .sp + .sp {
+        margin-left: 2px;
+        font-size: 10px;
       }
     </style>
   </head>
@@ -1996,8 +2000,8 @@
             const done = !!order.complete || i < stage;
             const active = !order.complete && i === stage;
             const status = done ? "Completed" : active ? "In Progress" : "Pending";
-            const gold = i === 6 && name === "Deployment & Launch";
-            const cls = (done ? "trk d" : active ? "trk n" : "trk") + (gold ? " g" : "");
+            const last = i === stages.length - 1;
+            const cls = (done ? "trk d" : active ? "trk n" : "trk") + (last ? " g" : "");
             return (
               '<div class="' +
               cls +
@@ -2005,7 +2009,9 @@
               (done ? "✓" : i + 1) +
               "</i><div><b>" +
               esc(name) +
-              '</b><div class="meta">' +
+              "</b>" +
+              (last ? '<span class="sp" aria-hidden="true">✦</span><span class="sp" aria-hidden="true">✦</span>' : "") +
+              '<div class="meta">' +
               status +
               "</div></div></div>"
             );
