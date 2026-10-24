@@ -1167,7 +1167,10 @@
       ST.map((s) => s.g),
       true,
     );
-    return h.length ? h[0].object.userData.st : -1;
+    if (!h.length) return -1;
+    let o = h[0].object;
+    while (o && (o.userData == null || o.userData.st == null)) o = o.parent;
+    return o && o.userData ? o.userData.st : -1;
   }
   R.domElement.addEventListener("pointerdown", (e) => {
     dx = e.clientX;
@@ -1218,12 +1221,8 @@
     const i = hit(e);
     if (i >= 0) {
       focus(i);
-      const openSlug = ST[i] && ST[i].open;
-      if (openSlug) {
-        const si = SV.findIndex((s) => s.slug === openSlug);
-        if (si >= 0) go(si);
-      }
-    }     else if (i === -2) gOpen(-1);
+      if (SV[i]) go(i);
+    } else if (i === -2) gOpen(-1);
     else if (i === -3 && openCamera) openCamera();
     else if (i === -4 && openMeet) openMeet();
     else if (i === -5 && openOrders) openOrders();
