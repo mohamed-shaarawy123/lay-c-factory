@@ -3302,8 +3302,8 @@
         "</b>";
       html += stages
         .map((name, i) => {
-          const last = i === stages.length - 1;
-          const cls = (i < ix || fin ? "d" : i === ix ? "n" : "") + (last ? " g" : "");
+          const gold = i === stages.length - 1 || name === "Day of the shoot";
+          const cls = (i < ix || fin ? "d" : i === ix ? "n" : "") + (gold ? " g" : "");
           return (
             '<div class="ost ' +
             cls +
@@ -3312,7 +3312,7 @@
             "</i><div><b>" +
             esc(name) +
             "</b>" +
-            (last ? '<span class="sp" aria-hidden="true">✦</span><span class="sp" aria-hidden="true">✦</span>' : "") +
+            (gold ? '<span class="sp" aria-hidden="true">✦</span><span class="sp" aria-hidden="true">✦</span>' : "") +
             "</div></div>"
           );
         })
