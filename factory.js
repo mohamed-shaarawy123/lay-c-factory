@@ -805,6 +805,12 @@
   embMark.position.set(0, 0.02, 0.33);
   hoopBeanie.g.add(embMark);
   hoopE.add(hoopBeanie.g);
+  const embRoof = cyl(sP, 0.2, 0.045, 0, 1.02, 0.22, M.paper);
+  embRoof.scale.x = 1.5;
+  const embRoofMark = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.19), embMark.material);
+  embRoofMark.rotation.x = -Math.PI / 2;
+  embRoofMark.position.set(0, 1.05, 0.22);
+  sP.add(embRoofMark);
   box(sP, 0.18, 1.35, 0.18, 0, 1.62, -0.58, M.body);
   box(sP, 0.16, 0.12, 0.95, 0, 2.28, -0.12, M.chrome);
   const eNeedle = new THREE.Group();
@@ -964,6 +970,11 @@
     scr(slip, 0.46, 0.68, 0, 0, 0.025, slipTex);
     const tag = scr(g, 0.34, 0.21, 0.3, -0.05, 0.08, tagTex);
     tag.material.side = THREE.DoubleSide;
+    const mark = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.14), embMark.material);
+    mark.position.set(0, 0.02, 0.34);
+    mark.visible = false;
+    b.logo.visible = false;
+    b.g.add(mark);
     const halo = new THREE.Mesh(
       new THREE.RingGeometry(0.4, 0.414, 40),
       new THREE.MeshBasicMaterial({
@@ -978,7 +989,7 @@
     halo.position.y = -0.2;
     g.add(slip, b.g, halo);
     machine.add(g);
-    P.push({ g, b, slip, tag, halo, s: -1, ph: 0, d: 0 });
+    P.push({ g, b, slip, tag, halo, mark, s: -1, ph: 0, d: 0 });
   }
   // state
   let mode = "assembled",
@@ -2465,7 +2476,8 @@
   }
   function barHTML() {
     return (
-      '<div class="wrap"><div class="bar"><button class="back" id="back">&larr; Back to the machine</button></div>'
+      '<div class="wrap"><div class="bar"><button class="back" id="back">&larr; Back to the machine</button><div class="bar-r">' +
+      '<button class="ask" id="askg" type="button"><span class="av" aria-hidden="true"></span>Ask the guide</button></div></div>'
     );
   }
   function customerBlock(acc) {
@@ -3577,6 +3589,10 @@
       go(+w.dataset.i);
       return;
     }
+    if (e.target.closest("#askg")) {
+      gOpen(cur);
+      return;
+    }
     const sb = e.target.closest(".sb");
     if (sb) {
       const q = SV[cur].q[+sb.dataset.j];
@@ -3909,7 +3925,25 @@
     let albumMeta = { mine: 0, locked: true, private: true, published: false, reason: "" };
     let shareChoice = false;
     let stream = null;
+    let pendingCam = null;
     let shooting = false;
+    function primeCamera() {
+      if (stream || pendingCam) return pendingCam;
+      pendingCam = navigator.mediaDevices
+        .getUserMedia({
+          video: { facingMode: facing, width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false,
+        })
+        .then((s) => {
+          pendingCam = null;
+          return s;
+        })
+        .catch((err) => {
+          pendingCam = null;
+          throw err;
+        });
+      return pendingCam;
+    }
     const esc = (s) =>
       String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const stop = () => {
@@ -4112,14 +4146,13 @@
         // Warm the server-side NSFW model once while the camera preview starts.
         fetch("/api/album?warm=1", { cache: "no-store" }).catch(() => {});
         try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: facing, width: { ideal: 960 }, height: { ideal: 720 } },
-            audio: false,
-          });
+          const ready = stream ? Promise.resolve(stream) : pendingCam || primeCamera();
+          const next = await ready;
           if (view !== "camera" || box.hidden) {
-            stop();
+            if (next && next !== stream) next.getTracks().forEach((t) => t.stop());
             return;
           }
+          stream = next;
           video.srcObject = stream;
           video.classList.toggle("mir", facing === "user");
           await video.play();
@@ -4269,10 +4302,11 @@
       view = "";
       cb.focus({ preventScroll: true });
     }
-    openCamera = async () => {
+    openCamera = () => {
       box.hidden = false;
-      await refreshCount();
-      await setView("welcome");
+      primeCamera();
+      refreshCount();
+      setView("camera");
     };
     cb.onclick = () => openCamera();
     alb.onclick = async () => {
@@ -4325,12 +4359,10 @@
         shooting = true;
         const frame = box.querySelector(".cv");
         if (frame) frame.classList.add("fl");
-        setBusy(true, "Checking your photo…");
         let c = null;
         try {
-          // Scale once from the live frame — no full-res encode + re-decode round trip.
-          c = frameFromVideo(video, 900);
-          setBusy(true, "Uploading and checking your photo…");
+          c = frameFromVideo(video, 640);
+          setBusy(true, "Saving your photo…");
           await upload(c);
         } catch (ex) {
           if (frame) frame.classList.remove("fl");
@@ -5701,8 +5733,8 @@
   function gClose(quiet) {
     gd.hidden = true;
     if (quiet) return;
-    const backBtn = $("#back");
-    (cur >= 0 && backBtn ? backBtn : mas).focus({ preventScroll: true });
+    const a = $("#askg");
+    (cur >= 0 && a ? a : mas).focus({ preventScroll: true });
   }
   mas.onclick = () => gOpen(-1);
   $("#gx").onclick = () => gClose();
@@ -6535,7 +6567,9 @@
         p.b.parts.forEach((x) => (x.visible = true));
         p.b.mat.color.setHex(s >= 2 ? GRAY : CREAM);
         p.b.pom.visible = s >= 4;
-        p.b.logo.visible = s >= 3;
+        const stitched = d >= 2.55;
+        p.b.logo.visible = s > 0 && !stitched;
+        if (p.mark) p.mark.visible = stitched;
         p.tag.visible = s === 5;
       }
       p.g.visible = mode !== "order" || i === 0;
