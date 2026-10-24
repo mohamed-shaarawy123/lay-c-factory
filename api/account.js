@@ -58,7 +58,35 @@ module.exports = async function handler(req, res) {
   const payload = await readPayload(req);
   if (!payload) return json(res, 400, { ok: false, error: "The account is missing." });
 
-  const mode = payload.mode === "login" ? "login" : "signup";
+  const mode = payload.mode === "login" ? "login" : payload.mode === "session" ? "session" : "signup";
+  let supabase;
+  try {
+    supabase = supabaseAdmin();
+  } catch (err) {
+    return json(res, err.status || 500, { ok: false, error: err.message });
+  }
+
+  if (mode === "session") {
+    const token = text(payload.token, 80);
+    if (token.length < 16) return json(res, 401, { ok: false, error: "Sign in again." });
+    const saved = await supabase
+      .from("orders")
+      .select("id, customer_name, customer_email, customer_phone")
+      .eq("status", "account")
+      .eq("items->>token", token)
+      .maybeSingle();
+    if (saved.error || !saved.data) return json(res, 401, { ok: false, error: "Sign in again." });
+    return json(res, 200, {
+      ok: true,
+      token,
+      account_id: saved.data.id,
+      customer_name: saved.data.customer_name || "",
+      customer_email: saved.data.customer_email || "",
+      customer_phone: saved.data.customer_phone || "",
+      staff: isStaffEmail(saved.data.customer_email || ""),
+    });
+  }
+
   const customer_name = text(payload.customer_name, 120);
   const customer_email = text(payload.customer_email, 160).toLowerCase();
   const customer_phone = text(payload.customer_phone, 40);
@@ -72,13 +100,6 @@ module.exports = async function handler(req, res) {
   if (mode === "signup") {
     if (!customer_name) return json(res, 400, { ok: false, error: "Enter your name." });
     if (customer_phone.length < 6) return json(res, 400, { ok: false, error: "Enter a phone number." });
-  }
-
-  let supabase;
-  try {
-    supabase = supabaseAdmin();
-  } catch (err) {
-    return json(res, err.status || 500, { ok: false, error: err.message });
   }
 
   const existing = await supabase

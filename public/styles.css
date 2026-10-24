@@ -495,7 +495,7 @@ header .id {
   background: var(--panel);
   font-size: 11px;
   font-weight: 600;
-  max-width: 180px;
+  max-width: min(42vw, 200px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -975,16 +975,6 @@ header .id {
 #journey.v {
   opacity: 1;
 }
-#journey.tour {
-  flex-wrap: wrap;
-  z-index: 6;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  backdrop-filter: blur(14px);
-  pointer-events: none;
-}
 #jprog {
   display: block;
   margin-top: 2px;
@@ -992,31 +982,128 @@ header .id {
   letter-spacing: 0.04em;
   color: var(--amber);
 }
-#tourctl {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  width: 100%;
-  pointer-events: auto;
-}
-#tourctl button,
-#modes #tourstart {
-  min-height: 36px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: var(--amber);
-  color: var(--on);
-  font-size: clamp(10px, 2.4vw, 12px);
-  font-weight: 600;
-}
-#tourctl button {
-  background: transparent;
+#tour {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
   color: var(--fg);
-  border: 1px solid var(--line);
 }
-#tourstart[hidden],
-#tourctl[hidden] {
+#tour .tsp {
+  position: fixed;
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(8, 20, 70, 0.62);
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  pointer-events: none;
+  animation: tpulse 1.6s ease-in-out infinite;
+}
+#tour .tsp.none {
+  outline-color: transparent;
+  animation: none;
+}
+#tour .tsp.mv {
+  transition:
+    left 0.4s ease,
+    top 0.4s ease,
+    width 0.4s ease,
+    height 0.4s ease;
+}
+@keyframes tpulse {
+  0%,
+  100% {
+    outline-offset: 2px;
+  }
+  50% {
+    outline-offset: 6px;
+  }
+}
+#tour .tc {
+  position: fixed;
+  width: min(330px, calc(100vw - 24px));
+  box-sizing: border-box;
+  padding: 16px 16px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 14px 40px rgba(15, 42, 138, 0.35);
+  outline: none;
+}
+#tour .tk {
+  font:
+    600 10px ui-monospace,
+    monospace;
+  letter-spacing: 1.5px;
+  color: var(--amber);
+}
+#tour .tt {
+  margin: 6px 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--fg);
+}
+#tour .tb {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--mut);
+}
+#tour .td {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+#tour .td i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line);
+}
+#tour .td i.on {
+  width: 16px;
+  border-radius: 4px;
+  background: var(--amber);
+}
+#tour .tr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#tour .tgap {
+  flex: 1;
+}
+#tour .tnext {
+  padding: 9px 14px;
+  border-radius: 9px;
+  background: var(--amber);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+}
+#tour .tback {
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--fg);
+  font-size: 13px;
+}
+#tour .tback[hidden] {
   display: none;
+}
+#tour .tskip {
+  padding: 8px 2px;
+  color: var(--mut);
+  font-size: 12px;
+  text-decoration: underline;
+}
+@media (prefers-reduced-motion: reduce) {
+  #tour .tsp {
+    animation: none;
+  }
+  #tour .tsp.mv {
+    transition: none;
+  }
 }
 #journey b {
   font-size: 12px;
@@ -1473,10 +1560,105 @@ input {
   min-height: 200px;
   box-shadow: 0 8px 28px rgba(15, 42, 138, 0.08);
 }
-.win:hover,
-.win:focus-visible {
+.win.soon {
+  border-color: #2f5bff;
+  background: linear-gradient(160deg, rgba(47, 91, 255, 0.14), rgba(47, 91, 255, 0.05));
+}
+.win.soon .wt,
+.win.soon .wd {
+  opacity: 0.6;
+}
+.win.soon .wg {
+  color: #fff;
+  background: #2f5bff;
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 14px;
+  letter-spacing: 0.3px;
+}
+.win.soon:hover,
+.win.soon:focus-visible {
+  border-color: #2f5bff;
+  box-shadow:
+    0 0 0 1px #2f5bff,
+    0 8px 28px rgba(47, 91, 255, 0.22);
+}
+.win:not(.soon):hover,
+.win:not(.soon):focus-visible {
   border-color: var(--amber);
   box-shadow: 0 0 0 1px var(--amber);
+}
+#studio-ask {
+  background: #fff;
+  color: var(--fg);
+}
+#studio-ask .bx {
+  width: min(560px, 100%);
+  margin: 28px auto 0;
+  box-sizing: border-box;
+}
+#studio-ask h3 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  letter-spacing: -0.3px;
+  color: var(--fg);
+}
+#studio-ask p {
+  margin: 0 0 16px;
+  color: var(--mut);
+  line-height: 1.5;
+}
+#studio-ask input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--amber);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--fg);
+  font: inherit;
+}
+#studio-ask .stc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+#studio-ask .stc button {
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--fg);
+  font-weight: 600;
+}
+#studio-ask .stc button[aria-pressed="true"] {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+#studio-ask .sub {
+  width: 100%;
+  margin-top: 4px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  background: var(--amber);
+  color: #fff;
+  font-weight: 700;
+}
+#studio-ask .msg {
+  min-height: 1.3em;
+  margin: 10px 0 0;
+  text-align: center;
+  color: var(--fg);
+}
+#studio-ask #stx {
+  display: block;
+  margin: 8px auto 0;
+  padding: 8px 16px;
+  color: var(--fg);
+  font-weight: 600;
 }
 .win .wt {
   font-size: 22px;
@@ -3153,12 +3335,8 @@ header {
     padding: clamp(14px, 3vw, 20px);
   }
   #modes button,
-  #cams button,
-  #tourctl button {
+  #cams button {
     min-height: max(36px, calc(var(--ui-touch) * 0.85));
-  }
-  #journey.tour {
-    top: 58px;
   }
 }
 
