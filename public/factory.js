@@ -4035,16 +4035,12 @@
       if (!canvas || canvas.width < 160 || canvas.height < 160) {
         throw new Error("Take a proper photo. The picture is too small to save.");
       }
-      const t = document.createElement("canvas");
-      t.width = 24;
-      t.height = 24;
-      const g = t.getContext("2d", { alpha: false, willReadFrequently: true });
-      g.drawImage(canvas, 0, 0, 24, 24);
-      const data = g.getImageData(0, 0, 24, 24).data;
+      const data = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
       let n = 0;
       let sum = 0;
       let sum2 = 0;
-      for (let i = 0; i < data.length; i += 4) {
+      const step = Math.max(16, Math.floor(data.length / 16000)) * 4;
+      for (let i = 0; i < data.length; i += step) {
         const y = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
         sum += y;
         sum2 += y * y;
@@ -4269,7 +4265,10 @@
       if (needAccount()) return;
       properPhoto(canvas);
       const acc = accGet() || {};
-      const [image, thumb] = await Promise.all([canvasToJpeg(canvas, 0.7), makeThumb(canvas, 220, 0.62)]);
+      const image = await canvasToJpeg(canvas, 0.78);
+      const thumb = await makeThumb(canvas, 280, 0.7);
+      canvas.width = 0;
+      canvas.height = 0;
       const res = await fetch("/api/album", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -4303,26 +4302,6 @@
         note: statusNote,
         heading: data.pending ? "Waiting for review" : data.duplicate ? "Already in your album" : "Saved to your photo binder",
       };
-      if (view === "saved") {
-        const head = box.querySelector("h2");
-        const note = box.querySelector("#sst");
-        const btn = box.querySelector('[data-a="album"]');
-        const shot = box.querySelector(".ph canvas.shot");
-        if (head) head.textContent = last.heading;
-        if (note) note.textContent = last.note;
-        if (btn) btn.textContent = "Open the photo binder (" + count + ")";
-        if (shot && thumb) {
-          const im = document.createElement("img");
-          im.src = thumb;
-          im.alt = "The picture you just took";
-          shot.replaceWith(im);
-        }
-        canvas.width = 0;
-        canvas.height = 0;
-        return;
-      }
-      canvas.width = 0;
-      canvas.height = 0;
       await setView("saved", last);
     }
     function closeCam() {
@@ -4381,7 +4360,6 @@
           const p = msg.querySelector("p");
           if (p) p.textContent = text;
         };
-        if (needAccount()) return;
         if (!video || !video.videoWidth) {
           showMsg("The camera is not ready yet. Wait a moment, then take the picture.");
           return;
@@ -4391,34 +4369,24 @@
         if (frame) frame.classList.add("fl");
         let c = null;
         try {
-          c = frameFromVideo(video, 512);
-          properPhoto(c);
+          c = frameFromVideo(video, 640);
+          setBusy(true, "Saving your photo…");
+          await upload(c);
         } catch (ex) {
           if (frame) frame.classList.remove("fl");
-          shooting = false;
+          setBusy(false);
           showMsg(ex.message || "This photo cannot be saved. Only a legal photo is allowed.");
-          return;
+        } finally {
+          shooting = false;
+          if (c) {
+            c.width = 0;
+            c.height = 0;
+          }
+          const shut = box.querySelector(".shut");
+          const flip = box.querySelector('[data-a="flip"]');
+          if (shut) shut.disabled = false;
+          if (flip) flip.disabled = false;
         }
-        stop();
-        last = {
-          thumb: "",
-          ts: Date.now(),
-          note: "Saving your photo…",
-          heading: "Photo taken",
-        };
-        await setView("saved", last);
-        const preview = box.querySelector(".ph img");
-        if (preview) {
-          c.className = "shot";
-          preview.replaceWith(c);
-        }
-        shooting = false;
-        upload(c).catch((ex) => {
-          const head = box.querySelector("h2");
-          const note = box.querySelector("#sst");
-          if (head) head.textContent = "This photo was not saved";
-          if (note) note.textContent = ex.message || "This photo cannot be saved. Only a legal photo is allowed.";
-        });
       } else if (a === "view" && t.dataset.id) {
         const acc = accGet() || {};
         const res = await fetch("/api/album?id=" + encodeURIComponent(t.dataset.id) + (acc.token ? "&token=" + encodeURIComponent(acc.token) : ""));
