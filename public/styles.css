@@ -442,26 +442,34 @@ header .id {
 .mdod:hover {
   filter: brightness(1.08);
 }
-.mcs {
+.mico {
   flex: none;
-  display: block;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #fff;
-  color: var(--fg);
+  display: flex;
+  justify-content: center;
+  gap: 22px;
+  padding: 2px 0 4px;
+}
+.mico a {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  color: var(--amber);
   text-decoration: none;
 }
-.mcs b {
+.mico svg {
+  width: 28px;
+  height: 28px;
   display: block;
-  font-size: 12px;
 }
-.mcs span {
-  display: block;
-  margin-top: 4px;
-  font: 700 14px ui-monospace, monospace;
-  letter-spacing: 0.4px;
-  color: var(--amber);
+.mico .wa {
+  color: #25d366;
+}
+.mico .ig {
+  color: #e1306c;
+}
+.mico a:hover {
+  opacity: 0.75;
 }
 .shr {
   display: flex;
