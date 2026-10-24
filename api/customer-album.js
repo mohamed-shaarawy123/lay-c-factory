@@ -4,6 +4,7 @@ const path = require("path");
 const { createClient } = require("@supabase/supabase-js");
 const { readPayload } = require("../lib/body");
 const { isStaffEmail } = require("../lib/staff");
+const { moderatePhoto } = require("../lib/photo-moderate");
 
 const BUCKET = "album-photos";
 const LINK_DAYS = 14;
@@ -178,6 +179,8 @@ async function openAlbum(supabase, raw) {
   if (photos.error) return { status: 502, body: { ok: false, error: photos.error.message } };
   const shown = [];
   for (const photo of photos.data || []) {
+    if (String(photo.storage_path || "").indexOf("hold/") === 0) continue;
+    if (photo.moderation_status === "pending" || photo.moderation_status === "rejected") continue;
     const signed = await supabase.storage.from(BUCKET).createSignedUrl(photo.storage_path, SIGNED_SECONDS);
     if (signed.error || !signed.data) continue;
     shown.push({
@@ -308,6 +311,26 @@ module.exports = async function handler(req, res) {
       if (!albumId || !file) return json(res, 400, { ok: false, error: "Choose a JPEG, PNG, or WebP photo under 2 MB." });
       const album = await supabase.from("albums").select("id").eq("id", albumId).maybeSingle();
       if (album.error || !album.data) return json(res, 404, { ok: false, error: "That album was not found." });
+      const check = await moderatePhoto(payload.image, { timeoutMs: 20000, req });
+      if (!check.ok || check.decision === "rejected" || check.decision === "unavailable" || check.unavailable) {
+        const unavailable = check.decision === "unavailable" || check.unavailable === true;
+        return json(res, unavailable ? 503 : 400, {
+          ok: false,
+          published: false,
+          rejected: Boolean(check.rejected),
+          moderation_status: check.decision || "rejected",
+          error: check.error || "This photo was not uploaded. It did not pass the content check.",
+        });
+      }
+      if (check.pending || check.decision === "pending") {
+        return json(res, 403, {
+          ok: false,
+          pending: true,
+          published: false,
+          moderation_status: "pending",
+          error: "This photo needs a review before it can be added. It was not saved to the album.",
+        });
+      }
       await ensureBucket(supabase);
       const photoId = crypto.randomUUID();
       const storagePath = albumId + "/" + photoId + "." + file.ext;

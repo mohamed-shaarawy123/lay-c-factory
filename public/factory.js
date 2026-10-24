@@ -455,6 +455,58 @@
     for (let i = 0; i < 16; i++) c.fillRect(i * 8 + 4, 0, 3, h);
   });
   knit.wrapS = knit.wrapT = THREE.RepeatWrapping;
+  const logoCanvas = document.createElement("canvas");
+  logoCanvas.width = 256;
+  logoCanvas.height = 256;
+  const logoMap = new THREE.CanvasTexture(logoCanvas);
+  logoMap.encoding = THREE.sRGBEncoding;
+  logoMap.anisotropy = 4;
+  const logoMat = new THREE.MeshStandardMaterial({
+    map: logoMap,
+    transparent: true,
+    roughness: 0.62,
+    metalness: 0,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4,
+    depthWrite: false,
+  });
+  const logoGeo = new THREE.SphereGeometry(0.362, 32, 24, Math.PI / 2 - 0.5, 1.0, 0.4, 0.86);
+  {
+    const img = new Image();
+    img.onload = () => {
+      const w = 256,
+        h = 256,
+        tmp = document.createElement("canvas");
+      tmp.width = w;
+      tmp.height = h;
+      const tctx = tmp.getContext("2d");
+      const mark = 188;
+      tctx.drawImage(img, (w - mark) / 2, (h - mark) / 2, mark, mark);
+      const px = tctx.getImageData(0, 0, w, h);
+      const d = px.data;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i] + d[i + 1] + d[i + 2] < 42) d[i + 3] = 0;
+      }
+      tctx.putImageData(px, 0, 0);
+      const c = logoCanvas.getContext("2d");
+      c.clearRect(0, 0, w, h);
+      c.drawImage(tmp, 2, 3);
+      c.globalCompositeOperation = "source-atop";
+      c.fillStyle = "rgba(8, 24, 90, 0.55)";
+      c.fillRect(0, 0, w, h);
+      c.globalCompositeOperation = "source-over";
+      c.drawImage(tmp, 0, 0);
+      c.strokeStyle = "#10267a";
+      c.lineWidth = 2;
+      c.setLineDash([2, 3]);
+      c.beginPath();
+      c.ellipse(128, 128, 86, 86, 0, 0, TAU);
+      c.stroke();
+      logoMap.needsUpdate = true;
+    };
+    img.src = "logo.png";
+  }
   function makeBeanie() {
     const g = new THREE.Group(),
       mat = m(CREAM, 0, 0.95, { map: knit, side: THREE.DoubleSide }),
@@ -472,8 +524,13 @@
     const pom = new THREE.Mesh(new THREE.IcosahedronGeometry(0.14, 2), pm);
     pom.position.y = 0.37;
     pom.castShadow = true;
-    g.add(dome, cuff, pom);
-    return { g, mat, pm, pom, parts: [dome, cuff] };
+    const logo = new THREE.Mesh(logoGeo, logoMat);
+    logo.scale.y = 1.05;
+    logo.position.y = -0.02;
+    logo.castShadow = false;
+    logo.receiveShadow = false;
+    g.add(dome, cuff, pom, logo);
+    return { g, mat, pm, pom, logo, parts: [dome, cuff] };
   }
   // stations
   const defs = [
@@ -492,12 +549,18 @@
       out: "colour",
       desc: "The shell takes a dip and comes out in the signature gray.",
     },
-    { name: "Pom-pom", out: "finish", desc: "A fluffy pom-pom is wound, trimmed and sewn on top." },
+    {
+      name: "Embroidery Machine",
+      label: "EMBROIDERY",
+      out: "finish",
+      desc: "The needle head stitches the LAY C logo into the front of the knitted beanie.",
+    },
     {
       name: "Marketing",
+      label: "POM-POM",
       out: "market",
       open: "marketing",
-      desc: "Media buying and UGC. Tap to book ads or creator content.",
+      desc: "A pom-pom is wound and sewn on here. Tap to book ads or creator content.",
     },
     {
       name: "Checkout",
@@ -530,7 +593,7 @@
         c.fillStyle = "#0f2a80";
         c.fillRect(0, 0, w, h);
         txt(c, "0" + (i + 1), 22, 50, 38, "#4169e1", 600);
-        txt(c, (i === 3 ? "EMBROIDERY" : i === 4 ? "POM-POM" : d.name).toUpperCase(), 100, 48, 34, "#d7d9d7", 600);
+        txt(c, (d.label || d.name).toUpperCase(), 100, 48, 34, "#d7d9d7", 600);
       }),
     );
     ST.push({ ...d, g, gm, i, base: new THREE.Vector3(px, 0.24, pz) });
@@ -678,44 +741,75 @@
   mini.g.scale.setScalar(1.1);
   mini.g.position.y = -0.2;
   mini.pom.visible = false;
+  mini.logo.visible = false;
   mini.parts.forEach((p) => (p.castShadow = false));
   hang.add(mini.g);
-  // Web developing booth: embroidery hoop, the shape under pin 04 in the reference
-  const embTex = ctex(128, 64, (c, w, h) => {
-    c.fillStyle = "#4169e1";
-    c.fillRect(0, 0, w, h);
-    c.strokeStyle = "#ffd24a";
-    c.lineWidth = 3;
-    c.setLineDash([6, 4]);
-    c.strokeRect(5, 5, w - 10, h - 10);
-    txt(c, "LC", 34, 46, 38, "#ffd24a", 800);
-  });
+  // Embroidery machine: needle head, thread rack, hoop and a beanie under the needle
   box(sP, 1.7, 0.55, 1.3, 0, 0.54, 0, M.body);
   box(sP, 1.8, 0.06, 1.4, 0, 0.85, 0, M.ivory);
+  box(sP, 0.9, 0.08, 0.7, 0, 0.96, 0.12, M.dark);
   const hoopE = new THREE.Group();
-  hoopE.position.set(0, 1.05, 0.1);
+  hoopE.position.set(0, 1.08, 0.12);
   sP.add(hoopE);
-  const hr = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.07, 12, 40), M.orange);
+  const hr = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.055, 12, 40), M.orange);
   hr.rotation.x = Math.PI / 2;
   hoopE.add(hr);
-  const hr2 = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.035, 10, 36), M.chrome);
+  const hr2 = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.028, 10, 36), M.chrome);
   hr2.rotation.x = Math.PI / 2;
-  hr2.position.y = 0.04;
+  hr2.position.y = 0.03;
   hoopE.add(hr2);
-  cyl(hoopE, 0.3, 0.04, 0, 0.02, 0, M.ivory);
-  const emE = scr(hoopE, 0.46, 0.24, 0, 0.05, 0, embTex);
-  emE.rotation.x = -Math.PI / 2;
-  box(sP, 0.16, 1.15, 0.16, 0, 1.5, -0.62, M.body);
-  box(sP, 0.22, 0.14, 0.85, 0, 2.05, -0.22, M.chrome);
+  for (const x of [-0.5, 0.5]) {
+    cyl(hoopE, 0.035, 0.22, x, -0.08, 0, M.chrome);
+    box(hoopE, 0.08, 0.04, 0.16, x, -0.18, 0, M.body);
+  }
+  const hoopBeanie = makeBeanie();
+  hoopBeanie.g.scale.setScalar(0.78);
+  hoopBeanie.g.rotation.x = -Math.PI / 2;
+  hoopBeanie.g.position.y = 0.08;
+  hoopBeanie.pom.visible = false;
+  hoopBeanie.logo.visible = true;
+  hoopE.add(hoopBeanie.g);
+  box(sP, 0.18, 1.35, 0.18, 0, 1.62, -0.58, M.body);
+  box(sP, 0.16, 0.12, 0.95, 0, 2.28, -0.12, M.chrome);
   const eNeedle = new THREE.Group();
-  eNeedle.position.set(0, 1.55, 0.1);
+  eNeedle.position.set(0, 1.72, 0.12);
   sP.add(eNeedle);
-  cyl(eNeedle, 0.035, 0.72, 0, 0, 0, M.body);
-  cyl(eNeedle, 0.09, 0.14, 0, 0.38, 0, M.orange);
-  cyl(sP, 0.16, 0.08, -0.58, 0.96, -0.42, M.orange);
-  cyl(sP, 0.1, 0.42, -0.58, 1.2, -0.42, M.ivory);
-  cyl(sP, 0.16, 0.08, 0.58, 0.96, -0.42, M.chrome);
-  cyl(sP, 0.1, 0.42, 0.58, 1.2, -0.42, M.body);
+  box(eNeedle, 0.28, 0.16, 0.22, 0, 0.42, 0, M.body);
+  box(eNeedle, 0.16, 0.08, 0.16, 0, 0.3, 0.02, M.orange);
+  cyl(eNeedle, 0.02, 0.55, 0, 0.05, 0, M.chrome);
+  box(eNeedle, 0.1, 0.025, 0.1, 0, -0.2, 0, M.chrome);
+  const embSpools = [];
+  [
+    [-0.62, "#1d3fbf"],
+    [-0.28, "#f4f1ea"],
+    [0.28, "#ffd24a"],
+    [0.62, "#9db4ff"],
+  ].forEach(([x, col]) => {
+    const sp = new THREE.Group();
+    sp.position.set(x, 1.55, -0.48);
+    sP.add(sp);
+    const core = cyl(sp, 0.11, 0.22, 0, 0, 0, m(col, 0, 0.9));
+    core.rotation.z = Math.PI / 2;
+    for (const z of [-0.12, 0.12]) {
+      const f = cyl(sp, 0.16, 0.025, z, 0, 0, M.chrome);
+      f.rotation.z = Math.PI / 2;
+    }
+    embSpools.push(sp);
+    const th = new THREE.Mesh(
+      new THREE.TubeGeometry(
+        new THREE.CatmullRomCurve3([
+          new THREE.Vector3(x, 1.55, -0.32),
+          new THREE.Vector3(x * 0.35, 2.05, -0.2),
+          new THREE.Vector3(0, 2.05, 0.02),
+        ]),
+        16,
+        0.012,
+        5,
+      ),
+      m(col, 0, 0.85),
+    );
+    sP.add(th);
+  });
   // Media buying booth: pom-pom winder, the shape under pin 05 in the reference
   box(sM, 1.7, 0.55, 1.3, 0, 0.54, 0, M.body);
   box(sM, 1.8, 0.06, 1.4, 0, 0.85, 0, M.ivory);
@@ -873,10 +967,54 @@
     ["New order", "Orders · Mariam Sa3b wants a gray beanie"],
     ["Knitting the shell", "Knitter · thread becomes a ribbed cap"],
     ["Dyeing it gray", "Dye vat · one dip, full colour"],
-    ["Sewing on the pom-pom", "Pom-pom · fluffy finishing"],
-    ["Running the ads", "Marketing · media buying and UGC push the brand"],
-    ["Payment received", "Checkout · tag on, coin in"],
+    ["Stitching the logo", "Embroidery Machine · the LAY C mark is sewn into the front"],
+    ["Sewing on the pom-pom", "Pom-Pom Station · fluffy finishing"],
+    ["Checked and paid", "Checkout · inspected, tagged and paid"],
   ];
+  const TOUR = [
+    {
+      i: 0,
+      name: "Orders",
+      purpose: "Receive the customer order",
+      process: "A new beanie order arrives and starts the line.",
+    },
+    {
+      i: 1,
+      name: "Knitting Machine",
+      purpose: "Manufacture the beanie",
+      process: "Yarn spools feed a circular head that knits the ribbed shell.",
+    },
+    {
+      i: 2,
+      name: "Dyeing Station",
+      purpose: "Dye the beanie",
+      process: "The shell is dipped and comes out in the signature gray.",
+    },
+    {
+      i: 3,
+      name: "Embroidery Machine",
+      purpose: "Embroider the LAY C logo",
+      process: "The needle head stitches the LAY C mark into the front of the beanie.",
+    },
+    {
+      i: 4,
+      name: "Pom-Pom Station",
+      purpose: "Attach the pom-pom",
+      process: "A fluffy pom-pom is wound, trimmed and sewn on top.",
+    },
+    {
+      i: 5,
+      name: "Quality Check and Checkout",
+      purpose: "Inspect and finish the product",
+      process: "The beanie is checked, tagged and paid for.",
+    },
+  ];
+  let touring = false,
+    tourStep = 0,
+    tourPaused = false,
+    tourHold = 0,
+    tourLock = false;
+  const TOUR_DWELL = 8;
   function goal() {
     const ex = mode === "stations" ? 1.2 : 1;
     if (camMode === "station") {
@@ -929,10 +1067,61 @@
     document
       .querySelectorAll("[data-cam]")
       .forEach((b) => b.setAttribute("aria-pressed", b.dataset.cam === camMode));
-    $("#journey").classList.toggle("v", mode === "order");
+    $("#journey").classList.toggle("v", mode === "order" || touring);
+    $("#journey").classList.toggle("tour", touring);
+    const tourCtl = $("#tourctl");
+    if (tourCtl) tourCtl.hidden = !touring;
+    const tourStart = $("#tourstart");
+    if (tourStart) tourStart.hidden = touring;
+    const tourPauseBtn = $("#tourpause");
+    if (tourPauseBtn) {
+      tourPauseBtn.textContent = tourPaused ? "Resume" : "Pause";
+      tourPauseBtn.setAttribute("aria-label", tourPaused ? "Resume the tour" : "Pause the tour");
+    }
+  }
+  function tourWrite() {
+    if (!touring) return;
+    const stop = TOUR[tourStep];
+    $("#jt").textContent = stop.name;
+    const prog = $("#jprog");
+    if (prog) prog.textContent = "Station " + (tourStep + 1) + " of " + TOUR.length;
+    $("#jd").textContent = stop.purpose + ". " + stop.process;
+    const frac = tourStep + Math.min(1, tourHold / TOUR_DWELL);
+    $("#jp").style.width = (frac / TOUR.length) * 100 + "%";
+  }
+  function tourGo(step) {
+    tourStep = (step + TOUR.length) % TOUR.length;
+    tourHold = 0;
+    touring = true;
+    sel = TOUR[tourStep].i;
+    camMode = "station";
+    if (mode === "order") mode = "assembled";
+    tourLock = true;
+    goal();
+    camAnim = true;
+    tourLock = false;
+    lastInt = performance.now();
+    sync();
+    tourWrite();
+  }
+  function startTour() {
+    tourPaused = false;
+    tourGo(0);
+    return true;
+  }
+  function exitTour(keepView) {
+    if (!touring && keepView) return;
+    touring = false;
+    tourPaused = false;
+    tourHold = 0;
+    const prog = $("#jprog");
+    if (prog) prog.textContent = "";
+    sync();
+    if (!keepView) setCam("overview");
   }
   function setMode(n) {
     if (!["assembled", "stations", "order"].includes(n)) return false;
+    if (touring) exitTour(true);
     mode = n;
     lastInt = performance.now();
     if (n === "order") {
@@ -947,6 +1136,7 @@
   }
   function setCam(n) {
     if (!["overview", "side", "top", "station", "flight"].includes(n)) return false;
+    if (touring && !tourLock) exitTour(true);
     camMode = n;
     if (mode === "order") mode = "assembled";
     ft = 0;
@@ -984,12 +1174,37 @@
       focus(ST.findIndex((s) => s.name.toLowerCase() === String(id).toLowerCase())),
     play,
     pause,
+    startTour,
+    exitTour: () => exitTour(false),
   };
   document
     .querySelectorAll("[data-mode]")
     .forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
   document.querySelectorAll("[data-cam]").forEach((b) => (b.onclick = () => setCam(b.dataset.cam)));
   $("#play").onclick = () => (playing ? pause() : play());
+  const tourStartBtn = $("#tourstart");
+  if (tourStartBtn) tourStartBtn.onclick = () => startTour();
+  const tourPrevBtn = $("#tourprev");
+  if (tourPrevBtn)
+    tourPrevBtn.onclick = () => {
+      tourPaused = false;
+      tourGo(tourStep - 1);
+    };
+  const tourNextBtn = $("#tournext");
+  if (tourNextBtn)
+    tourNextBtn.onclick = () => {
+      tourPaused = false;
+      tourGo(tourStep + 1);
+    };
+  const tourPauseEl = $("#tourpause");
+  if (tourPauseEl)
+    tourPauseEl.onclick = () => {
+      tourPaused = !tourPaused;
+      sync();
+      tourWrite();
+    };
+  const tourExitBtn = $("#tourexit");
+  if (tourExitBtn) tourExitBtn.onclick = () => exitTour(false);
   addEventListener("resize", layout);
   if (window.visualViewport) {
     visualViewport.addEventListener("resize", layout);
@@ -1005,6 +1220,10 @@
   ctrl.addEventListener("end", () => {
     dragging = false;
     lastInt = performance.now();
+    if (touring) {
+      goal();
+      camAnim = true;
+    }
   });
   // pointer
   const rc = new THREE.Raycaster(),
@@ -1076,6 +1295,7 @@
     if (moved) return;
     const i = hit(e);
     if (i >= 0) {
+      if (touring) exitTour(true);
       focus(i);
       const openSlug = ST[i] && ST[i].open;
       if (openSlug) {
@@ -3623,6 +3843,8 @@
     const appEl = $("#app");
     const ICON =
       '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/></svg>';
+    const SHARE =
+      '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="2.2"/><circle cx="6" cy="12" r="2.2"/><circle cx="18" cy="19" r="2.2"/><path d="M8.2 11.1 15.8 6.2M8.2 12.9l7.6 4.9"/></svg>';
     const cb = document.createElement("button");
     cb.id = "cambtn";
     cb.type = "button";
@@ -3663,7 +3885,8 @@
     let facing = "user";
     let last = null;
     let count = 0;
-    let albumMeta = { mine: 0, locked: true, private: false, reason: "" };
+    let albumMeta = { mine: 0, locked: true, private: true, published: false, reason: "" };
+    let shareChoice = false;
     let stream = null;
     let shooting = false;
     const esc = (s) =>
@@ -3732,14 +3955,15 @@
       const acc = accGet() || {};
       const q = new URLSearchParams();
       if (acc.token) q.set("token", acc.token);
-      q.set("mine", "1");
+      if (tab === "mine") q.set("mine", "1");
       const res = await fetch("/api/album?" + q.toString(), { cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.error || "The album could not be opened.");
       albumMeta = {
         mine: data.mine || 0,
         locked: Boolean(data.locked),
-        private: Boolean(data.private),
+        private: data.private !== false,
+        published: Boolean(data.published || data.publish_locked),
         reason: data.reason || "",
       };
       return data.photos || [];
@@ -3831,6 +4055,7 @@
             esc(p.email) +
             "</span></button><figcaption>" +
             esc(p.email) +
+            (p.pending ? " · Review" : p.publish_locked || p.shared ? " · Public" : " · Private") +
             "</figcaption></figure>",
         )
         .join("");
@@ -3843,9 +4068,18 @@
         box.innerHTML =
           '<div class="cbox"><button type="button" class="cx" data-a="close" aria-label="Close">&times;</button><div class="cic">' +
           ICON +
-          "</div><h2>Welcome to the Lay C family</h2><p>Take a picture and we will keep it in the photo binder. It stays connected to " +
-          (acc.email ? esc(acc.email) : "the email you sign in with") +
-          ". Only a legal photo from the camera can be saved. A picture from your files cannot be added, and a photo that breaks the rules is not saved. Photos stay in your private binder.</p>" +
+          "</div><h2>Welcome to the LAY C family</h2><p>We are so happy to have you with us. Take a picture and we will keep it safe in your LAY C photo binder.</p>" +
+          (acc.token
+            ? '<label class="shr"><input type="checkbox" id="shon"' +
+              (albumMeta.published || shareChoice ? " checked" : "") +
+              (albumMeta.published ? " disabled" : "") +
+              "> Also share my pictures in the family album, where everyone who took a picture can see them. Every picture is checked by AI first.</label>" +
+              '<p class="sst" id="shhint">' +
+              (albumMeta.published
+                ? "This album is already public. Sharing is permanent and cannot be reversed. A new approved photo is published with it."
+                : "Leave this off and the photo stays in My pictures. Turn it on to publish that photo after it is approved. Publication cannot be undone, and other photos stay as they are.") +
+              "</p>"
+            : "") +
           '<button type="button" class="cp" data-a="cam">Take a picture</button>' +
           (count ? '<button type="button" class="cs" data-a="album">Open the photo binder (' + count + ")</button>" : "") +
           (acc.token ? "" : '<button type="button" class="cs" data-a="signin">Sign in</button>') +
@@ -3880,45 +4114,73 @@
         box.innerHTML =
           '<div class="cbox"><button type="button" class="cx" data-a="close" aria-label="Close">&times;</button><div class="ph"><img src="' +
           esc(arg.thumb) +
-          '" alt="The picture you just took"></div><h2>Saved to your photo binder</h2><p class="sst">Uploaded ' +
+          '" alt="The picture you just took"></div><h2>' +
+          esc(arg.heading || "Saved to your photo binder") +
+          '</h2><p class="sst">Uploaded ' +
           esc(when(arg.ts)) +
           '</p><p class="sst" id="sst">' +
-          esc(arg.note || "Saved. This photo cannot be deleted or hidden.") +
+          esc(arg.note || "The photo was saved.") +
           '</p><button type="button" class="cp" data-a="album">Open the photo binder (' +
           count +
           ')</button><button type="button" class="cs" data-a="cam">Take another picture</button></div>';
       } else if (next === "album") {
-        tab = "mine";
+        const all = tab !== "mine";
         let body = '<p class="em">No pictures yet.</p>';
         let n = 0;
         try {
           const photos = await albumList();
-          badge(albumMeta.mine || photos.length || 0);
+          badge(albumMeta.mine || 0);
           n = photos.length;
-          body = photos.length
-            ? grid(photos)
-            : '<p class="em">' + esc(albumMeta.reason || "Your binder is empty. Take a picture with the camera.") + "</p>";
+          const empty = all ? "No shared pictures yet. Be the first!" : "Your binder is empty. Take a picture with the camera.";
+          body = photos.length ? grid(photos) : '<p class="em">' + esc(albumMeta.locked ? albumMeta.reason || empty : empty) + "</p>";
         } catch (ex) {
           body = '<p class="em">' + esc(ex.message || "The album could not be opened.") + "</p>";
         }
-        box.classList.remove("prot");
+        const shareBtn =
+          '<button type="button" class="sharebtn" data-a="' +
+          (albumMeta.published ? "share-locked" : "share-album") +
+          '" aria-pressed="' +
+          (albumMeta.published ? "true" : "false") +
+          '" aria-label="' +
+          (albumMeta.published ? "Sharing is permanent" : "Share this album") +
+          '">' +
+          SHARE +
+          "</button>";
+        box.classList.toggle("prot", all && !albumMeta.locked && (albumMeta.mine || 0) > 0);
         box.innerHTML =
-          '<div class="cbox ca"><button type="button" class="cx" data-a="close" aria-label="Close">&times;</button><div class="ah"><b>Lay C photo binder</b><span>' +
+          '<div class="cbox ca"><button type="button" class="cx" data-a="close" aria-label="Close">&times;</button><div class="ah"><b>LAY C family photo binder</b><span>' +
           n +
           " photo" +
           (n === 1 ? "" : "s") +
-          '</span></div><div class="bind"><div class="rings" aria-hidden="true"></div><div class="pgs">' +
+          "</span>" +
+          shareBtn +
+          '</div><div class="tabs"><button type="button" data-a="tab" data-t="all" aria-pressed="' +
+          all +
+          '">Everyone\'s album</button><button type="button" data-a="tab" data-t="mine" aria-pressed="' +
+          !all +
+          '">My pictures (' +
+          (albumMeta.mine || 0) +
+          ')</button></div><div class="bind"><div class="rings" aria-hidden="true"></div><div class="pgs">' +
           body +
           '</div></div><div class="abar"><button type="button" class="cp" data-a="cam">Take a picture</button></div></div>';
         return;
       } else if (next === "view" && arg) {
         const actions =
           '<div class="row"><button type="button" class="cs" data-a="album">Back to binder</button>' +
-          (arg.own
+          (arg.can_publish
+            ? '<button type="button" class="cp" data-a="publish" data-id="' + esc(arg.id) + '">Make public</button>'
+            : "") +
+          (arg.can_delete
             ? '<button type="button" class="cs" data-a="delphoto" data-id="' + esc(arg.id) + '">Delete</button>'
             : "") +
           "</div>" +
-          (arg.own ? '<p class="sst">Private binder photo. Only you can see it.</p>' : "");
+          (arg.pending
+            ? '<p class="sst">Waiting for review. This photo is private and is not published.</p>'
+            : arg.publish_locked || arg.shared
+              ? '<p class="sst">This photo is public. It cannot be made private, edited, or deleted.</p>'
+              : arg.own
+                ? '<p class="sst">Private photo in My pictures. Only you can see it. You can delete it, or share the album from the binder. Publishing cannot be undone.</p>'
+                : "");
         box.innerHTML =
           '<div class="cbox cv2"><button type="button" class="cx" data-a="album" aria-label="Close">&times;</button><div class="ph"><img src="' +
           esc(arg.image || arg.thumb) +
@@ -3930,7 +4192,7 @@
           esc(when(arg.ts)) +
           " · " +
           esc(arg.email) +
-          (arg.own ? " · Private" : "") +
+          (arg.pending ? " · In review" : arg.shared ? " · Public" : arg.own ? " · Private" : "") +
           "</p>" +
           actions +
           "</div>";
@@ -3948,22 +4210,35 @@
       const res = await fetch("/api/album", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: acc.token, image, thumb, source: "camera" }),
+        body: JSON.stringify({
+          token: acc.token,
+          image,
+          thumb,
+          source: "camera",
+          share: Boolean(shareChoice || albumMeta.published),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
         const err = new Error(data.error || "The picture was not saved.");
         err.rejected = Boolean(data.rejected);
+        err.pending = Boolean(data.pending);
         throw err;
       }
       await refreshCount();
+      tab = data.pending || !data.publish_locked ? "mine" : "all";
+      const statusNote = data.note
+        ? data.note
+        : data.pending || data.moderation_status === "pending"
+          ? "This photo needs a review before it can be shared. It stays private and is not published."
+          : data.publish_locked
+            ? "Approved and published. This photo cannot be made private, edited, or deleted."
+            : "Approved and saved privately to " + (acc.email || "your email") + ". Only you can see it until you share the album.";
       last = {
         thumb,
         ts: Date.now(),
-        note:
-          "Accepted and saved privately to " +
-          (acc.email || "your email") +
-          ". Only you can see it in your binder.",
+        note: statusNote,
+        heading: data.pending ? "Waiting for review" : data.duplicate ? "Already in your album" : "Saved to your photo binder",
       };
       await setView("saved", last);
     }
@@ -3982,7 +4257,7 @@
     alb.onclick = async () => {
       if (!count) return;
       box.hidden = false;
-      tab = "mine";
+      tab = "all";
       await setView("album");
     };
     box.addEventListener("click", async (e) => {
@@ -3998,7 +4273,6 @@
         if (needAccount()) return;
         setView("camera");
       } else if (a === "album") {
-        tab = "mine";
         setView("album");
       } else if (a === "back") setView(count ? "album" : "welcome");
       else if (a === "signin") {
@@ -4058,6 +4332,48 @@
         const data = await res.json().catch(() => ({}));
         if (data.photo) setView("view", data.photo);
         else alert((data && data.error) || "That picture was not found.");
+      } else if (a === "share-locked") {
+        const hint = box.querySelector("#shhint");
+        const message = "This album is public. Sharing is permanent and cannot be reversed.";
+        if (hint) hint.textContent = message;
+        else alert(message);
+      } else if (a === "share-album") {
+        if (needAccount()) return;
+        const ok = confirm("Publish this album? Every photo is checked first. If any photo is still in review or was not approved, the album stays private. Once it is public, you cannot make it private or delete its photos.");
+        if (!ok) return;
+        const acc = accGet() || {};
+        const button = t;
+        button.disabled = true;
+        const res = await fetch("/api/album", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: acc.token, action: "publish_album", confirm: true, confirm_public: true }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok || !data.publish_locked) {
+          button.disabled = false;
+          alert((data && data.error) || "The album was not published.");
+          return;
+        }
+        albumMeta.published = true;
+        albumMeta.private = false;
+        await refreshCount();
+        setView(view === "album" ? "album" : "welcome");
+      } else if (a === "publish" && t.dataset.id) {
+        if (!confirm("Publish this photo to the family album? Once public, you cannot make it private or delete it.")) return;
+        const acc = accGet() || {};
+        const res = await fetch("/api/album", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: acc.token, action: "publish", id: t.dataset.id, confirm: true, confirm_public: true }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok || !data.publish_locked) {
+          alert((data && data.error) || "The photo was not published.");
+          return;
+        }
+        await refreshCount();
+        setView("album");
       } else if (a === "delphoto" && t.dataset.id) {
         if (!confirm("Delete this private photo from your binder? This cannot be undone.")) return;
         const acc = accGet() || {};
@@ -4071,6 +4387,25 @@
         await refreshCount();
         setView("album");
       }
+    });
+    box.addEventListener("change", (e) => {
+      if (e.target.id !== "shon") return;
+      if (albumMeta.published) {
+        e.target.checked = true;
+        shareChoice = true;
+        return;
+      }
+      if (e.target.checked) {
+        const agreed = confirm(
+          "Share the next photos you take while this is checked? After a photo is approved it is published, and you cannot make that photo private or delete it. Photos already in your album are not changed.",
+        );
+        if (!agreed) {
+          e.target.checked = false;
+          shareChoice = false;
+          return;
+        }
+      }
+      shareChoice = e.target.checked;
     });
     refreshCount();
   }
@@ -6139,9 +6474,10 @@
       );
       b.scale.setScalar(1 - u * 0.7);
     });
-    eNeedle.position.y = 1.45 + Math.max(0, Math.sin(t * 9)) * 0.22;
-    hoopE.position.x = Math.sin(t * 2.2) * 0.12;
-    hoopE.position.z = 0.1 + Math.cos(t * 1.7) * 0.08;
+    eNeedle.position.y = 1.62 + Math.abs(Math.sin(t * 9)) * 0.16;
+    embSpools.forEach((s, i) => (s.rotation.x = t * (i % 2 ? -1.5 : 1.7)));
+    hoopE.position.x = Math.sin(t * 1.4) * 0.06;
+    hoopE.position.z = 0.12 + Math.cos(t * 1.1) * 0.04;
     spinPom.rotation.y = t * 2;
     spinPom.scale.setScalar(0.85 + (Math.sin(tact) + 1) * 0.12);
     cutter.rotation.y = t * 6;
@@ -6177,7 +6513,8 @@
         p.b.g.visible = s > 0;
         p.b.parts.forEach((x) => (x.visible = true));
         p.b.mat.color.setHex(s >= 2 ? GRAY : CREAM);
-        p.b.pom.visible = s >= 3;
+        p.b.pom.visible = s >= 4;
+        p.b.logo.visible = s >= 3;
         p.tag.visible = s === 5;
       }
       p.g.visible = mode !== "order" || i === 0;
@@ -6197,6 +6534,8 @@
         jPrev = n;
       }
       $("#jp").style.width = p.ph * 100 + "%";
+      const prog = $("#jprog");
+      if (prog) prog.textContent = "";
       if (!dragging && playing) {
         dTgt.copy(p.g.position);
         dPos.copy(dTgt).addScaledVector(VD, mobile ? 10 : 14);
@@ -6215,6 +6554,11 @@
         .add(dTgt);
       camAnim = true;
     } else if (camMode === "station" && camAnim) goal();
+    if (touring && playing && !tourPaused && !dragging) {
+      tourHold += dt;
+      if (tourHold >= TOUR_DWELL) tourGo(tourStep + 1);
+      else tourWrite();
+    }
     if (camAnim && !dragging) {
       const sp2 = 1 - Math.exp(-dt * (mode === "order" ? 2.2 : 3));
       cam.position.lerp(dPos, sp2);

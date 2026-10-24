@@ -8,6 +8,7 @@ const { signedExcelUrl, orderToExcelCsv } = require("../lib/order-excel");
 const { trackingState, stageIndex } = require("../lib/order-stages");
 const { buildOrderDocument } = require("../lib/order-document");
 const { renderOrderPdf } = require("../lib/order-pdf");
+const { isPublishLocked, moderationStatus, isAlbumPublished, markPublished, markPrivate } = require("../lib/photo-privacy");
 const redeemAttempts = new Map();
 
 function loadEnv() {
@@ -202,7 +203,9 @@ function photoBrief(row) {
     shared: items.shared !== false,
     private: Boolean(items.private),
     moderated: Boolean(items.moderated),
+    moderation_status: moderationStatus(items),
     rejected: Boolean(items.rejected),
+    publish_locked: isPublishLocked(items),
     source: items.source || "",
     thumb: typeof items.thumb === "string" ? items.thumb : "",
     has_image: Boolean(items.image || items.thumb),
@@ -787,6 +790,9 @@ module.exports = async function handler(req, res) {
       const cur = await supabase.from("orders").select("id, status, items").eq("id", id).maybeSingle();
       if (cur.error || !cur.data) return json(res, 404, { ok: false, error: "That record was not found." });
       if (cur.data.status === "account") return json(res, 400, { ok: false, error: "Account records cannot change status this way." });
+      if (cur.data.status === "photo" && isPublishLocked(itemsOf(cur.data))) {
+        return json(res, 403, { ok: false, error: "Published photos cannot be modified." });
+      }
       const items = Object.assign({}, itemsOf(cur.data), note ? { admin_note: note } : {});
       const saved = await supabase.from("orders").update({ status, items }).eq("id", id).select("id").single();
       if (saved.error) return json(res, 502, { ok: false, error: saved.error.message || "Status was not updated." });
@@ -809,6 +815,73 @@ module.exports = async function handler(req, res) {
       if (saved.error) return json(res, 502, { ok: false, error: saved.error.message || "The photo was not hidden." });
       await logAdmin(supabase, who, "photo_hide", { id, email: row.data.customer_email });
       return json(res, 200, { ok: true, hidden: true });
+    }
+
+    if (op === "photo_review") {
+      const id = text(payload.id, 80);
+      const decision = text(payload.decision, 20);
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json(res, 400, { ok: false, error: "That photo was not found." });
+      if (decision !== "approve" && decision !== "reject") {
+        return json(res, 400, { ok: false, error: "Choose approve or reject for this review." });
+      }
+      const row = await supabase.from("orders").select("id, status, items, customer_email, customer_name").eq("id", id).eq("status", "photo").maybeSingle();
+      if (row.error || !row.data) return json(res, 404, { ok: false, error: "That photo was not found." });
+      const current = itemsOf(row.data);
+      if (moderationStatus(current) !== "pending") {
+        return json(res, 400, { ok: false, error: "That photo is not waiting for review." });
+      }
+      const decidedAt = new Date().toISOString();
+      if (decision === "reject") {
+        const cleared = Object.assign({}, current, {
+          image: "",
+          thumb: "",
+          rejected: true,
+          hidden: true,
+          admin_hidden: true,
+          shared: false,
+          privacy: "private",
+          privacy_status: "private",
+          publish_locked: false,
+          pending: false,
+          moderated: true,
+          moderation_status: "rejected",
+          moderation_decided_at: decidedAt,
+          moderation_scores: null,
+        });
+        const saved = await supabase.from("orders").update({ items: cleared }).eq("id", id).eq("status", "photo").select("id");
+        if (saved.error || !(saved.data || []).length) {
+          return json(res, 502, { ok: false, error: (saved.error && saved.error.message) || "The review was not saved." });
+        }
+        await logAdmin(supabase, who, "photo_review", { id, decision: "reject", decided_at: decidedAt });
+        return json(res, 200, { ok: true, moderation_status: "rejected", published: false });
+      }
+      const owner = await supabase
+        .from("orders")
+        .select("items")
+        .eq("status", "account")
+        .eq("customer_email", row.data.customer_email)
+        .limit(1)
+        .maybeSingle();
+      const albumPublic = Boolean(owner.data && isAlbumPublished(itemsOf(owner.data)));
+      const next = albumPublic
+        ? markPublished(Object.assign({}, current, { moderation_decided_at: decidedAt, pending: false }))
+        : markPrivate(Object.assign({}, current, { moderated: true, moderation_status: "approved", moderation_decided_at: decidedAt, pending: false, rejected: false }));
+      const saved = await supabase.from("orders").update({ items: next }).eq("id", id).eq("status", "photo").select("id");
+      if (saved.error || !(saved.data || []).length) {
+        return json(res, 502, { ok: false, published: false, error: (saved.error && saved.error.message) || "The review was not saved." });
+      }
+      await logAdmin(supabase, who, "photo_review", {
+        id,
+        decision: "approve",
+        published: albumPublic,
+        decided_at: decidedAt,
+      });
+      return json(res, 200, {
+        ok: true,
+        moderation_status: "approved",
+        published: albumPublic,
+        publish_locked: albumPublic,
+      });
     }
 
     if (op === "delete") {

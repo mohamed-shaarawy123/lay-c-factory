@@ -4,14 +4,14 @@
     <title>Lay C Factory</title>
     <meta charset="utf8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <link rel="stylesheet" href="styles.css?v=cservice1" />
+    <link rel="stylesheet" href="styles.css?v=tour1" />
   </head>
   <body>
     <div id="app">
       <div
         id="scene"
         role="img"
-        aria-label="Interactive 3D machine with five stations that makes gray beanies: Orders, Knitter, Dye vat, Pom-pom and Checkout. Drag to rotate, scroll to zoom, tap a station."
+        aria-label="Interactive 3D factory that makes gray beanies: Orders, Knitter, Dye vat, Embroidery Machine, Pom-pom and Checkout. Drag to rotate, scroll to zoom, tap a station, or start the factory tour."
       ></div>
       <header>
         <div class="id">
@@ -48,8 +48,16 @@
         </a>
       </nav>
       <div id="journey">
-        <div><b id="jt"></b><small id="jd"></small></div>
+        <div>
+          <b id="jt"></b><small id="jprog"></small><small id="jd"></small>
+        </div>
         <div class="track"><i id="jp"></i></div>
+        <nav id="tourctl" aria-label="Factory tour" hidden>
+          <button type="button" id="tourprev">Previous</button>
+          <button type="button" id="tournext">Next</button>
+          <button type="button" id="tourpause">Pause</button>
+          <button type="button" id="tourexit">Exit Tour</button>
+        </nav>
       </div>
       <div id="tip">
         <b></b>
@@ -60,6 +68,7 @@
           <button data-mode="assembled" aria-pressed="true">Assembled</button
           ><button data-mode="stations" aria-pressed="false">Stations</button
           ><button data-mode="order" aria-pressed="false">One beanie</button>
+          <button id="tourstart" type="button">Start Factory Tour</button>
         </nav>
         <nav id="cams" aria-label="Camera">
           <span class="cap">VIEW</span
@@ -137,6 +146,6 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="factory.js?v=machine-style1"></script>
+    <script src="factory.js?v=tour2"></script>
   </body>
 </html>
