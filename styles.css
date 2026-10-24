@@ -820,6 +820,9 @@ header .id {
   border-color: var(--amber);
   color: var(--on);
 }
+.sharebtn:disabled {
+  cursor: default;
+}
 .shr .sharebtn {
   color: var(--amber);
 }

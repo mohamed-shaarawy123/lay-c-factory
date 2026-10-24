@@ -1198,7 +1198,7 @@
                 : "<span>0" + (i + 1) + "</span>" + ST[i].name;
       tip.querySelector("p").textContent =
         i === -3
-          ? "Take a photo. It stays in your private binder."
+              ? "Take a photo. It is saved in your album. Sign in first."
           : i === -4
             ? "Join a private room with the access code for your signed-in account."
             : i === -5
@@ -3894,7 +3894,7 @@
     cb.id = "cambtn";
     cb.type = "button";
     cb.className = "cambtn";
-    cb.setAttribute("aria-label", "Open the camera and photo binder");
+    cb.setAttribute("aria-label", "Open the camera and your album");
     cb.innerHTML = ICON + "<em hidden></em>";
     appEl.appendChild(cb);
     camBtnEl = cb;
@@ -3903,7 +3903,7 @@
     alb.type = "button";
     alb.className = "albbtn";
     alb.hidden = true;
-    alb.setAttribute("aria-label", "Open your photo binder");
+    alb.setAttribute("aria-label", "Open your album");
     alb.innerHTML =
       '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M21 16l-5-4-4 3-2-2-5 5"/></svg>';
     appEl.appendChild(alb);
@@ -3923,7 +3923,7 @@
     box.hidden = true;
     box.setAttribute("role", "dialog");
     box.setAttribute("aria-modal", "true");
-    box.setAttribute("aria-label", "Lay C camera and photo binder");
+    box.setAttribute("aria-label", "Lay C camera and album");
     appEl.appendChild(box);
     let tab = "all";
     let view = "";
@@ -3931,7 +3931,6 @@
     let last = null;
     let count = 0;
     let albumMeta = { mine: 0, locked: true, private: true, published: false, reason: "" };
-    let shareChoice = false;
     let stream = null;
     let pendingCam = null;
     let shooting = false;
@@ -4131,20 +4130,16 @@
         box.innerHTML =
           '<div class="cbox"><button type="button" class="cx" data-a="close" aria-label="Close">&times;</button><div class="cic">' +
           ICON +
-          "</div><h2>Welcome to the LAY C family</h2><p>We are so happy to have you with us. Take a picture and we will keep it safe in your LAY C photo binder.</p>" +
+          "</div><h2>Welcome to the LAY C family</h2><p>We are so happy to have you with us. Take a picture and we will save it in your album.</p>" +
           (acc.token
-            ? '<label class="shr"><input type="checkbox" id="shon"' +
-              (albumMeta.published || shareChoice ? " checked" : "") +
-              (albumMeta.published ? " disabled" : "") +
-              "> Also share my pictures in the family album, where everyone who took a picture can see them. Every picture is checked by AI first.</label>" +
-              '<p class="sst" id="shhint">' +
+            ? '<p class="sst">' +
               (albumMeta.published
-                ? "This album is already public. Sharing is permanent and cannot be reversed. A new approved photo is published with it."
-                : "Leave this off and the photo stays in My pictures. Turn it on to publish that photo after it is approved. Publication cannot be undone, and other photos stay as they are.") +
+                ? "Your album is public. A new photo is saved in that album, and the album cannot be made private."
+                : "Your photo is saved in your album. Use the share icon on the album if you want to make it public. That cannot be undone.") +
               "</p>"
             : "") +
           '<button type="button" class="cp" data-a="cam">Take a picture</button>' +
-          (count ? '<button type="button" class="cs" data-a="album">Open the photo binder (' + count + ")</button>" : "") +
+          (count ? '<button type="button" class="cs" data-a="album">Open your album (' + count + ")</button>" : "") +
           (acc.token ? "" : '<button type="button" class="cs" data-a="signin">Sign in</button>') +
           "</div>";
       } else if (next === "camera") {
@@ -4177,12 +4172,12 @@
           '<div class="cbox"><button type="button" class="cx" data-a="close" aria-label="Close">&times;</button><div class="ph"><img src="' +
           esc(arg.thumb) +
           '" alt="The picture you just took"></div><h2>' +
-          esc(arg.heading || "Saved to your photo binder") +
+          esc(arg.heading || "Saved to your album") +
           '</h2><p class="sst">Uploaded ' +
           esc(when(arg.ts)) +
           '</p><p class="sst" id="sst">' +
           esc(arg.note || "The photo was saved.") +
-          '</p><button type="button" class="cp" data-a="album">Open the photo binder (' +
+          '</p><button type="button" class="cp" data-a="album">Open your album (' +
           count +
           ')</button><button type="button" class="cs" data-a="cam">Take another picture</button></div>';
       } else if (next === "album") {
@@ -4193,24 +4188,21 @@
           const photos = await albumList();
           badge(albumMeta.mine || 0);
           n = photos.length;
-          const empty = all ? "No shared pictures yet. Be the first!" : "Your binder is empty. Take a picture with the camera.";
+          const empty = all ? "No shared pictures yet. Be the first!" : "Your album is empty. Take a picture with the camera.";
           body = photos.length ? grid(photos) : '<p class="em">' + esc(albumMeta.locked ? albumMeta.reason || empty : empty) + "</p>";
         } catch (ex) {
           body = '<p class="em">' + esc(ex.message || "The album could not be opened.") + "</p>";
         }
-        const shareBtn =
-          '<button type="button" class="sharebtn" data-a="' +
-          (albumMeta.published ? "share-locked" : "share-album") +
-          '" aria-pressed="' +
-          (albumMeta.published ? "true" : "false") +
-          '" aria-label="' +
-          (albumMeta.published ? "Sharing is permanent" : "Share this album") +
-          '">' +
-          SHARE +
-          "</button>";
+        const shareBtn = albumMeta.published
+          ? '<button type="button" class="sharebtn" disabled aria-pressed="true" aria-label="This album is public and cannot be made private">' +
+            SHARE +
+            "</button>"
+          : '<button type="button" class="sharebtn" data-a="share-album" aria-pressed="false" aria-label="Share this album">' +
+            SHARE +
+            "</button>";
         box.classList.toggle("prot", all && !albumMeta.locked && (albumMeta.mine || 0) > 0);
         box.innerHTML =
-          '<div class="cbox ca"><button type="button" class="cx" data-a="close" aria-label="Close">&times;</button><div class="ah"><b>LAY C family photo binder</b><span>' +
+          '<div class="cbox ca"><button type="button" class="cx" data-a="close" aria-label="Close">&times;</button><div class="ah"><b>Your album</b><span>' +
           n +
           " photo" +
           (n === 1 ? "" : "s") +
@@ -4220,7 +4212,7 @@
           all +
           '">Everyone\'s album</button><button type="button" data-a="tab" data-t="mine" aria-pressed="' +
           !all +
-          '">My pictures (' +
+          '">My album (' +
           (albumMeta.mine || 0) +
           ')</button></div><div class="bind"><div class="rings" aria-hidden="true"></div><div class="pgs">' +
           body +
@@ -4228,20 +4220,17 @@
         return;
       } else if (next === "view" && arg) {
         const actions =
-          '<div class="row"><button type="button" class="cs" data-a="album">Back to binder</button>' +
-          (arg.can_publish
-            ? '<button type="button" class="cp" data-a="publish" data-id="' + esc(arg.id) + '">Make public</button>'
-            : "") +
-          (arg.can_delete
+          '<div class="row"><button type="button" class="cs" data-a="album">Back to album</button>' +
+          (arg.can_delete && !albumMeta.published
             ? '<button type="button" class="cs" data-a="delphoto" data-id="' + esc(arg.id) + '">Delete</button>'
             : "") +
           "</div>" +
           (arg.pending
-            ? '<p class="sst">Waiting for review. This photo is private and is not published.</p>'
-            : arg.publish_locked || arg.shared
-              ? '<p class="sst">This photo is public. It cannot be made private, edited, or deleted.</p>'
+            ? '<p class="sst">Waiting for review. This photo stays in your album and is not public yet.</p>'
+            : albumMeta.published || arg.publish_locked || arg.shared
+              ? '<p class="sst">This photo is in a public album. The album cannot be made private, and this photo cannot be deleted.</p>'
               : arg.own
-                ? '<p class="sst">Private photo in My pictures. Only you can see it. You can delete it, or share the album from the binder. Publishing cannot be undone.</p>'
+                ? '<p class="sst">This photo is in your album. Only you can see it until you share the album. Sharing cannot be undone.</p>'
                 : "");
         box.innerHTML =
           '<div class="cbox cv2"><button type="button" class="cx" data-a="album" aria-label="Close">&times;</button><div class="ph"><img src="' +
@@ -4263,6 +4252,7 @@
     }
     async function upload(canvas) {
       if (needAccount()) return;
+      await refreshCount();
       properPhoto(canvas);
       const acc = accGet() || {};
       const image = await canvasToJpeg(canvas, 0.78);
@@ -4277,7 +4267,7 @@
           image,
           thumb,
           source: "camera",
-          share: Boolean(shareChoice || albumMeta.published),
+          share: Boolean(albumMeta.published),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -4295,12 +4285,12 @@
           ? "This photo needs a review before it can be shared. It stays private and is not published."
           : data.publish_locked
             ? "Approved and published. This photo cannot be made private, edited, or deleted."
-            : "Approved and saved privately to " + (acc.email || "your email") + ". Only you can see it until you share the album.";
+            : "Saved to your album. Only you can see it until you share the album. Sharing cannot be undone.";
       last = {
         thumb,
         ts: Date.now(),
         note: statusNote,
-        heading: data.pending ? "Waiting for review" : data.duplicate ? "Already in your album" : "Saved to your photo binder",
+        heading: data.pending ? "Waiting for review" : data.duplicate ? "Already in your album" : "Saved to your album",
       };
       await setView("saved", last);
     }
@@ -4310,13 +4300,19 @@
       view = "";
       cb.focus({ preventScroll: true });
     }
-    openCamera = () => {
+    function startCamera() {
+      const acc = accGet() || {};
+      if (!acc.token) {
+        openAcc(startCamera, "login");
+        return;
+      }
       box.hidden = false;
       primeCamera();
       refreshCount();
       setView("camera");
-    };
-    cb.onclick = () => openCamera();
+    }
+    openCamera = startCamera;
+    cb.onclick = () => startCamera();
     alb.onclick = async () => {
       if (!count) return;
       box.hidden = false;
@@ -4332,10 +4328,7 @@
       if (!t) return;
       const a = t.dataset.a;
       if (a === "close") closeCam();
-      else if (a === "cam") {
-        if (needAccount()) return;
-        setView("camera");
-      } else if (a === "album") {
+      else if (a === "cam") startCamera(); else if (a === "album") {
         setView("album");
       } else if (a === "back") setView(count ? "album" : "welcome");
       else if (a === "signin") {
@@ -4400,7 +4393,7 @@
         else alert(message);
       } else if (a === "share-album") {
         if (needAccount()) return;
-        const ok = confirm("Publish this album? Every photo is checked first. If any photo is still in review or was not approved, the album stays private. Once it is public, you cannot make it private or delete its photos.");
+        const ok = confirm("Make your album public? Every approved photo in your album is shared. You cannot make the album private again.");
         if (!ok) return;
         const acc = accGet() || {};
         const button = t;
@@ -4419,24 +4412,9 @@
         albumMeta.published = true;
         albumMeta.private = false;
         await refreshCount();
-        setView(view === "album" ? "album" : "welcome");
-      } else if (a === "publish" && t.dataset.id) {
-        if (!confirm("Publish this photo to the family album? Once public, you cannot make it private or delete it.")) return;
-        const acc = accGet() || {};
-        const res = await fetch("/api/album", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: acc.token, action: "publish", id: t.dataset.id, confirm: true, confirm_public: true }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.ok || !data.publish_locked) {
-          alert((data && data.error) || "The photo was not published.");
-          return;
-        }
-        await refreshCount();
         setView("album");
       } else if (a === "delphoto" && t.dataset.id) {
-        if (!confirm("Delete this private photo from your binder? This cannot be undone.")) return;
+        if (!confirm("Delete this private photo from your album? This cannot be undone.")) return;
         const acc = accGet() || {};
         const res = await fetch("/api/album", {
           method: "POST",
@@ -4448,25 +4426,6 @@
         await refreshCount();
         setView("album");
       }
-    });
-    box.addEventListener("change", (e) => {
-      if (e.target.id !== "shon") return;
-      if (albumMeta.published) {
-        e.target.checked = true;
-        shareChoice = true;
-        return;
-      }
-      if (e.target.checked) {
-        const agreed = confirm(
-          "Share the next photos you take while this is checked? After a photo is approved it is published, and you cannot make that photo private or delete it. Photos already in your album are not changed.",
-        );
-        if (!agreed) {
-          e.target.checked = false;
-          shareChoice = false;
-          return;
-        }
-      }
-      shareChoice = e.target.checked;
     });
     refreshCount();
   }
@@ -6701,7 +6660,7 @@
       {
         k: "EXTRAS",
         t: "Take a selfie",
-        b: "Press the camera key on the front right of the base to take a selfie. It goes into our family photo binder, and you can see photos from everyone.",
+        b: "Sign in, then press the camera key. The photo is saved in your album. The share icon publishes that album, and it cannot be made private again.",
         w3: "cam",
       },
       {

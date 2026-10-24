@@ -536,25 +536,11 @@ module.exports = async function handler(req, res) {
     }
 
     if (action === "publish") {
-      const id = text(payload.id, 80);
-      if (!/^[0-9a-f-]{36}$/i.test(id)) return json(res, 400, { ok: false, error: "That picture was not found." });
-      if (!confirmed) {
-        return json(res, 400, {
-          ok: false,
-          needs_confirm: true,
-          published: false,
-          error: "Confirm publication. Once this photo is public, you cannot make it private or delete it.",
-        });
-      }
-      const one = await supabase
-        .from("orders")
-        .select("id, customer_email, items, status")
-        .eq("id", id)
-        .eq("status", "photo")
-        .maybeSingle();
-      if (one.error || !one.data) return json(res, 404, { ok: false, error: "That picture was not found." });
-      const published = await publishOwnedPhoto(supabase, who, one.data);
-      return json(res, published.status, published.body);
+      return json(res, 400, {
+        ok: false,
+        published: false,
+        error: "A photo is not published on its own. Use the share icon to publish your album.",
+      });
     }
 
     if (action === "unpublish" || action === "make_private") {
@@ -578,6 +564,13 @@ module.exports = async function handler(req, res) {
       if (one.error || !one.data) return json(res, 404, { ok: false, error: "That picture was not found." });
       if (one.data.customer_email !== who.customer_email) {
         return json(res, 403, { ok: false, error: "Only the owner can delete a private photo." });
+      }
+      if (isAlbumPublished(who.items)) {
+        return json(res, 403, {
+          ok: false,
+          error: "This album is public. Its photos cannot be deleted.",
+          publish_locked: true,
+        });
       }
       const items = one.data.items || {};
       if (isPublishLocked(items) || isFamilyAlbumVisible(items)) {
@@ -668,9 +661,8 @@ module.exports = async function handler(req, res) {
         rejected: false,
       };
       const pending = check.pending === true || check.decision === "pending";
-      const requestedShare = payload.share === true || payload.share === "true";
       const albumPublic = isAlbumPublished(who.items);
-      const publishNow = !pending && (albumPublic || requestedShare);
+      const publishNow = !pending && albumPublic;
       const items = pending
         ? markPending(base)
         : publishNow
@@ -698,12 +690,10 @@ module.exports = async function handler(req, res) {
       }
       const state = photoState(items, true);
       const note = pending
-        ? "This photo needs a review before it can be shared. It is in My pictures only and is not in Everyone's album."
+        ? "Saved to your album. It needs a review before it can be seen, and it is not public yet."
         : publishNow
-          ? albumPublic && !requestedShare
-            ? "Saved. This album is already public, so this approved photo was published with it and cannot be made private or deleted."
-            : "Saved to your photo binder and Everyone's album. This photo is public and cannot be made private, edited, or deleted."
-          : "Saved to your photo binder. It is in My pictures only and is not in Everyone's album.";
+          ? "Saved to your album. This album is already public, so this photo is public with it and cannot be made private."
+          : "Saved to your album. Only you can see it until you share the album. Sharing cannot be undone.";
       return json(res, 200, Object.assign({
         ok: true,
         id: saved.data.id,
