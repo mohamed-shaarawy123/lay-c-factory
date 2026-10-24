@@ -3,36 +3,21 @@
     TAU = Math.PI * 2,
     app = $("#app"),
     W = () => app.clientWidth,
-    H = () => app.clientHeight,
-    phone =
-      Math.min(window.innerWidth || 1200, window.innerHeight || 900) < 700 ||
-      !!(
-        window.matchMedia &&
-        window.matchMedia("(pointer: coarse)").matches &&
-        (window.innerWidth || 1200) < 1100
-      );
+    H = () => app.clientHeight;
   let R;
   try {
-    R = new THREE.WebGLRenderer({
-      antialias: !phone,
-      alpha: !phone,
-      powerPreference: "high-performance",
-      precision: phone ? "mediump" : "highp",
-    });
+    R = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   } catch (e) {
     $("#err").style.display = "block";
     return;
   }
   const scene = new THREE.Scene(),
-    cam = new THREE.PerspectiveCamera(33, 1, 0.1, phone ? 80 : 150);
-  R.setPixelRatio(Math.min(devicePixelRatio || 1, phone ? 1 : 1.5));
+    cam = new THREE.PerspectiveCamera(33, 1, 0.1, 150);
+  R.setPixelRatio(Math.min(devicePixelRatio, 1.75));
   R.outputEncoding = THREE.sRGBEncoding;
-  if (!phone) {
-    R.toneMapping = THREE.ACESFilmicToneMapping;
-    R.toneMappingExposure = 1.1;
-  }
-  R.shadowMap.enabled = !phone;
-  if (phone) R.setClearColor(0xffffff, 1);
+  R.toneMapping = THREE.ACESFilmicToneMapping;
+  R.toneMappingExposure = 1.1;
+  R.shadowMap.enabled = true;
   $("#scene").appendChild(R.domElement);
   const ctrl = new THREE.OrbitControls(cam, R.domElement);
   Object.assign(ctrl, {
@@ -50,8 +35,8 @@
   scene.add(new THREE.HemisphereLight(0xdbe5f4, 0x1a2a66, 0.95));
   const key = new THREE.DirectionalLight(0xffffff, 1.7);
   key.position.set(-4, 12, 7);
-  key.castShadow = !phone;
-  key.shadow.mapSize.set(phone ? 512 : 1024, phone ? 512 : 1024);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
   Object.assign(key.shadow.camera, {
     left: -10,
     right: 10,
@@ -65,18 +50,14 @@
   const rim = new THREE.DirectionalLight(0xc4d4ed, 0.8);
   rim.position.set(3, 7, -8);
   scene.add(rim);
-  if (!phone) {
-    const fr = new THREE.DirectionalLight(0xffffff, 0.5);
-    fr.position.set(5, 3, 10);
-    scene.add(fr);
-    const pl = new THREE.PointLight(0xcfdcff, 0.9, 22);
-    pl.position.set(-4, 5, 3);
-    scene.add(pl);
-  }
+  const fr = new THREE.DirectionalLight(0xffffff, 0.5);
+  fr.position.set(5, 3, 10);
+  scene.add(fr);
+  const pl = new THREE.PointLight(0xcfdcff, 0.9, 22);
+  pl.position.set(-4, 5, 3);
+  scene.add(pl);
   const m = (c, me = 0.25, ro = 0.45, x = {}) =>
-    phone
-      ? new THREE.MeshLambertMaterial({ color: c, ...x })
-      : new THREE.MeshStandardMaterial({ color: c, metalness: me, roughness: ro, ...x });
+    new THREE.MeshStandardMaterial({ color: c, metalness: me, roughness: ro, ...x });
   const OR = 0x4169e1,
     CREAM = 0xffffff,
     GRAY = 0x45464a;
@@ -96,14 +77,14 @@
   const box = (p, w, h, d, x, y, z, mt) => {
     const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mt);
     o.position.set(x, y, z);
-    o.castShadow = o.receiveShadow = !phone;
+    o.castShadow = o.receiveShadow = true;
     p.add(o);
     return o;
   };
   const cyl = (p, r, h, x, y, z, mt, r2 = r) => {
-    const o = new THREE.Mesh(new THREE.CylinderGeometry(r, r2, h, phone ? 12 : 20), mt);
+    const o = new THREE.Mesh(new THREE.CylinderGeometry(r, r2, h, 28), mt);
     o.position.set(x, y, z);
-    o.castShadow = o.receiveShadow = !phone;
+    o.castShadow = o.receiveShadow = true;
     p.add(o);
     return o;
   };
@@ -114,7 +95,7 @@
     fn(c.getContext("2d"), w, h);
     const t = new THREE.CanvasTexture(c);
     t.encoding = THREE.sRGBEncoding;
-    t.anisotropy = phone ? 1 : 4;
+    t.anisotropy = 4;
     return t;
   };
   const txt = (c, s, x, y, sz, col, wt = 600) => {
@@ -224,15 +205,8 @@
       c.textBaseline = "middle";
       txt(c, "LAY C", w / 2, h * 0.43, 58, "#ffffff", 800);
     });
-  const flagGeo = new THREE.PlaneGeometry(FW, FH, phone ? 8 : 18, phone ? 3 : 6),
-    flagMat = phone
-      ? new THREE.MeshLambertMaterial({ map: flagTex, side: THREE.DoubleSide })
-      : new THREE.MeshStandardMaterial({
-          map: flagTex,
-          side: THREE.DoubleSide,
-          roughness: 0.8,
-          metalness: 0,
-        });
+  const flagGeo = new THREE.PlaneGeometry(FW, FH, 18, 6),
+    flagMat = new THREE.MeshStandardMaterial({ map: flagTex, side: THREE.DoubleSide, roughness: 0.8, metalness: 0 });
   const flagMesh = new THREE.Mesh(flagGeo, flagMat);
   flagMesh.position.set(FW / 2 + 0.04, 2.15, 0);
   flagMesh.castShadow = true;
@@ -297,7 +271,7 @@
     }),
   );
   envG.traverse((o) => {
-    if (o.isMesh) o.castShadow = o.receiveShadow = !phone;
+    if (o.isMesh) o.castShadow = o.receiveShadow = true;
   });
   // selfie key on the front-right corner of the platform
   const CAMX = 6.0,
@@ -372,22 +346,20 @@
   });
   const camIcon = new THREE.Mesh(
     new THREE.PlaneGeometry(0.72, 0.49),
-    phone
-      ? new THREE.MeshLambertMaterial({ map: camIconTex })
-      : new THREE.MeshStandardMaterial({
-          map: camIconTex,
-          bumpMap: camBump,
-          bumpScale: 6,
-          roughness: 0.4,
-          metalness: 0.05,
-        }),
+    new THREE.MeshStandardMaterial({
+      map: camIconTex,
+      bumpMap: camBump,
+      bumpScale: 6,
+      roughness: 0.4,
+      metalness: 0.05,
+    }),
   );
   camIcon.rotation.x = -Math.PI / 2;
   camIcon.position.set(0, 0.0825, 0);
   camKey.add(camIcon);
   camProp.traverse((o) => {
     if (o.isMesh) {
-      o.castShadow = o.receiveShadow = !phone;
+      o.castShadow = o.receiveShadow = true;
       o.userData.cam3d = true;
     }
   });
@@ -488,7 +460,7 @@
   logoCanvas.height = 256;
   const logoMap = new THREE.CanvasTexture(logoCanvas);
   logoMap.encoding = THREE.sRGBEncoding;
-  logoMap.anisotropy = phone ? 1 : 4;
+  logoMap.anisotropy = 4;
   const logoOpts = {
     map: logoMap,
     transparent: true,
@@ -497,18 +469,8 @@
     polygonOffsetUnits: -4,
     depthWrite: false,
   };
-  const logoMat = phone
-    ? new THREE.MeshLambertMaterial(logoOpts)
-    : new THREE.MeshStandardMaterial({ ...logoOpts, roughness: 0.62, metalness: 0 });
-  const logoGeo = new THREE.SphereGeometry(
-    0.362,
-    phone ? 16 : 32,
-    phone ? 12 : 24,
-    Math.PI / 2 - 0.5,
-    1.0,
-    0.4,
-    0.86,
-  );
+  const logoMat = new THREE.MeshStandardMaterial({ ...logoOpts, roughness: 0.62, metalness: 0 });
+  const logoGeo = new THREE.SphereGeometry(0.362, 32, 24, Math.PI / 2 - 0.5, 1.0, 0.4, 0.86);
   {
     const img = new Image();
     img.onload = () => {
@@ -549,19 +511,16 @@
       mat = m(CREAM, 0, 0.95, { map: knit, side: THREE.DoubleSide }),
       pm = m(GRAY, 0, 0.95, { flatShading: true });
     const dome = new THREE.Mesh(
-      new THREE.SphereGeometry(0.34, phone ? 16 : 28, phone ? 10 : 18, 0, TAU, 0, Math.PI / 2),
+      new THREE.SphereGeometry(0.34, 28, 18, 0, TAU, 0, Math.PI / 2),
       mat,
     );
     dome.scale.y = 1.05;
     dome.position.y = -0.02;
     dome.castShadow = true;
-    const cuff = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.35, 0.34, 0.17, phone ? 14 : 28, 1, true),
-      mat,
-    );
+    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.34, 0.17, 28, 1, true), mat);
     cuff.position.y = -0.1;
     cuff.castShadow = true;
-    const pom = new THREE.Mesh(new THREE.IcosahedronGeometry(0.14, phone ? 1 : 2), pm);
+    const pom = new THREE.Mesh(new THREE.IcosahedronGeometry(0.14, 2), pm);
     pom.position.y = 0.37;
     pom.castShadow = true;
     const logo = new THREE.Mesh(logoGeo, logoMat);
@@ -791,10 +750,7 @@
   const hoopE = new THREE.Group();
   hoopE.position.set(0, 1.08, 0.12);
   sP.add(hoopE);
-  const hr = new THREE.Mesh(
-    new THREE.TorusGeometry(0.42, 0.055, phone ? 6 : 12, phone ? 20 : 40),
-    M.orange,
-  );
+  const hr = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.055, 12, 40), M.orange);
   hr.rotation.x = Math.PI / 2;
   hoopE.add(hr);
   const hr2 = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.028, 10, 36), M.chrome);
@@ -1004,9 +960,8 @@
     c.fillRect(0, 0, w, h);
     txt(c, "PAID ✓", 18, 62, 34, "#1d3fbf", 700);
   });
-  const PACKS = phone ? 3 : 6;
   const P = [];
-  for (let i = 0; i < PACKS; i++) {
+  for (let i = 0; i < 6; i++) {
     const g = new THREE.Group(),
       b = makeBeanie(),
       slip = new THREE.Group();
@@ -1082,7 +1037,7 @@
     // Continuous space factor (0 cramped → 1 roomy) instead of a hard width cutoff.
     const room = Math.max(0, Math.min(1, (Math.min(w, h * 1.35) - 360) / 540));
     mobile = room < 0.55;
-    R.setPixelRatio(Math.min(devicePixelRatio || 1, phone ? 1 : 1.25 + 0.25 * room));
+    R.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5 + 0.25 * room));
     R.setSize(w, h, false);
     const canvas = R.domElement;
     canvas.style.width = "100%";
@@ -6319,7 +6274,7 @@
     ST_ON = 1;
   const manTex = new THREE.TextureLoader().load("man.png");
   manTex.encoding = THREE.sRGBEncoding;
-  manTex.anisotropy = phone ? 1 : 4;
+  manTex.anisotropy = 4;
   const man = new THREE.Sprite(
     new THREE.SpriteMaterial({
       map: manTex,
@@ -6552,8 +6507,7 @@
   // loop
   const v3 = new THREE.Vector3();
   let last = performance.now(),
-    lastDraw = -1,
-    lastPaint = 0;
+    lastDraw = -1;
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(Math.max(0, (now - last) / 1000), 0.045);
@@ -6632,7 +6586,7 @@
     }
     // packets
     P.forEach((p, i) => {
-      const ph = (t / 26 + i / PACKS) % 1;
+      const ph = (t / 26 + i / 6) % 1;
       p.ph = ph;
       const th = A0 + ph * STEP * 6,
         d = (th - A0) / STEP,
@@ -6712,8 +6666,6 @@
       camMode === "overview" &&
       now - lastInt > 6500;
     ctrl.update();
-    if (phone && now - lastPaint < 30) return;
-    lastPaint = now;
     R.render(scene, cam);
     pinUpdate();
   }
