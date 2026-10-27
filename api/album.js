@@ -123,6 +123,7 @@ function photoBrief(row, whoEmail) {
       name: row.customer_name,
       thumb: items.thumb || "",
       ts: items.ts || 0,
+      comment: text(items.comment, 280),
       own: Boolean(own),
     },
     state,
@@ -418,6 +419,7 @@ module.exports = async function handler(req, res) {
               image: own || visible ? items.image || items.thumb || "" : "",
               thumb: items.thumb || "",
               ts: items.ts || 0,
+              comment: text(items.comment, 280),
               own,
             },
             state,
@@ -629,6 +631,7 @@ module.exports = async function handler(req, res) {
           email: who.customer_email,
           accepted: true,
           note: "This photo is already in your album.",
+          comment: text(existing.data.items.comment, 280),
         }, state));
       }
 
@@ -652,6 +655,7 @@ module.exports = async function handler(req, res) {
         thumb,
         ts: Date.now(),
         source: "camera",
+        comment: text(payload.comment, 280),
         content_hash: digest,
         moderation_status: check.decision,
         moderation_decided_at: decidedAt,
@@ -700,6 +704,7 @@ module.exports = async function handler(req, res) {
         email: who.customer_email,
         accepted: !pending,
         pending,
+        comment: text(items.comment, 280),
         note,
       }, state));
     } finally {

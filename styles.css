@@ -723,6 +723,40 @@ header .id {
 .cmsg .cp {
   width: auto;
 }
+.cnote-l {
+  display: block;
+  margin-top: 12px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.cnote {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  resize: vertical;
+}
+.ccmt {
+  display: block;
+  margin: 8px 0 0;
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 .cbar {
   display: flex;
   align-items: center;
@@ -1329,6 +1363,12 @@ footer {
   width: 1px;
   height: 14px;
   background: var(--amber);
+}
+.pin.rugb:after {
+  height: var(--stem, 14px);
+  background:
+    repeating-linear-gradient(to bottom, var(--amber) 0 4px, transparent 4px 8px) bottom / 100% 88% no-repeat,
+    linear-gradient(var(--amber), var(--amber)) top / 100% 12% no-repeat;
 }
 #pins {
   position: absolute;
@@ -2765,12 +2805,12 @@ header {
     min-width: 0;
   }
   .logo {
-    position: static;
-    top: auto;
-    left: auto;
-    transform: none;
-    width: clamp(24px, 7vw, 28px);
-    height: clamp(24px, 7vw, 28px);
+    position: absolute;
+    left: 50%;
+    top: -4px;
+    transform: translateX(-50%);
+    width: 34px;
+    height: 34px;
   }
   .id b {
     font-size: 13px;
@@ -3349,18 +3389,13 @@ header {
 
 @media (max-width: 480px) {
   .pin .pn {
-    display: none;
+    display: inline;
   }
   .pin {
-    gap: 0;
-    padding: 8px 10px;
-    max-width: none;
-    min-width: 36px;
-    min-height: 36px;
-    justify-content: center;
-  }
-  .pin i {
-    font-size: 11px;
+    gap: 5px;
+    padding: 5px 8px;
+    max-width: min(180px, 48vw);
+    font-size: 10px;
   }
   #cams .cap,
   footer span:last-child {
@@ -3409,8 +3444,8 @@ header {
     right: 8px;
   }
   .logo {
-    width: 24px;
-    height: 24px;
+    width: 32px;
+    height: 32px;
   }
   .id b {
     font-size: 12px;
