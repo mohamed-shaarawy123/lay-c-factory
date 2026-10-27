@@ -133,8 +133,8 @@
   let RUG = -1;
   {
     const RW = 5.4;
-    const RD = RW / (1400 / 1000);
-    const tex = new THREE.TextureLoader().load("rug-keep-off.jpg?v=layc");
+    const RD = RW / (1736 / 1134);
+    const tex = new THREE.TextureLoader().load("rug-layc.jpg?v=home");
     tex.encoding = THREE.sRGBEncoding;
     tex.anisotropy = Math.min(8, R.capabilities.getMaxAnisotropy());
     const rugSide = m(0x2a4fd0, 0, 0.95);
@@ -247,46 +247,95 @@
     a.needsUpdate = true;
   };
   waveFlag(0);
-  // envelope for customer reviews, on the last empty corner of the base (back-left)
+  // light-blue mailbox for customer reviews, in the envelope's corner
+  // Open until this person leaves a review, then the slot closes. Other accounts stay open.
+  let mailDoor = null;
+  let mailOpenNow = 1;
+  let mailOpenTarget = 1;
+  function mailWho() {
+    try {
+      const a = JSON.parse(localStorage.getItem("lcaccount") || "null");
+      const email = a && a.email ? String(a.email).trim().toLowerCase() : "";
+      return email || "guest";
+    } catch (e) {
+      return "guest";
+    }
+  }
+  function mailReviewed() {
+    try {
+      const all = JSON.parse(localStorage.getItem("lcreviewed") || "{}");
+      return !!(all && all[mailWho()]);
+    } catch (e) {
+      return false;
+    }
+  }
+  function applyMail(k) {
+    if (mailDoor) mailDoor.rotation.x = k * 1.45;
+  }
+  function syncMail(snap) {
+    mailOpenTarget = mailReviewed() ? 0 : 1;
+    if (snap) {
+      mailOpenNow = mailOpenTarget;
+      applyMail(mailOpenNow);
+    }
+  }
+  function markMailReviewed() {
+    try {
+      const all = JSON.parse(localStorage.getItem("lcreviewed") || "{}") || {};
+      all[mailWho()] = Date.now();
+      localStorage.setItem("lcreviewed", JSON.stringify(all));
+    } catch (e) {}
+    syncMail(false);
+    const door = $("#rvdoor");
+    if (door) door.textContent = "Thank you. Your mailbox is now closed.";
+  }
   const envG = new THREE.Group();
   envG.position.set(-6.2, 0.235, -3.6);
-  envG.scale.setScalar(1);
+  envG.scale.setScalar(0.9);
   envG.rotation.y = -0.55;
   machine.add(envG);
-  const envB = new THREE.Group();
-  envB.position.set(0, 0.05, 0);
-  envB.rotation.x = -Math.PI / 2 + 0.03;
-  envB.rotation.z = 0.12;
-  envG.add(envB);
-  box(envB, 1.3, 0.88, 0.07, 0, 0, 0, M.ivory);
-  box(envB, 1.34, 0.04, 0.09, 0, 0.44, 0, M.edge);
-  box(envB, 1.34, 0.04, 0.09, 0, -0.44, 0, M.edge);
-  box(envB, 0.04, 0.88, 0.09, -0.65, 0, 0, M.edge);
-  box(envB, 0.04, 0.88, 0.09, 0.65, 0, 0, M.edge);
-  {
+  const mbArch = (r, h) => {
     const sh = new THREE.Shape();
-    sh.moveTo(-0.62, 0.42);
-    sh.lineTo(0.62, 0.42);
-    sh.lineTo(0, -0.08);
-    sh.lineTo(-0.62, 0.42);
-    const fg = new THREE.ExtrudeGeometry(sh, { depth: 0.025, bevelEnabled: false }),
-      fl = new THREE.Mesh(fg, M.orange);
-    fl.position.z = 0.036;
-    fl.castShadow = true;
-    envB.add(fl);
-  }
-  const sealM = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.04, 24), M.light);
-  sealM.rotation.x = Math.PI / 2;
-  sealM.position.set(0, -0.08, 0.075);
-  envB.add(sealM);
+    sh.moveTo(-r, 0);
+    sh.lineTo(r, 0);
+    sh.lineTo(r, h);
+    sh.absarc(0, h, r, 0, Math.PI, false);
+    sh.lineTo(-r, 0);
+    return sh;
+  };
+  box(envG, 0.62, 0.05, 0.62, 0, 0.025, 0, M.dark);
+  box(envG, 0.16, 0.95, 0.16, 0, 0.5, 0, M.chrome);
+  const mb = new THREE.Group();
+  mb.position.set(0, 0.96, 0);
+  mb.scale.setScalar(0.7);
+  envG.add(mb);
+  const bm = new THREE.Mesh(new THREE.ExtrudeGeometry(mbArch(0.34, 0.34), { depth: 1.1, bevelEnabled: false }), M.body);
+  bm.position.z = -0.55;
+  bm.castShadow = bm.receiveShadow = true;
+  mb.add(bm);
+  const hole = new THREE.Mesh(new THREE.ExtrudeGeometry(mbArch(0.28, 0.28), { depth: 0.012, bevelEnabled: false }), M.dark);
+  hole.position.set(0, 0.04, 0.55);
+  mb.add(hole);
+  const l1 = box(mb, 0.3, 0.2, 0.012, -0.02, 0.2, 0.567, M.ivory);
+  l1.rotation.z = 0.1;
+  const l2 = box(mb, 0.28, 0.18, 0.012, 0.04, 0.17, 0.575, M.edge);
+  l2.rotation.z = -0.07;
+  mailDoor = new THREE.Group();
+  mailDoor.position.set(0, 0.015, 0.55);
+  mb.add(mailDoor);
+  const mailDoorMesh = new THREE.Mesh(new THREE.ExtrudeGeometry(mbArch(0.31, 0.31), { depth: 0.05, bevelEnabled: false }), M.ivory);
+  mailDoorMesh.castShadow = true;
+  mailDoor.add(mailDoorMesh);
+  box(mailDoor, 0.34, 0.035, 0.04, 0, 0.505, 0.07, M.dark);
+  box(mailDoor, 0.11, 0.11, 0.06, 0, 0.105, 0.08, M.chrome);
   scr(
-    envB,
-    0.9,
-    0.2,
+    mailDoor,
+    0.5,
+    0.14,
     0,
-    -0.3,
-    0.039,
-    ctex(540, 120, (c, w, h) => {
+    0.285,
+    0.0525,
+    ctex(480, 134, (c, w, h) => {
       c.fillStyle = "#f4f7ff";
       c.fillRect(0, 0, w, h);
       c.textAlign = "center";
@@ -294,9 +343,29 @@
       txt(c, "REVIEWS", w / 2, h / 2, 64, "#0f2a8a", 800);
     }),
   );
+  scr(
+    mb,
+    0.7,
+    0.16,
+    0.3405,
+    0.22,
+    -0.05,
+    ctex(540, 124, (c, w, h) => {
+      c.fillStyle = "#4169e1";
+      c.fillRect(0, 0, w, h);
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      txt(c, "REVIEWS", w / 2, h / 2, 66, "#ffffff", 800);
+    }),
+  ).rotation.y = Math.PI / 2;
+  const mailFlagMat = m(0xe8453c, 0.2, 0.5);
+  box(mb, 0.03, 0.03, 0.03, 0.37, 0.18, -0.25, M.chrome);
+  box(mb, 0.03, 0.46, 0.03, 0.385, 0.4, -0.25, M.chrome);
+  box(mb, 0.025, 0.15, 0.3, 0.385, 0.62, -0.4, mailFlagMat);
   envG.traverse((o) => {
     if (o.isMesh) o.castShadow = o.receiveShadow = true;
   });
+  syncMail(true);
   // selfie key on the front-right corner of the platform
   const CAMX = 6.0,
     CAMZ = 3.6,
@@ -1232,7 +1301,7 @@
             : i === -5
               ? "See your order and its stage."
               : i === -6
-                ? "Read and leave a customer review."
+                ? "Read and leave a review. The blue mailbox stays open until you send one, then it closes."
                 : i === -7
                   ? "Open interior design or execution for this space."
                   : ST[i].desc;
@@ -2551,6 +2620,9 @@
     const out = $("#accout");
     if (out) out.hidden = !on;
     syncAccPanel();
+    try {
+      syncMail(false);
+    } catch (e) {}
   }
   function syncAccPanel() {
     const box = $("#account");
@@ -3330,8 +3402,13 @@
     RV.busy = false;
     const saved = accGet();
     const name = (saved && saved.name) || "";
+    const doorNote = mailReviewed()
+      ? "Your mailbox is closed. You can still read reviews."
+      : "The mailbox stays open until you send a review.";
     pg.innerHTML =
-      '<div id="rv"><div class="bx"><h3>Customer reviews</h3><p class="avg" id="rva">Loading reviews…</p>' +
+      '<div id="rv"><div class="bx"><h3>Customer reviews</h3><p class="avg" id="rvdoor">' +
+      doorNote +
+      '</p><p class="avg" id="rva">Loading reviews…</p>' +
       '<label class="visually-hidden" for="rvn">Your name</label>' +
       '<input id="rvn" maxlength="30" placeholder="Your name" autocomplete="name" value="' +
       rvEsc(name) +
@@ -3397,6 +3474,7 @@
         RV.star = 0;
         rvDrawRating();
         m.textContent = "Thank you! Your review was added.";
+        markMailReviewed();
         await rvLoad();
       } catch (e) {
         m.textContent = "Sorry, the review could not be saved.";
@@ -5538,7 +5616,7 @@ B(.13,.02,.025,.32,1,.075,['metal','#cfcfd2'],0,.008);S(.025,.37,1,.06,['metal',
 const KD=F.findIndex(f=>f[0]==='Door'),KW=F.findIndex(f=>f[0]==='Window'),TT=['Intern','Planner','Designer','Venue pro','Mogul','Legend'],CH=['Nice choice!','Looks great!','Guests will love it!','Stylish!','Smart move!'];
 const D={},PL={img:'',name:'',room:-1,sel:-1,uid:0};let box=null,R3=null,sc=null,cam=null,ctl=null,rg=null,wl=[],objs=new Map(),selH=null,hemi=null,dl=null,drag=null,dn=null,LT=0;
 const fm=n=>Number(n).toLocaleString('en-US'),star=n=>'★'.repeat(n)+'☆'.repeat(5-n),cl=(v,a,b)=>Math.max(a,Math.min(b,v)),DD=()=>D[PL.room],GL=new THREE.MeshPhysicalMaterial({color:0xd6ecff,transparent:true,opacity:.22,roughness:.04,metalness:0,clearcoat:1,clearcoatRoughness:.03,depthWrite:false}),MC={};
-const stl=document.createElement('style');stl.textContent='.ixg{margin:0 0 22px;padding:16px;border:2px solid var(--amber);border-radius:16px;background:var(--panel)}.ixg h3{margin:0 0 6px;font-size:18px}.ixg .sm{margin:0 0 12px;color:var(--mut);font-size:13px;line-height:1.5}.ixup{display:block;padding:18px;border:2px dashed var(--amber);border-radius:12px;text-align:center;cursor:pointer;font-weight:700;color:var(--amber);margin-bottom:12px}.ixup input{display:none}.ixth{display:block;max-width:100%;max-height:150px;margin:0 auto 12px;border-radius:10px;border:1px solid var(--line)}.ixrms{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}.ixrm{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 8px;border:2px solid var(--line);border-radius:14px;background:#fff;color:var(--fg);font:700 13px system-ui;cursor:pointer}.ixrm span{font-size:34px;line-height:1}.ixrm small{color:var(--mut);font-weight:500}.ixrm:hover{border-color:var(--amber);transform:translateY(-3px)}.ixrm.dn{border-color:var(--amber);background:rgba(65,105,225,.08)}.ix3{position:relative;height:min(34vh,300px);border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#0a1030;touch-action:none}.ix3 canvas{position:absolute;left:0;top:0;z-index:1}.ixhd{margin:8px 0;font:700 13px system-ui}.ixg details{margin:10px 0;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:#fff}.ixg summary{cursor:pointer;font-weight:700;font-size:14px}.ixp{position:absolute;z-index:5;left:8px;right:8px;bottom:8px;display:flex;flex-wrap:nowrap;gap:8px;margin:0;padding:8px;max-height:none;overflow-x:auto;overflow-y:hidden;border-radius:12px;background:rgba(255,255,255,.94);border:1px solid var(--line);box-shadow:0 8px 24px rgba(0,0,0,.28);touch-action:pan-x}.ixgh{position:fixed;z-index:80;pointer-events:none;padding:8px 10px;border-radius:12px;background:#fff;border:2px solid var(--amber);font:700 12px system-ui,sans-serif;box-shadow:0 8px 20px rgba(0,0,0,.25)}.ixpb{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:78px;padding:8px 6px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--fg);font:600 11px system-ui;cursor:pointer}.ixpb span{font-size:22px;line-height:1}.ixpb em{font-style:normal;color:var(--mut);font-weight:500}.ixpb:hover{border-color:var(--amber)}.ixpb{flex:0 0 auto;cursor:grab}.ixpb:active{cursor:grabbing}.ixf{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px}.ixf label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mut)}.ixf input[type=color]{width:100%;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:none}.ixf select{padding:8px;border:1px solid var(--line);border-radius:8px}.ixbtns{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 8px}.ixbtns button,.ixsb button{padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--fg);font-weight:600;cursor:pointer}.ixsb{margin-top:10px;padding:12px;border:2px solid var(--amber);border-radius:12px}.tktp{max-height:min(72dvh,520px);overflow:auto}@media (max-width:760px){.ix3{height:min(46dvh,320px)}.ixf{grid-template-columns:1fr}.ixbtns button,.ixpb{min-height:40px}.ixp{max-height:none}}';document.head.appendChild(stl);
+const stl=document.createElement('style');stl.textContent='.ixg{margin:0 0 22px;padding:16px;border:2px solid var(--amber);border-radius:16px;background:var(--panel);width:100%;max-width:100%;min-width:0;box-sizing:border-box}.ixg h3{margin:0 0 6px;font-size:18px}.ixg .sm{margin:0 0 12px;color:var(--mut);font-size:13px;line-height:1.5}.ixup{display:block;padding:18px;border:2px dashed var(--amber);border-radius:12px;text-align:center;cursor:pointer;font-weight:700;color:var(--amber);margin-bottom:12px}.ixup input{display:none}.ixth{display:block;max-width:100%;max-height:150px;margin:0 auto 12px;border-radius:10px;border:1px solid var(--line)}.ixrms{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}.ixrm{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 8px;border:2px solid var(--line);border-radius:14px;background:#fff;color:var(--fg);font:700 13px system-ui;cursor:pointer}.ixrm span{font-size:34px;line-height:1}.ixrm small{color:var(--mut);font-weight:500}.ixrm:hover{border-color:var(--amber);transform:translateY(-3px)}.ixrm.dn{border-color:var(--amber);background:rgba(65,105,225,.08)}.ix3{position:relative;width:100%;max-width:100%;height:min(44vh,440px);border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#e7eef8;touch-action:none}.ix3 canvas{position:absolute;left:0;top:0;z-index:1;width:100%;height:100%}#ixwrap,#ixgame,#ixed,#ixrooms{width:100%;max-width:100%;min-width:0;box-sizing:border-box}.ixhd{margin:8px 0;font:700 13px system-ui}.ixg details{margin:10px 0;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:#fff}.ixg summary{cursor:pointer;font-weight:700;font-size:14px}.ixp{position:relative;z-index:2;left:auto;right:auto;bottom:auto;display:flex;flex-wrap:nowrap;gap:8px;width:100%;max-width:100%;min-width:0;box-sizing:border-box;margin:10px 0 0;padding:8px;max-height:none;overflow-x:auto;overflow-y:hidden;border-radius:12px;background:#fff;border:1px solid var(--line);box-shadow:none;touch-action:pan-x}.ixgh{position:fixed;z-index:80;pointer-events:none;padding:8px 10px;border-radius:12px;background:#fff;border:2px solid var(--amber);font:700 12px system-ui,sans-serif;box-shadow:0 8px 20px rgba(0,0,0,.25)}.ixpb{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:78px;padding:8px 6px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--fg);font:600 11px system-ui;cursor:pointer}.ixpb span{font-size:22px;line-height:1}.ixpb em{font-style:normal;color:var(--mut);font-weight:500}.ixpb:hover{border-color:var(--amber)}.ixpb{flex:0 0 auto;cursor:grab}.ixpb:active{cursor:grabbing}.ixf{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px}.ixf label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mut)}.ixf input[type=color]{width:100%;height:34px;padding:0;border:1px solid var(--line);border-radius:8px;background:none}.ixf select{padding:8px;border:1px solid var(--line);border-radius:8px}.ixbtns{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 8px}.ixbtns button,.ixsb button{padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--fg);font-weight:600;cursor:pointer}.ixsb{margin-top:10px;padding:12px;border:2px solid var(--amber);border-radius:12px}.tktp{max-height:min(72dvh,520px);overflow:auto}@media (max-width:760px){.ix3{height:min(42dvh,340px)}.ixf{grid-template-columns:1fr}.ixbtns button,.ixpb{min-height:40px}.ixp{max-height:none}}';document.head.appendChild(stl);
 const RBC={};
 let zCL=[],zCM=[],zSG=null;
 function zuv(g){const p=g.attributes.position,n=g.attributes.normal,u=g.attributes.uv;for(let i=0;i<p.count;i++){const ax=Math.abs(n.getX(i)),ay=Math.abs(n.getY(i)),az=Math.abs(n.getZ(i));if(ax>=ay&&ax>=az)u.setXY(i,p.getZ(i),p.getY(i));else if(ay>=az)u.setXY(i,p.getX(i),p.getZ(i));else u.setXY(i,p.getX(i),p.getY(i))}}
@@ -5618,16 +5696,18 @@ C=(r,h,x,y,z,col,main,r2)=>add(new THREE.Mesh(new THREE.CylinderGeometry(r2==nul
 Sp=(r,x,y,z,col,main,sx,sy,sz,rx,ry,rz)=>{const m=add(new THREE.Mesh(zsph(),mt(col,main)),x,y,z);m.scale.set(r*(sx||1),r*(sy||1),r*(sz||1));m.rotation.set(rx||0,ry||0,rz||0);return m},
 Em=(w,h,d,x,y,z,col,it,tk)=>{let m;try{if(tk==='sky'){m=new THREE.MeshBasicMaterial({map:zskT(),toneMapped:false});m.userData.sky=1}else if(tk==='art')m=new THREE.MeshStandardMaterial({map:zartT(),roughness:.7});else if(tk==='tv')m=new THREE.MeshStandardMaterial({color:'#050505',roughness:.12,metalness:.2,emissive:'#ffffff',emissiveMap:ztvT(),emissiveIntensity:it||.8});else m=new THREE.MeshStandardMaterial({color:'#000',emissive:col,emissiveIntensity:it||1})}catch(e){m=new THREE.MeshStandardMaterial({color:col||'#888'})}
 reg(m,2);const ge=rbg(w,h,d,.002).clone(),p=ge.attributes.position,u=ge.attributes.uv;for(let i=0;i<u.count;i++)u.setXY(i,p.getX(i)/w+.5,p.getY(i)/h+.5);const me=new THREE.Mesh(ge,m);me.position.set(x,y+h/2,z);me.castShadow=tk==='art';me.receiveShadow=true;g.add(me);return me};
-g.userData.o=o;BD[f[0]](B,C,g,Sp,Em);if(g.userData.cm)mm.push(...g.userData.cm);if(g.userData.ca)am.push(...g.userData.ca);g.userData.id=o.id;g.userData.mm=mm;g.userData.am=am;g.userData.xm=xm;fin(o,g);return g}
+g.userData.o=o;BD[f[0]](B,C,g,Sp,Em);if(g.userData.cm)mm.push(...g.userData.cm);if(g.userData.ca)am.push(...g.userData.ca);g.userData.id=o.id;g.userData.mm=mm;g.userData.am=am;g.userData.xm=xm;fin(o,g);
+if(o.skin&&!f[5]){try{g.updateMatrixWorld(true);const bb=new THREE.Box3().setFromObject(g),sz=bb.getSize(new THREE.Vector3()),ct=bb.getCenter(new THREE.Vector3()),tx=new THREE.CanvasTexture(o.skin);tx.encoding=THREE.sRGBEncoding;tx.anisotropy=8;const pln=new THREE.Mesh(new THREE.PlaneGeometry(Math.max(.08,sz.x*.94),Math.max(.08,sz.y*.94)),new THREE.MeshStandardMaterial({map:tx,roughness:.5,metalness:.04}));pln.position.set(ct.x,ct.y,bb.max.z+.012);pln.castShadow=false;pln.receiveShadow=true;g.add(pln)}catch(e){}}
+return g}
 function place(o){const g=objs.get(o.id);if(!g)return;g.position.set(o.x,F[o.k][4],o.z);g.rotation.y=o.r*Math.PI/180;g.scale.set(o.s*(o.sx||1),o.s*(o.sy||1),o.s)}
 function fit(o){const c=DD().cfg,hw=c.w/2,hd=c.d/2;if(F[o.k][5]){const d=[o.z+hd,hd-o.z,o.x+hw,hw-o.x],i=d.indexOf(Math.min(...d));if(i===0){o.z=-hd+.05;o.r=0;o.x=cl(o.x,-hw+.7,hw-.7)}else if(i===1){o.z=hd-.05;o.r=180;o.x=cl(o.x,-hw+.7,hw-.7)}else if(i===2){o.x=-hw+.05;o.r=90;o.z=cl(o.z,-hd+.7,hd-.7)}else{o.x=hw-.05;o.r=-90;o.z=cl(o.z,-hd+.7,hd-.7)}}else{o.x=cl(o.x,-hw+.3,hw-.3);o.z=cl(o.z,-hd+.3,hd-.3)}}
 function put(o){const g=mkg(o);if(!F[o.k][5]&&F[o.k][0]!=='Rug'){try{const bb=new THREE.Box3().setFromObject(g),sx=bb.max.x-bb.min.x,sz=bb.max.z-bb.min.z;if(isFinite(sx)&&isFinite(sz)&&sx>0&&sz>0){const p=new THREE.Mesh(new THREE.PlaneGeometry(1,1),zcsM());p.geometry.boundingBox=new THREE.Box3();p.rotation.x=-Math.PI/2;p.position.set((bb.max.x+bb.min.x)/2,.004,(bb.max.z+bb.min.z)/2);p.scale.set(sx*1.5+.1,sz*1.5+.1,1);p.raycast=()=>{};p.renderOrder=1;g.add(p)}}catch(e){}}sc.add(g);objs.set(o.id,g);place(o);light()}
 function ftex(c){const S=window.innerWidth>800?2048:1024,k=({wood:1,tile:1,carpet:1,plain:1})[c.ft]?c.ft:'plain',sp={wood:[zgWood,.9,.5,.35,.3],tile:[zgTile,.7,.28,.6,.12],carpet:[zgCarp,2.6,1,0,0],plain:[(x,s,m)=>zgPl(x,s,m,222),.5,.8,.1,.4]}[k];
 return{map:zt1('f'+k+'c',S,(x,s)=>sp[0](x,s,0),0,1),bump:zt1('f'+k+'b',S,(x,s)=>sp[0](x,s,1),0,0),bs:sp[1],r:sp[2],cc:sp[3],cr:sp[4]}}
-function light(){if(!sc)return;const t=DD().cfg.light;sc.background=new THREE.Color('#0a1030');hemi.intensity=.62-.48*t;dl.intensity=1.9-1.78*t;dl.color.copy(new THREE.Color('#fff0d8').lerp(new THREE.Color('#8ea6ff'),t));
+function light(){if(!sc)return;const t=DD().cfg.light;sc.background=new THREE.Color('#e7eef8').lerp(new THREE.Color('#0a1030'),t);hemi.intensity=.62-.48*t;dl.intensity=1.9-1.78*t;dl.color.copy(new THREE.Color('#fff0d8').lerp(new THREE.Color('#8ea6ff'),t));
 const em=.1+1.3*Math.max(0,(t-.15)/.85);objs.forEach(g=>{if(g.userData.pl)g.userData.pl.intensity=t>.25?(t-.25)/.75*2.2:0;(g.userData.mm||[]).forEach(m=>{if(m.userData.shade){m.emissive.copy(m.color);m.emissiveIntensity=em}});(g.userData.xm||[]).forEach(m=>{if(m.userData.sky)m.color.copy(new THREE.Color('#ffffff').lerp(new THREE.Color('#1c2a58'),t))})});
 zCL.forEach(l=>{l.intensity=.18+1.5*t});zCM.forEach(m=>m.color.setRGB(.86+.8*t,.82+.62*t,.74+.3*t));
-sc.traverse(m=>{if(m.material&&m.material.isMeshStandardMaterial)m.material.envMapIntensity=1.1*(1-.88*t)});if(R3)R3.toneMappingExposure=1.2-.2*t}
+sc.traverse(m=>{if(m.material&&m.material.isMeshStandardMaterial)m.material.envMapIntensity=1.1*(1-.88*t)});if(R3)R3.toneMappingExposure=1.35-.25*t}
 function wmat(c,wi){const col=(c.wc&&c.wc[wi])||c.wall;let pm=null,pb=null,ao=null;try{pm=zt1('plc',512,(x,s)=>zgPl(x,s,0,236),0,1);pb=zt1('plb',512,(x,s)=>zgPl(x,s,1,236),0,0);ao=zt1('wao',256,zgWAO,0,0)}catch(e){}
 const m=new THREE.MeshStandardMaterial({color:col,transparent:true,roughness:.92,map:pm,bumpMap:pb,bumpScale:.35,aoMap:ao,aoMapIntensity:.9});
 if(wi===0&&c.ph&&c.pho){m.bumpMap=null;m.aoMap=null;const ar=c.w/c.h,t=new THREE.TextureLoader().load(c.ph,i=>{const ia=i.image.width/i.image.height;if(ia>ar){i.repeat.x=ar/ia;i.offset.x=(1-i.repeat.x)/2}else{i.repeat.y=ia/ar;i.offset.y=(1-i.repeat.y)/2}m.needsUpdate=true});t.encoding=THREE.sRGBEncoding;m.map=t;m.emissiveMap=t;m.emissive.set(0x666666);m.color.set('#ffffff');m.roughness=.8}return m}
@@ -5641,10 +5721,12 @@ const fl=new THREE.Mesh(fg,fm);fl.rotation.x=-Math.PI/2;fl.receiveShadow=true;fl
 const m=new THREE.Mesh(bg,wmat(c,wi));m.userData.surf='wall';m.userData.wi=wi;const bmt=new THREE.MeshStandardMaterial({color:'#f6f3ec',transparent:true,roughness:.4}),bm=new THREE.Mesh(rbg(a[2],.11,.03,.006),bmt),cr=new THREE.Mesh(rbg(a[2],.07,.05,.012),bmt),zo=-(a[4]+a[5]);
 bm.position.set(0,.055-c.h/2,zo*.065);cr.position.set(0,c.h/2-.035,zo*.075);bm.receiveShadow=cr.receiveShadow=true;m.add(bm,cr);if(ph)bm.visible=cr.visible=false;
 m.position.set(a[0]+a[4]*.05,c.h/2,a[1]+a[5]*.05);m.rotation.y=a[3];m.receiveShadow=true;rg.add(m);wl.push({m:m,n:a,b:bm})});
-const cm=new THREE.Mesh(new THREE.PlaneGeometry(c.w,c.d),new THREE.MeshStandardMaterial({color:'#f8f6f1',roughness:.96}));cm.rotation.x=Math.PI/2;cm.position.y=c.h;cm.receiveShadow=true;cm.raycast=()=>{};rg.add(cm);
+const cm=new THREE.Mesh(new THREE.PlaneGeometry(c.w,c.d),new THREE.MeshStandardMaterial({color:c.ceil||'#f8f6f1',roughness:.9}));cm.rotation.x=Math.PI/2;cm.position.y=c.h;cm.receiveShadow=true;cm.raycast=()=>{};rg.add(cm);
 const dm=new THREE.MeshBasicMaterial({color:0xdcd3c0}),rm=new THREE.MeshStandardMaterial({color:'#e8e5de',roughness:.4,metalness:.3}),nx=Math.max(1,Math.round(c.w/2.4)),nz=Math.max(1,Math.round(c.d/2.4));zCM.push(dm);
 for(let i=0;i<nx;i++)for(let j=0;j<nz;j++){const x=-c.w/2+c.w*(i+.5)/nx,z=-c.d/2+c.d*(j+.5)/nz;[new THREE.Mesh(new THREE.CircleGeometry(.075,28),dm),new THREE.Mesh(new THREE.RingGeometry(.075,.095,28),rm)].forEach(q=>{q.rotation.x=Math.PI/2;q.position.set(x,c.h-.004,z);q.raycast=()=>{};rg.add(q)})}
-(c.w>6?[-c.w/4,c.w/4]:[0]).forEach(px=>{const l=new THREE.PointLight(0xffe4bd,0,Math.max(c.w,c.d)*1.4,1.6);l.position.set(px,c.h-.4,0);rg.add(l);zCL.push(l)});
+const spots=(Array.isArray(c.lights)&&c.lights.length)?c.lights.map(p=>({x:cl(+p.x,-c.w/2+.25,c.w/2-.25),z:cl(+p.z,-c.d/2+.25,c.d/2-.25)})):(c.w>6?[{x:-c.w/4,z:0},{x:c.w/4,z:0}]:[{x:0,z:0}]);
+const bulbM=new THREE.MeshStandardMaterial({color:'#fff8ee',emissive:'#ffe2b0',emissiveIntensity:1.15,roughness:.22});
+spots.forEach(p=>{const l=new THREE.PointLight(0xffe4bd,0,Math.max(c.w,c.d)*1.4,1.6);l.position.set(p.x,c.h-.4,p.z);rg.add(l);zCL.push(l);const b=new THREE.Mesh(new THREE.SphereGeometry(.05,16,12),bulbM);b.position.set(p.x,c.h-.07,p.z);b.castShadow=false;b.raycast=()=>{};rg.add(b)});
 const R=Math.hypot(c.w,c.d)/2+1.2,s=dl.shadow.camera;s.left=s.bottom=-R;s.right=s.top=R;s.updateProjectionMatrix();
 sc.add(rg);DD().items.forEach(o=>{fit(o);place(o)});light()}
 
@@ -5666,11 +5748,11 @@ function ui0(){const q=s=>box.querySelector(s),c=DD().cfg;q('#ixrn').textContent
 function loop(tk){if(tk!==LT||!R3)return;if(!box||!box.isConnected){kill();return}requestAnimationFrame(()=>loop(tk));try{wl.forEach(w=>{const v=cam.position,d=(v.x-w.m.position.x)*w.n[4]+(v.z-w.m.position.z)*w.n[5];w.m.material.opacity=d>.1?.1:1;w.m.material.depthWrite=d<=.1;w.b.material.opacity=w.m.material.opacity;w.b.material.depthWrite=d<=.1});ctl.update();if(selH)selH.update();R3.render(sc,cam)}catch(e){if(!loop.er){loop.er=1;try{hud('3D view problem: '+e.message)}catch(x){}}}}
 function kill(){LT++;if(R3){R3.dispose();if(R3.domElement.parentNode)R3.domElement.remove()}R3=null;ctl=null;sc=null;rg=null;objs=new Map();selH=null;drag=null}
 function init3(){const h=box.querySelector('#ix3');R3=new THREE.WebGLRenderer({antialias:true});R3.shadowMap.enabled=true;R3.shadowMap.type=THREE.PCFSoftShadowMap;R3.outputEncoding=THREE.sRGBEncoding;R3.toneMapping=THREE.ACESFilmicToneMapping;R3.toneMappingExposure=1.2;R3.setPixelRatio(Math.min(2,devicePixelRatio||1));h.appendChild(R3.domElement);R3.domElement.style.cssText='display:block;width:100%;height:100%;touch-action:none';
-sc=new THREE.Scene();cam=new THREE.PerspectiveCamera(50,1,.1,100);hemi=new THREE.HemisphereLight(0xf2f6ff,0x8a7f72,.62);dl=new THREE.DirectionalLight(0xfff0d8,1.9);dl.position.set(4,8,5);dl.castShadow=true;dl.shadow.mapSize.set(window.innerWidth>800?4096:2048,window.innerWidth>800?4096:2048);dl.shadow.bias=-.0004;dl.shadow.normalBias=.03;dl.shadow.radius=4;const s=dl.shadow.camera;s.left=s.bottom=-8;s.right=s.top=8;s.far=30;sc.add(hemi,dl);{const pm=new THREE.PMREMGenerator(R3),es=new THREE.Scene();es.background=new THREE.Color(0xbfd8f2);[[0,6,0,8,.2,8,6],[-6,2,0,.2,5,6,3],[6,2,2,.2,5,5,3],[0,-4,0,30,.2,30,.32],[0,2,-6,7,3.5,.2,4.5]].forEach(a=>{const m=new THREE.Mesh(new THREE.BoxGeometry(a[3],a[4],a[5]),new THREE.MeshBasicMaterial({color:new THREE.Color(1,1,1).multiplyScalar(a[6])}));m.position.set(a[0],a[1],a[2]);es.add(m)});sc.environment=pm.fromScene(es,.04).texture;pm.dispose()}
+sc=new THREE.Scene();sc.background=new THREE.Color(0xe7eef8);cam=new THREE.PerspectiveCamera(50,1,.1,100);hemi=new THREE.HemisphereLight(0xf2f6ff,0x8a7f72,.62);dl=new THREE.DirectionalLight(0xfff0d8,1.9);dl.position.set(4,8,5);dl.castShadow=true;dl.shadow.mapSize.set(window.innerWidth>800?4096:2048,window.innerWidth>800?4096:2048);dl.shadow.bias=-.0004;dl.shadow.normalBias=.03;dl.shadow.radius=4;const s=dl.shadow.camera;s.left=s.bottom=-8;s.right=s.top=8;s.far=30;sc.add(hemi,dl);{const fl2=new THREE.DirectionalLight(0xfff4e4,.55);fl2.position.set(-6,3.4,-4);sc.add(fl2)}{const pm=new THREE.PMREMGenerator(R3),es=new THREE.Scene();es.background=new THREE.Color(0xbfd8f2);[[0,6,0,8,.2,8,6],[-6,2,0,.2,5,6,3],[6,2,2,.2,5,5,3],[0,-4,0,30,.2,30,.32],[0,2,-6,7,3.5,.2,4.5]].forEach(a=>{const m=new THREE.Mesh(new THREE.BoxGeometry(a[3],a[4],a[5]),new THREE.MeshBasicMaterial({color:new THREE.Color(1,1,1).multiplyScalar(a[6])}));m.position.set(a[0],a[1],a[2]);es.add(m)});sc.environment=pm.fromScene(es,.04).texture;pm.dispose()}
 const dom=R3.domElement;dom.addEventListener('pointerdown',pd);dom.addEventListener('pointermove',pm);dom.addEventListener('pointerup',pu);dom.addEventListener('pointercancel',pu);
 ctl=new THREE.OrbitControls(cam,dom);ctl.enableDamping=true;ctl.maxPolarAngle=Math.PI/2.02;ctl.minDistance=2;ctl.maxDistance=22;
 ['touchstart','touchmove'].forEach(v=>h.addEventListener(v,e=>e.stopPropagation(),{passive:true}));
-if(window.ResizeObserver)new ResizeObserver(()=>{const w=h.clientWidth,hh=h.clientHeight;if(R3&&w&&hh){R3.setSize(w,hh);cam.aspect=w/hh;cam.updateProjectionMatrix()}}).observe(h);loop(++LT)}
+if(window.ResizeObserver)new ResizeObserver(()=>{const w=h.clientWidth,hh=h.clientHeight;if(R3&&w&&hh){R3.setSize(w,hh,false);cam.aspect=w/hh;cam.updateProjectionMatrix()}}).observe(h);loop(++LT)}
 function view(top){const c=DD().cfg;cam.fov=50;cam.updateProjectionMatrix();ctl.minDistance=2;ctl.maxDistance=22;ctl.enableZoom=true;ctl.enablePan=true;ctl.rotateSpeed=1;ctl.minPolarAngle=0;ctl.maxPolarAngle=Math.PI/2.02;if(top){cam.position.set(0,Math.max(c.w,c.d)*1.5,.01);ctl.target.set(0,0,0)}else{cam.position.set(c.w*.8,c.h*1.2,c.d*1.1);ctl.target.set(0,1,0)}ctl.update()}
 function enter(ri){agentMount();tourEnter();PL.room=ri;if(!D[ri]){const r=RM[ri];D[ri]={cfg:{w:r[2],d:r[3],h:r[8]||2.8,wall:r[4],floor:r[5],ft:r[6],light:0,ph:r[9]||'',pho:r[9]?1:0},items:[{id:++PL.uid,k:KD,x:0,z:r[3]/2,r:180,s:1,c:F[KD][3],fr:1}].concat(r[9]?[]:[{id:++PL.uid,k:KW,x:0,z:-r[3]/2,r:0,s:1,c:F[KW][3],fr:1}])}}
 const q=s=>box.querySelector(s);q('#ixrooms').hidden=true;q('#ixed').hidden=false;kill();init3();DD().items.forEach(put);bld();ui0();view(false);PL.sel=-1;selUI();hud('Welcome to your '+RM[ri][0].toLowerCase()+'! Add pieces below.');calc()}
@@ -5733,19 +5815,21 @@ function aiPrompt(w,d,uw,ud){const L=F.map((f,k)=>[f,k]).filter(x=>x[0][2]>0).ma
 return 'Rebuild the room in the attached photo as a simple 3D scene so a person can feel they are standing in it. Reply with ONLY one JSON object and no other text.\n'+
 'Coordinates are in metres. The room is a box centred on 0,0. The camera that took the photo is at the front, looking at the back wall (z = -depth/2). x grows to the right and z grows towards the camera. Rotation is in degrees: 0 = the piece faces the camera, 90 = faces right, 180 = faces the back wall, 270 = faces left.\n'+
 'Estimate real sizes from familiar objects (a door is about 2.05 m high, a sofa seat about 0.45 m high). '+((uw||ud)?'The customer says the room is about '+(uw?w+' m wide ':'')+(ud?d+' m deep':'')+'. ':'')+'\n'+
-'Use only these piece kinds, with default size width x depth x height: '+L+'. Choose the closest kind for anything else and skip what fits none (curtains, cables, small decor). Include every large piece you can see, keep positions, sizes and colors as close to the photo as you can, and keep pieces inside the room and not overlapping.\n'+
+'Use only these piece kinds, with default size width x depth x height: '+L+'. Choose the closest kind for anything else and skip what fits none (curtains, cables, small decor). Study furniture, doors, windows, colours, texture, electronics, walls, floor, ceiling and lighting. Include every large piece you can see, keep positions, sizes and colors as close to the photo as you can, and keep pieces inside the room and not overlapping.\n'+
 'Wall pieces (Window, Door, Picture) use "wall" (back, front, left or right) and "offset": metres along that wall from its centre (back and front: positive is right; left and right: it is the z position, positive towards the camera). Give their "w" and "h" too.\n'+
-'JSON shape: {"room":{"width":4.5,"depth":4,"height":2.7,"wall_color":"#e8e2d6","wall_colors":{"back":"#e8e2d6","left":"#e8e2d6","right":"#e8e2d6"},"floor_color":"#b98b5e","floor_type":"wood"},"items":[{"kind":"Sofa","x":0,"z":-1,"rotation":0,"color":"#5b7db1","w":2.1,"d":0.9,"h":0.85},{"kind":"Window","wall":"back","offset":0,"color":"#f5f5f5","w":1.2,"h":1.2}]}. floor_type is one of wood, tile, carpet, plain. Leave out wall_colors entries that match wall_color. Use at most 30 items.'}
+'JSON shape: {"room":{"width":4.5,"depth":4,"height":2.7,"wall_color":"#e8e2d6","wall_colors":{"back":"#e8e2d6","left":"#e8e2d6","right":"#e8e2d6"},"floor_color":"#b98b5e","floor_type":"wood"},"items":[{"kind":"Sofa","x":0,"z":-1,"rotation":0,"color":"#5b7db1","w":2.1,"d":0.9,"h":0.85},{"kind":"Window","wall":"back","offset":0,"color":"#f5f5f5","w":1.2,"h":1.2}]}. floor_type is one of wood, tile, carpet, plain. Leave out wall_colors entries that match wall_color. Use at most 30 items. Also set ceiling_color, and lights as an array of {x,z} for ceiling lamps. A television is kind TV unit. A standing lamp is Floor lamp.'}
 function aiBuild(j,nm,w0,d0,uw,ud){const R=j.room||{},hx=v=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v)?v:null,num=(v,a,b,df)=>cl(v!==null&&v!==''&&isFinite(+v)?+v:df,a,b);
 const w=uw?w0:Math.round(num(R.width,3,12,w0)*10)/10,d=ud?d0:Math.round(num(R.depth,3,12,d0)*10)/10,h=Math.round(num(R.height,2.4,4,2.8)*10)/10,wall=hx(R.wall_color)||SP.wall,fl=hx(R.floor_color)||SP.floor,ft=['wood','tile','carpet','plain'].indexOf(R.floor_type)>=0?R.floor_type:'wood',wc=R.wall_colors||{};
+const ceil=hx(R.ceiling_color)||'#f4f1ea',lights=Array.isArray(R.lights)?R.lights.filter(p=>p&&isFinite(+p.x)&&isFinite(+p.z)).slice(0,6).map(p=>({x:Math.round(+p.x*100)/100,z:Math.round(+p.z*100)/100})):null;
 RM.push([nm,'📷',w,d,wall,fl,ft,Math.min(150000,Math.max(25000,Math.round(w*d*1.5)*1000)),h,SP.url]);const ri=RM.length-1;
-D[ri]={cfg:{w:w,d:d,h:h,wall:wall,floor:fl,ft:ft,light:0,ph:SP.url,pho:0,wc:[hx(wc.back),hx(wc.front),hx(wc.left),hx(wc.right)]},items:[]};PL.room=ri;
+D[ri]={cfg:{w:w,d:d,h:h,wall:wall,floor:fl,ft:ft,light:0,ph:SP.url,pho:0,wc:[hx(wc.back),hx(wc.front),hx(wc.left),hx(wc.right)],ceil:ceil,lights:lights&&lights.length?lights:null},items:[]};PL.room=ri;
 (Array.isArray(j.items)?j.items:[]).slice(0,40).forEach(it=>{const k=F.findIndex(f=>f[2]>0&&f[0].toLowerCase()===String(it.kind||'').toLowerCase());if(k<0)return;const f=F[k],dm=dimsOf(k),o={id:++PL.uid,k:k,x:0,z:0,r:0,s:1,sx:1,sy:1,a:'',f:0,c:hx(it.color)||f[3],fr:(f[0]==='Door'||f[0]==='Window')?1:0};
 if(f[5]){const of=num(it.offset,-20,20,0),wl=it.wall;if(wl==='front'){o.x=of;o.z=d/2}else if(wl==='left'){o.x=-w/2;o.z=of}else if(wl==='right'){o.x=w/2;o.z=of}else{o.x=of;o.z=-d/2}if(+it.w>0)o.sx=cl(it.w/dm.x,.4,2.5);if(+it.h>0)o.sy=cl(it.h/dm.y,.4,2.5)}
 else{o.x=num(it.x,-20,20,0);o.z=num(it.z,-20,20,0);o.r=((+it.rotation||0)%360+360)%360;const rw=+it.w>0?it.w/dm.x:1,rd=+it.d>0?it.d/dm.z:1,rh=+it.h>0?it.h/dm.y:1;o.s=cl(rd,.5,2.2);o.sx=cl(rw/o.s,.4,2.5);o.sy=cl(rh/o.s,.4,2.5)}
-fit(o);D[ri].items.push(o)});return ri}
+fit(o);if(it.skin)o.skin=it.skin;D[ri].items.push(o)});return ri}
+function stampSkins(ri,scan){const dd=D[ri];if(!dd||!scan||!Array.isArray(scan.items))return;const pool=scan.items.filter(it=>it&&it.skin);dd.items.forEach(o=>{if(o.skin||F[o.k][5])return;const kind=F[o.k][0];let bi=-1,bd=2.8;pool.forEach((it,i)=>{if(it.used||it.kind!==kind)return;const dx=(+it.x||0)-o.x,dz=(+it.z||0)-o.z,d=dx*dx+dz*dz;if(d<bd){bd=d;bi=i}});if(bi>=0){o.skin=pool[bi].skin;pool[bi].used=true}});dd.items.forEach(o=>{if(!o.skin)return;const g=objs.get(o.id);if(g){sc.remove(g);objs.delete(o.id)}put(o)})}
 function localScan(cv,W,Dp){
-const G=96,H=Math.max(48,Math.round(G*cv.height/cv.width)),t=document.createElement('canvas');t.width=G;t.height=H;const tx=t.getContext('2d',{willReadFrequently:true});tx.drawImage(cv,0,0,G,H);const px=tx.getImageData(0,0,G,H).data;
+const G=128,H=Math.max(64,Math.round(G*cv.height/cv.width)),t=document.createElement('canvas');t.width=G;t.height=H;const tx=t.getContext('2d',{willReadFrequently:true});tx.drawImage(cv,0,0,G,H);const px=tx.getImageData(0,0,G,H).data;
 const P=(x,y)=>{const i=(y*G+x)*4;return[px[i],px[i+1],px[i+2]]},LU=c=>.299*c[0]+.587*c[1]+.114*c[2],dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
 const med=(x0,y0,x1,y1)=>{const a=[[],[],[]];for(let y=Math.floor(H*y0);y<Math.ceil(H*y1);y++)for(let x=Math.floor(G*x0);x<Math.ceil(G*x1);x++){const c=P(x,y);for(let k=0;k<3;k++)a[k].push(c[k])}return a.map(v=>{v.sort((p,q)=>p-q);return v[v.length>>1]||128})};
 const wB=med(.3,.08,.7,.3),wL=med(.0,.08,.1,.3),wR=med(.9,.08,1,.3),fC=med(.2,.88,.8,1);
@@ -5754,14 +5838,16 @@ let gx=0,gy=0,n=0;for(let y=Math.floor(H*.86);y<H-1;y++)for(let x=0;x<G-1;x++){c
 const mask=new Uint8Array(G*H);for(let y=Math.floor(H*.1);y<H;y++)for(let x=0;x<G;x++){const c=P(x,y),ref=x<G*.1?wL:x>G*.9?wR:wB;mask[y*G+x]=y<fy?(dist(c,ref)>38?1:0):(dist(c,fC)>44&&dist(c,ref)>44?1:0)}
 const seen=new Uint8Array(G*H),bl=[];for(let s=0;s<G*H;s++){if(!mask[s]||seen[s])continue;const st=[s];seen[s]=1;let x0=G,y0=H,x1=0,y1=0,cnt=0,r=0,g=0,b=0;while(st.length){const p=st.pop(),x=p%G,y=(p/G)|0;cnt++;x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);const c=P(x,y);r+=c[0];g+=c[1];b+=c[2];[[1,0],[-1,0],[0,1],[0,-1]].forEach(d=>{const nx=x+d[0],ny=y+d[1];if(nx<0||ny<0||nx>=G||ny>=H)return;const q=ny*G+nx;if(mask[q]&&!seen[q]){seen[q]=1;st.push(q)}})}if(cnt>G*H*.004)bl.push({x0:x0,y0:y0,x1:x1,y1:y1,cnt:cnt,c:[r/cnt,g/cnt,b/cnt]})}
 bl.sort((a,b)=>b.cnt-a.cnt);const fyN=fy/H,items=[],cl2=(v,a,b)=>Math.max(a,Math.min(b,v));
+const skinCanvas=o=>{try{const sx=cv.width/G,sy=cv.height/H,x0=Math.max(0,Math.floor(o.x0*sx)),y0=Math.max(0,Math.floor(o.y0*sy)),ww=Math.max(2,Math.min(cv.width-x0,Math.ceil((o.x1-o.x0+1)*sx))),hh=Math.max(2,Math.min(cv.height-y0,Math.ceil((o.y1-o.y0+1)*sy))),c=document.createElement('canvas'),s=Math.min(1,360/Math.max(ww,hh));c.width=Math.max(2,Math.round(ww*s));c.height=Math.max(2,Math.round(hh*s));const gx=c.getContext('2d');gx.imageSmoothingQuality='high';gx.drawImage(cv,x0,y0,ww,hh,0,0,c.width,c.height);return c}catch(e){return null}};
 bl.slice(0,14).forEach(o=>{const bw=(o.x1-o.x0+1)/G,bh=(o.y1-o.y0+1)/H,fill=o.cnt/((o.x1-o.x0+1)*(o.y1-o.y0+1)),cx=(o.x0+o.x1+1)/2/G,top=o.y0/H,bot=(o.y1+1)/H,lum=LU(o.c),col=hexc(o.c),tt=cl2((bot-fyN)/(1-fyN),0,1),vw=W*(1-.35*tt),wm=bw*vw,hm=bh*2.7*(1-.3*tt)*1.1,floor=bot>fyN-.03&&bot>.6,asp=bw/bh;let k=null;
 if(o.c[1]>o.c[0]+10&&o.c[1]>o.c[2]+10&&bh>.1)k='Plant';
 else if(!floor){if(lum>170&&fill>.7&&bw>.05)k='Window';else if(fill>.55)k='Picture'}
 else if(bh>.38&&asp<.55&&bw<.15&&fill>.72)k='Door';
 else if(bh>.38&&bw>=.12&&bw<.4&&asp<1)k=fill<.72?'Bookshelf':'Wardrobe';
-else if(bw<.05&&bh>.3)k='Floor lamp';
+else if(bw<.1&&bh>.22&&lum>130)k='Floor lamp';
 else if(lum<70&&fill>.75&&asp>1.4&&asp<2.6&&top<.6)k='Picture';
 else if(bh<.2&&bw>.25&&top>fyN+.08)k='Rug';
+else if(lum<100&&asp>1.35&&asp<3.2&&bh>=.08&&bh<.28&&bw>.16)k='TV unit';
 else if(bw>.38&&bh>.22&&lum>120)k='Bed';
 else if(bw>.25&&bh>.15&&bh<.5&&asp>1.4)k='Sofa';
 else if(bw>.2&&bh<.3)k=lum<110?'Desk':'Dining table';
@@ -5771,9 +5857,11 @@ else if(bw>.14)k='Armchair';
 if(!k)return;
 if(k==='Window'||k==='Picture'||k==='Door'){const side=cx<.06?'left':cx>.94?'right':'back',it={kind:k,wall:side,offset:side==='back'?(cx-.5)*W:0,w:cl2(wm,k==='Door'?.8:.3,k==='Window'?2.2:k==='Door'?1.1:1.6),h:cl2(hm,k==='Door'?2:.3,k==='Door'?2.1:k==='Window'?1.8:1.2)};if(k!=='Window')it.color=col;items.push(it);return}
 let x=(cx-.5)*W*(1-.35*tt),z=-Dp/2+tt*Dp*.85+.45,rot=0;if(cx<.12&&bw>.15){x=-W/2+.55;rot=90}else if(cx>.88&&bw>.15){x=W/2-.55;rot=270}
-x=cl2(x,-W/2+.4,W/2-.4);z=cl2(z,-Dp/2+.4,Dp/2-.5);const it={kind:k,x:x,z:z,rotation:rot,w:cl2(wm,.3,W*.7),h:cl2(hm,.3,2.2)};if(k!=='Plant')it.color=col;items.push(it)});
+x=cl2(x,-W/2+.4,W/2-.4);z=cl2(z,-Dp/2+.4,Dp/2-.5);const it={kind:k,x:x,z:z,rotation:rot,w:cl2(wm,.3,W*.7),h:cl2(hm,.3,2.2)};if(k!=='Plant')it.color=col;{const sk=skinCanvas(o);if(sk)it.skin=sk}items.push(it)});
 const wc={};if(dist(wL,wB)>16)wc.left=hexc(wL);if(dist(wR,wB)>16)wc.right=hexc(wR);
-return{room:{width:W,depth:Dp,height:2.7,wall_color:hexc(wB),floor_color:hexc(fC),floor_type:ft,wall_colors:wc},items:items}}
+const cC=med(.28,.0,.72,.08),cLum=LU(cC),lights=[],seenL=new Uint8Array(G*H);
+for(let y=1;y<Math.floor(H*.2);y++)for(let x=1;x<G-1;x++){const i=y*G+x;if(seenL[i])continue;if(LU(P(x,y))<Math.max(198,cLum+36))continue;const st=[[x,y]];seenL[i]=1;let cnt=0,sx=0;while(st.length){const q=st.pop();cnt++;sx+=q[0];[[1,0],[-1,0],[0,1],[0,-1]].forEach(dd=>{const nx=q[0]+dd[0],ny=q[1]+dd[1];if(nx<1||ny<1||nx>=G-1||ny>=H*.2)return;const p2=ny*G+nx;if(seenL[p2]||LU(P(nx,ny))<Math.max(198,cLum+36))return;seenL[p2]=1;st.push([nx,ny])})}if(cnt>8&&cnt<G*H*.012){const lx=(sx/cnt/G-.5)*W;if(!lights.some(q=>Math.abs(q.x-lx)<.55))lights.push({x:Math.round(lx*100)/100,z:Math.round((-Dp/2+.4)*100)/100})}}
+return{room:{width:W,depth:Dp,height:2.7,wall_color:hexc(wB),floor_color:hexc(fC),floor_type:ft,wall_colors:wc,ceiling_color:dist(cC,wB)>18?hexc(cC):'#f4f1ea',lights:lights.slice(0,6)},items:items}}
 const AG={busy:0,h:[]};
 const AGC={white:'#ffffff',black:'#1a1a1a',gray:'#9a9a9a',grey:'#9a9a9a',red:'#c0392b',blue:'#3b6fd4',navy:'#1f2f5c',green:'#4f9a5b',sage:'#9caf88',yellow:'#e8c44a',orange:'#e08a3c',brown:'#7a5230',beige:'#d8c8a8',cream:'#f1e8d2',pink:'#e79ab5',purple:'#7d5ba6',gold:'#c9a24a',teal:'#2f8f8f'};
 const KS=[[/coffee table|center table/,'Coffee table'],[/sofa|couch|settee/,'Sofa'],[/arm ?chair|recliner/,'Armchair'],[/\bbed\b/,'Bed'],[/dining|table/,'Dining table'],[/chair|stool/,'Chair'],[/desk/,'Desk'],[/wardrobe|closet|cupboard/,'Wardrobe'],[/\btv\b|television/,'TV unit'],[/book ?shelf|shelf|shelves/,'Bookshelf'],[/plant|flower/,'Plant'],[/lamp/,'Floor lamp'],[/\brug\b|carpet|\bmat\b/,'Rug'],[/kitchen|counter/,'Kitchen counter'],[/fridge|refrigerator/,'Fridge'],[/bath ?tub/,'Bathtub'],[/toilet/,'Toilet'],[/window/,'Window'],[/\bdoor\b/,'Door'],[/picture|painting|frame|\bart\b/,'Picture']];
@@ -5829,7 +5917,7 @@ function tkSample(){RM.push(['Living room','🛋️',5,4,'#e8e2d6','#b98b5e','wo
 const TS=[
 {ph:'A',t:'Name and measure your space',x:'Type a name for your space, then its width, depth and height in metres. The designer picks an icon from the name.',el:()=>tkq('#ixnm').closest('.ixf')},
 {ph:'A',t:'Add it',x:'Tap Add this space. Your room then appears in the list underneath.',el:()=>tkq('#ixadd')},
-{ph:'A',t:'Or start from a photo',x:'Have a room you love? Add its photo here and press Build. The wall and floor colors, windows, doors and main furniture are rebuilt in 3D and you start out standing inside.',el:()=>{const d=tkd('#ixql');if(d)d.open=true;return d}},
+{ph:'A',t:'Or start from a photo',x:'Have a room you love? Add its photo here and press Build. Furniture, doors, windows, colours, texture, electronics, walls, floor, ceiling and lighting are read from the photo and rebuilt in 3D. You start out standing inside.',el:()=>{const d=tkd('#ixql');if(d)d.open=true;return d}},
 {ph:'A',t:'Open your room',w:1,x:'Tap a room in this list to open it in 3D. The guide continues inside the room. No room yet? Let us make a sample one for you.',el:()=>tkq('#ixrg'),act:['Make a sample room',tkSample]},
 {ph:'B',t:'Your room in 3D',x:'Drag empty space to look around. Scroll or pinch to zoom. Drag any piece to move it across the floor.',el:()=>tkq('#ix3')},
 {ph:'B',t:'Change your view',x:'All rooms takes you back to your list. 3D view and Top view help you plan the layout. Stand inside lets you walk around at eye level. Clear room empties it.',el:()=>tkq('#ixed .ixbtns')},
@@ -5865,13 +5953,17 @@ function tourMount(){const o=tkq('#ixopen'),w=tkq('#ixwrap');if(!o||!w)return;co
 function fpv(){if(!cam||!ctl||PL.room<0)return;const c=DD().cfg,z=c.d/2-.6;cam.fov=72;cam.updateProjectionMatrix();ctl.minDistance=.02;ctl.maxDistance=.02;ctl.enableZoom=false;ctl.enablePan=false;ctl.rotateSpeed=-.45;ctl.minPolarAngle=.8;ctl.maxPolarAngle=2.4;cam.position.set(0,1.55,z+.02);ctl.target.set(0,1.55,z);ctl.update()}
 async function mkroom(){const q=s=>box.querySelector(s),m=t=>{q('#ixqs').textContent=t};if(SP.busy)return;if(!SP.url){m('Drop, paste or choose a photo of your space first.');return}const nm=(q('#ixqn').value.trim().replace(/\s+/g,' ')||'My space').slice(0,24),w=parseFloat(q('#ixqw').value),d=parseFloat(q('#ixqd').value);if(!(w>=3&&w<=12)||!(d>=3&&d<=12)){m('Width and depth must each be between 3 and 12 metres.');return}
 const uw=q('#ixqw').value!==SP.aw,ud=q('#ixqd').value!=='4',done=ri=>{SP.url=null;SP.blob=null;q('#ixqv').hidden=true;q('#ixqn').value='';m('')},
-plain=msg=>{let li=-1;try{if(SP.cv){const j=localScan(SP.cv,w,d);li=aiBuild(j,nm,w,d,uw,ud);if(li>=0){const n=D[li].items.length;done();enter(li);fpv();hud('Built from your photo right on this device: wall and floor colors, floor type and '+n+' piece'+(n===1?'':'s')+' found. Click any piece to recolor, move, resize or delete it, or add more from the catalog.');return}}}catch(e){li=-1}RM.push([nm,'📷',Math.round(w*10)/10,Math.round(d*10)/10,SP.wall,SP.floor,'wood',Math.min(150000,Math.max(25000,Math.round(w*d*1.5)*1000)),2.8,SP.url]);const ri=RM.length-1;done();enter(ri);if(msg)hud(msg)};
-if(SP.smp&&SP.img&&SP.blob){SP.busy=1;const btn=q('[data-a="mkroom"]');btn.disabled=true;m('Claude is studying your photo and building the room. This can take up to a minute.');let ri=-1,err=null;try{const j=await SP.smp.json(aiPrompt(w,d,uw,ud),{images:[SP.blob],modelTier:'default',cache:false});if(!j||typeof j!=='object')throw{code:'bad_answer'};ri=aiBuild(j,nm,w,d,uw,ud)}catch(e){err=e}
-SP.busy=0;btn.disabled=false;if(ri>=0){done();enter(ri);fpv();hud('Built from your photo. You are standing inside it: drag to look around, click anything to change it, or press 3D view to step back.')}else plain('Claude could not rebuild this photo'+(err&&err.code?' ('+err.code+')':'')+', so the photo is shown on the back wall instead. You can still add and change anything.')}
+studied=n=>'Studied your photo and rebuilt it as a realistic 3D room: furniture, doors, windows, colours, texture, electronics, walls, floor, ceiling and lighting'+(n?' ('+n+' piece'+(n===1?'':'s')+' placed)':'')+'. Drag to look around. Click anything to change it.';
+m('Studying the photo: furniture, doors, windows, colours, texture, electronics, walls, floor, ceiling and lighting.');
+await new Promise(r=>setTimeout(r,40));
+let scan=null;try{if(SP.cv)scan=localScan(SP.cv,w,d)}catch(e){scan=null}
+plain=msg=>{let li=-1;try{if(scan){li=aiBuild(scan,nm,w,d,uw,ud);if(li>=0){const n=D[li].items.length;done();enter(li);fpv();hud(studied(n));return}}}catch(e){li=-1}RM.push([nm,'📷',Math.round(w*10)/10,Math.round(d*10)/10,SP.wall,SP.floor,'wood',Math.min(150000,Math.max(25000,Math.round(w*d*1.5)*1000)),2.8,SP.url]);const ri=RM.length-1;done();enter(ri);if(msg)hud(msg)};
+if(SP.smp&&SP.img&&SP.blob){SP.busy=1;const btn=q('[data-a="mkroom"]');btn.disabled=true;m('Studying the photo and building a realistic 3D room. This can take up to a minute.');let ri=-1,err=null;try{const j=await SP.smp.json(aiPrompt(w,d,uw,ud),{images:[SP.blob],modelTier:'default',cache:false});if(!j||typeof j!=='object')throw{code:'bad_answer'};if(scan&&scan.room){j.room=j.room||{};if(!j.room.ceiling_color)j.room.ceiling_color=scan.room.ceiling_color;if((!j.room.lights||!j.room.lights.length)&&scan.room.lights)j.room.lights=scan.room.lights;if(!j.room.floor_type)j.room.floor_type=scan.room.floor_type}ri=aiBuild(j,nm,w,d,uw,ud)}catch(e){err=e}
+SP.busy=0;btn.disabled=false;if(ri>=0){done();enter(ri);try{if(scan)stampSkins(ri,scan)}catch(e){}fpv();hud(studied(D[ri].items.length))}else plain('The photo could not be fully read'+(err&&err.code?' ('+err.code+')':'')+', so it is shown on the back wall instead. You can still add and change anything.')}
 else plain()}
-function mount(){const col=pg.querySelector('.cols > div');if(!col)return;box=document.createElement('section');box.className='ixg';
+function mount(){const col=pg.querySelector('.cols > div');if(!col)return;col.style.minWidth='0';col.style.maxWidth='100%';box=document.createElement('section');box.className='ixg';
 const inp=(l,t,id,ex)=>'<label>'+l+'<input type="'+t+'" id="'+id+'"'+(ex||'')+'></label>';
-box.innerHTML='<button type="button" id="ixopen" aria-expanded="false" style="display:block;width:100%;padding:18px 20px;border-radius:14px;background:var(--amber);color:var(--on);font:700 17px system-ui,sans-serif;cursor:pointer;box-shadow:0 6px 20px rgba(65,105,225,.35)">🏟️ Design your space in 3D</button><div id="ixwrap" hidden style="margin-top:14px"><p class="sm">Step 1: name your space and type its measurements, then add it. Step 2: click it to open it in 3D. Step 3: customize everything: size, walls, floor, lighting, furniture, colors and layout.</p><div id="ixgame"><div id="ixrooms"><div class="ixf">'+inp('Name your space','text','ixnm',' maxlength="24" placeholder="e.g. Living room, Gym, Bakery" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit"')+inp('Width (m)','number','ixnw',' min="3" max="12" step="0.1" placeholder="3 to 12" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit"')+inp('Depth (m)','number','ixnd',' min="3" max="12" step="0.1" placeholder="3 to 12" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit"')+inp('Height (m)','number','ixnh',' min="2.4" max="4" step="0.1" value="2.8" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit"')+'</div><div class="ixbtns" style="margin:10px 0"><button type="button" id="ixadd">➕ Add this space</button><span id="ixem" title="Emoji picked from your name" style="font-size:28px;margin-left:10px">🏠</span></div><p class="sm" id="ixerr" role="status"></p><details style="margin:10px 0"><summary>📷 Or start from a photo of a furnished space</summary><p class="sm">Drop, paste or choose a photo of a room you like. Claude studies it and rebuilds the room in 3D, with the same layout, wall and floor colors, windows, doors and furniture, and you start out standing inside it. Then change anything you want. Width and depth are optional: type them if you know them, otherwise Claude estimates them from the photo. If Claude cannot be reached, the photo becomes the back wall of the room instead.</p><label class="ixup" id="ixql" style="padding:12px">📷 Drop, paste or tap to choose a photo of the space<input type="file" id="ixqp" accept="image/*"></label><img class="ixth" id="ixqv" alt="Space photo" hidden><p class="sm" id="ixqs" role="status"></p><div class="ixf">'+inp('Name this space','text','ixqn',' maxlength="24" placeholder="e.g. My living room"')+inp('Width (m)','number','ixqw',' min="3" max="12" step="0.1" value="4.5"')+inp('Depth (m)','number','ixqd',' min="3" max="12" step="0.1" value="4"')+'</div><div class="ixbtns" style="margin-top:10px"><button type="button" data-a="mkroom">✨ Build this room in 3D</button></div></details><p class="sm"><b>Click the space you want to design</b></p><div class="ixrms" id="ixrg"></div></div>'
+box.innerHTML='<button type="button" id="ixopen" aria-expanded="false" style="display:block;width:100%;padding:18px 20px;border-radius:14px;background:var(--amber);color:var(--on);font:700 17px system-ui,sans-serif;cursor:pointer;box-shadow:0 6px 20px rgba(65,105,225,.35)">🏟️ Design your space in 3D</button><div id="ixwrap" hidden style="margin-top:14px"><p class="sm">Step 1: name your space and type its measurements, then add it. Step 2: click it to open it in 3D. Step 3: customize everything: size, walls, floor, lighting, furniture, colors and layout.</p><div id="ixgame"><div id="ixrooms"><div class="ixf">'+inp('Name your space','text','ixnm',' maxlength="24" placeholder="e.g. Living room, Gym, Bakery" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit"')+inp('Width (m)','number','ixnw',' min="3" max="12" step="0.1" placeholder="3 to 12" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit"')+inp('Depth (m)','number','ixnd',' min="3" max="12" step="0.1" placeholder="3 to 12" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit"')+inp('Height (m)','number','ixnh',' min="2.4" max="4" step="0.1" value="2.8" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit"')+'</div><div class="ixbtns" style="margin:10px 0"><button type="button" id="ixadd">➕ Add this space</button><span id="ixem" title="Emoji picked from your name" style="font-size:28px;margin-left:10px">🏠</span></div><p class="sm" id="ixerr" role="status"></p><details style="margin:10px 0"><summary>📷 Or start from a photo of a furnished space</summary><p class="sm">Drop, paste or choose a photo of a room you like. The photo is studied piece by piece: furniture, doors, windows, colours, texture, electronics, walls, floor, ceiling and lighting, then rebuilt as a realistic 3D room. You start out standing inside it. Then change anything you want. Width and depth are optional: type them if you know them, otherwise Claude estimates them from the photo. If Claude cannot be reached, the photo becomes the back wall of the room instead.</p><label class="ixup" id="ixql" style="padding:12px">📷 Drop, paste or tap to choose a photo of the space<input type="file" id="ixqp" accept="image/*"></label><img class="ixth" id="ixqv" alt="Space photo" hidden><p class="sm" id="ixqs" role="status"></p><div class="ixf">'+inp('Name this space','text','ixqn',' maxlength="24" placeholder="e.g. My living room"')+inp('Width (m)','number','ixqw',' min="3" max="12" step="0.1" value="4.5"')+inp('Depth (m)','number','ixqd',' min="3" max="12" step="0.1" value="4"')+'</div><div class="ixbtns" style="margin-top:10px"><button type="button" data-a="mkroom">✨ Build this room in 3D</button></div></details><p class="sm"><b>Click the space you want to design</b></p><div class="ixrms" id="ixrg"></div></div>'
 +'<div id="ixed" hidden><div class="ixbtns"><button type="button" data-a="back">← All rooms</button><b id="ixrn"></b><button type="button" data-a="orb">3D view</button><button type="button" data-a="top">Top view</button><button type="button" data-a="fpv">👁 Stand inside</button><button type="button" data-a="reset">Clear room</button></div><div class="ix3" id="ix3"></div><p class="sm" id="ixmsg" role="status"></p>'
 +'<div class="ixsb" id="ixsel" hidden><b id="ixsn"></b><div class="ixf">'+inp('Color','color','ixic')+inp('Size','range','ixis',' min="0.5" max="2.2" step="0.05"')+inp('Details color','color','ixac')+'<label>Finish<select id="ixfn"><option value="0">Matte</option><option value="1">Satin</option><option value="2">Glossy</option><option value="3">Metallic</option></select></label>'+inp('Width','range','ixsx',' min="0.4" max="2.5" step="0.05"')+inp('Height','range','ixsy',' min="0.4" max="2.5" step="0.05"')+'<label id="ixirw">Rotation<input type="range" id="ixir" min="0" max="360" step="5"></label></div><div class="ixbtns" style="margin-top:10px"><button type="button" data-a="rst">↺ Reset piece</button><button type="button" data-a="dup">Duplicate</button><button type="button" data-a="del">🗑 Remove</button></div></div>'
 +'<div class="ixsb" id="ixsrf" hidden><b id="ixsrn"></b><div class="ixf" id="ixsrw">'+inp('This wall color','color','ixwq')+'</div><div class="ixf" id="ixsrfl">'+inp('Floor color','color','ixfq')+'<label>Floor type<select id="ixtq"><option value="wood">Wood</option><option value="tile">Tile</option><option value="carpet">Carpet</option><option value="plain">Plain</option></select></label></div><div class="ixbtns" style="margin-top:10px" id="ixsrb"><button type="button" data-a="wall-all">Paint all walls this color</button></div></div>'
@@ -5879,7 +5971,7 @@ box.innerHTML='<button type="button" id="ixopen" aria-expanded="false" style="di
 +'<div class="ixp" id="ixdock">'+F.map((f,k)=>'<button type="button" class="ixpb" draggable="true" data-k="'+k+'"><span>'+f[1]+'</span>'+f[0]+'<em>'+fm(f[2])+'</em></button>').join('')+'</div>'
 +'<details><summary>Room style, size and lighting</summary><div class="ixf">'+inp('Wall color','color','ixwc')+inp('Floor color','color','ixfc')+'<label>Floor type<select id="ixft"><option value="wood">Wood</option><option value="tile">Tile</option><option value="carpet">Carpet</option><option value="plain">Plain</option></select></label>'+inp('Width','range','ixw',' min="3" max="12" step="0.5"')+inp('Depth','range','ixd',' min="3" max="12" step="0.5"')+inp('Wall height','range','ixh',' min="2.4" max="4" step="0.1"')+inp('Day to night','range','ixl',' min="0" max="1" step="0.05"')+'<label><input type="checkbox" id="ixpo"> Show my photo on the back wall</label></div></details><button type="button" id="ixready" data-a="ready" hidden style="display:block;width:100%;margin:12px 0 4px;padding:18px 20px;border-radius:14px;background:#0f2a8a;color:#fff;font:800 17px system-ui,sans-serif;letter-spacing:1px;cursor:pointer;box-shadow:0 6px 20px rgba(15,42,138,.4)">YOUR SPACE IS READY</button></div></div></div>';
 col.insertBefore(box,col.firstChild);
-{const stage=box.querySelector('#ix3'),dock=box.querySelector('#ixdock');if(stage&&dock)stage.appendChild(dock);
+{const stage=box.querySelector('#ix3'),dock=box.querySelector('#ixdock');if(stage&&dock)stage.insertAdjacentElement('afterend',dock);
 let arm=null,ghost=null;
 const clearGhost=()=>{if(ghost){ghost.remove();ghost=null}};
 const onMove=e=>{if(!arm||e.pointerId!==arm.pid)return;const dx=e.clientX-arm.x,dy=e.clientY-arm.y;if(!arm.moved){if(Math.hypot(dx,dy)<8)return;const over=document.elementFromPoint(e.clientX,e.clientY);if(Math.abs(dx)>Math.abs(dy)&&dock.contains(over))return;arm.moved=true}
@@ -5942,7 +6034,7 @@ const NV='#0f2a8a',MU='#4f68c4',BL='#4169e1',nm=o=>F[o.k]?F[o.k][0]:'Custom piec
 ixRP.wdone=()=>{if(!box||PL.room<0||!DD())return;DD().cfg.wd=1;const b=box.querySelector('#ixready');if(b)b.hidden=false};
 const fade=v=>wl.forEach(w=>{const d=(v.position.x-w.m.position.x)*w.n[4]+(v.position.z-w.m.position.z)*w.n[5],a=d>.1?.1:1;w.m.material.opacity=a;w.m.material.depthWrite=d<=.1;w.b.material.opacity=a;w.b.material.depthWrite=d<=.1});
 function snap(cm,W,H,bg){const ob=sc.background;if(bg)sc.background=new THREE.Color(bg);try{R3.setPixelRatio(1);R3.setSize(W,H,false);fade(cm);R3.render(sc,cm);return R3.domElement.toDataURL('image/jpeg',.9)}finally{sc.background=ob}}
-function shots(){const h=box.querySelector('#ix3'),cw=h.clientWidth,ch=h.clientHeight,pr=R3.getPixelRatio();try{return shots0()}finally{R3.setPixelRatio(pr);R3.setSize(cw,ch);if(selH)selH.visible=true}}
+function shots(){const h=box.querySelector('#ix3'),cw=h.clientWidth,ch=h.clientHeight,pr=R3.getPixelRatio();try{return shots0()}finally{R3.setPixelRatio(pr);R3.setSize(cw,ch,false);if(selH)selH.visible=true}}
 function shots0(){const c=DD().cfg,hw=c.w/2+1,hd=c.d/2+1,PW=1100,PH=Math.round(PW*hd/hw),W=1000,H=667;
 if(selH)selH.visible=false;const op=new THREE.OrthographicCamera(-hw,hw,hd,-hd,.1,60);op.position.set(0,30,0);op.up.set(0,0,-1);op.lookAt(0,0,0);op.updateMatrixWorld();
 const S={plan:{u:snap(op,PW,PH,'#ffffff'),W:PW,H:PH,hw,hd}},pc=(f,p,t)=>{const k=new THREE.PerspectiveCamera(f,W/H,.1,100);k.position.set(...p);k.lookAt(...t);k.updateMatrixWorld();return k};
@@ -7326,6 +7418,10 @@ const tot=sm.querySelector('.tot');if(tot)tot.insertAdjacentHTML('beforebegin',h
       mode !== "order" &&
       camMode === "overview" &&
       now - lastInt > 6500;
+    if (mailDoor) {
+      mailOpenNow += (mailOpenTarget - mailOpenNow) * Math.min(1, dt * 4);
+      applyMail(mailOpenNow);
+    }
     ctrl.update();
     R.render(scene, cam);
     pinUpdate();
@@ -7382,7 +7478,7 @@ const tot=sm.querySelector('.tot');if(tot)tot.insertAdjacentHTML('beforebegin',h
       {
         k: "EXTRAS",
         t: "The mail box",
-        b: "The mail box on the back left holds customer reviews. Tap it to read them, rate us with watermelons and write a few words.",
+        b: "The mailbox on the back-left corner of the base holds customer reviews. It stays open until you leave a review, then it closes. Anyone who has not reviewed still sees it open. Tap it to rate us with watermelons and write a few words.",
         w3: "mail",
       },
       {
