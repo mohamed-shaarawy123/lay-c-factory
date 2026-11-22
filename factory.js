@@ -32,7 +32,8 @@
     zoomSpeed: 0.7,
     autoRotateSpeed: 0.24,
   });
-  scene.add(new THREE.HemisphereLight(0xdbe5f4, 0x1a2a66, 0.95));
+  const hemi = new THREE.HemisphereLight(0xdbe5f4, 0x1a2a66, 0.95);
+  scene.add(hemi);
   const key = new THREE.DirectionalLight(0xffffff, 1.7);
   key.position.set(-4, 12, 7);
   key.castShadow = true;
@@ -122,6 +123,108 @@
   floor.position.y = -0.43;
   floor.receiveShadow = true;
   scene.add(floor);
+  // Overhead lamp. It stays at daylight until the chain or the slider is moved.
+  const LAMP_HI = 6.55,
+    LAMP_LO = 3.05,
+    CHAIN_TOP = 8.55;
+  const lampRig = new THREE.Group();
+  scene.add(lampRig);
+  const brass = new THREE.MeshStandardMaterial({ color: 0xd4b06a, metalness: 0.74, roughness: 0.3 });
+  const shadeMat = new THREE.MeshStandardMaterial({
+    color: 0xf7f1e4,
+    roughness: 0.5,
+    metalness: 0.04,
+    side: THREE.DoubleSide,
+    emissive: 0xffd7a2,
+    emissiveIntensity: 0.12,
+  });
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: 0xffe7c0,
+    transparent: true,
+    opacity: 0.045,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const mount = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.07, 18), brass);
+  mount.position.y = CHAIN_TOP;
+  mount.castShadow = true;
+  lampRig.add(mount);
+  const linkGeo = new THREE.TorusGeometry(0.055, 0.012, 6, 12);
+  const links = [];
+  for (let i = 0; i < 24; i++) {
+    const link = new THREE.Mesh(linkGeo, brass);
+    link.rotation.x = Math.PI / 2;
+    link.rotation.y = i % 2 ? 0 : Math.PI / 2;
+    link.castShadow = true;
+    lampRig.add(link);
+    links.push(link);
+  }
+  const shade = new THREE.Group();
+  lampRig.add(shade);
+  const shadeMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.38, 0.32, 28, 1, true), shadeMat);
+  shadeMesh.castShadow = true;
+  shade.add(shadeMesh);
+  const shadeCap = new THREE.Mesh(new THREE.SphereGeometry(0.2, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), shadeMat);
+  shadeCap.position.y = 0.02;
+  shade.add(shadeCap);
+  const bulb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.075, 16, 12),
+    new THREE.MeshBasicMaterial({ color: 0xfff4d2 }),
+  );
+  bulb.position.y = -0.05;
+  shade.add(bulb);
+  const pull = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.46, 8), brass);
+  pull.position.y = -0.4;
+  shade.add(pull);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.012, 8, 16), brass);
+  ring.position.y = -0.64;
+  ring.castShadow = true;
+  shade.add(ring);
+  const beam = new THREE.Mesh(new THREE.ConeGeometry(1.35, 2.6, 28, 1, true), beamMat);
+  beam.position.y = -1.45;
+  shade.add(beam);
+  const lampSpot = new THREE.SpotLight(0xffe0b0, 0.85, 18, 0.78, 0.72, 1.15);
+  const lampPt = new THREE.PointLight(0xffe6c2, 0.3, 7, 2);
+  scene.add(lampSpot);
+  scene.add(lampSpot.target);
+  scene.add(lampPt);
+  const skyDay = new THREE.Color(0xf4f7ff),
+    skyNight = new THREE.Color(0x24344f),
+    skyNow = new THREE.Color(),
+    keyDay = new THREE.Color(0xffffff),
+    keyNight = new THREE.Color(0xffe2b8);
+  let lampT = 0;
+  const lampSlide = $("#lampslide");
+  function setLamp(t) {
+    lampT = Math.max(0, Math.min(1, t));
+    const y = LAMP_HI + (LAMP_LO - LAMP_HI) * lampT,
+      k = 1 - lampT;
+    shade.position.y = y;
+    const top = CHAIN_TOP - 0.08,
+      bot = y + 0.2;
+    links.forEach((link, i) => {
+      link.position.y = top + ((bot - top) * (i + 0.5)) / links.length;
+    });
+    lampSpot.position.set(0, y - 0.12, 0);
+    lampSpot.target.position.set(0, 0.15, 0);
+    lampPt.position.set(0, y - 0.16, 0);
+    lampSpot.intensity = 0.85 + lampT * 9.5;
+    lampPt.intensity = 0.3 + lampT * 3.4;
+    shadeMat.emissiveIntensity = 0.12 + lampT * 0.85;
+    beamMat.opacity = 0.04 + lampT * 0.08;
+    hemi.intensity = 0.2 + 0.75 * k;
+    key.intensity = 0.26 + 1.44 * k;
+    rim.intensity = 0.1 + 0.7 * k;
+    fr.intensity = 0.06 + 0.44 * k;
+    pl.intensity = 0.08 + 0.82 * k;
+    key.position.set(-4 * k + 0.4 * lampT, 12 * k + (y + 0.2) * lampT, 7 * k + 0.25 * lampT);
+    key.color.copy(keyDay).lerp(keyNight, lampT);
+    R.toneMappingExposure = 0.76 + 0.34 * k;
+    if (lampT < 0.02) scene.background = null;
+    else scene.background = skyNow.copy(skyDay).lerp(skyNight, lampT);
+    if (lampSlide && document.activeElement !== lampSlide) lampSlide.value = String(Math.round(lampT * 100));
+  }
+  setLamp(0);
   // plate
   box(machine, 13.6, 0.38, 8.9, 0, -0.09, 0, M.base);
   box(machine, 13.4, 0.06, 8.7, 0, 0.13, 0, M.edge);
@@ -152,7 +255,18 @@
     rugMesh.name = "lay-c-rug";
     machine.add(rugMesh);
   }
-  // small street telephone booth on the front-left corner of the base
+  // small street telephone booth. The door stays open until a call comes in.
+  let phoneDoor = null;
+  let phoneOpenNow = 1;
+  let phoneOpenTarget = 1;
+  let phoneInCall = false;
+  let phoneIncoming = false;
+  function applyPhone(k) {
+    if (phoneDoor) phoneDoor.rotation.y = -1.15 * k;
+  }
+  function syncPhoneDoor() {
+    phoneOpenTarget = phoneInCall || phoneIncoming ? 0 : 1;
+  }
   const phG = new THREE.Group();
   phG.position.set(6.1, 0.235, -3.6);
   phG.scale.setScalar(0.6);
@@ -178,12 +292,19 @@
         box(phG, 0.06, 0.06, PW, (s * PW) / 2, y, 0, M.body);
       }
     for (const s of [-1, 1]) {
-      for (const g of [
-        box(phG, PW - 0.08, 2, 0.015, 0, 1.36, (s * PW) / 2, glassM),
-        box(phG, 0.015, 2, PW - 0.08, (s * PW) / 2, 1.36, 0, glassM),
-      ])
-        g.castShadow = false;
+      const panes = [box(phG, 0.015, 2, PW - 0.08, (s * PW) / 2, 1.36, 0, glassM)];
+      if (s < 0) panes.push(box(phG, PW - 0.08, 2, 0.015, 0, 1.36, (s * PW) / 2, glassM));
+      for (const g of panes) g.castShadow = false;
     }
+    const doorW = PW - 0.14;
+    phoneDoor = new THREE.Group();
+    phoneDoor.position.set(-PW / 2 + 0.07, 0, PW / 2);
+    phG.add(phoneDoor);
+    box(phoneDoor, doorW, 2.02, 0.05, doorW / 2, 1.36, 0, M.body);
+    const doorGlass = box(phoneDoor, doorW - 0.14, 1.62, 0.02, doorW / 2, 1.46, 0.025, glassM);
+    doorGlass.castShadow = false;
+    box(phoneDoor, 0.04, 0.18, 0.07, doorW - 0.12, 1.28, 0.045, M.chrome);
+    applyPhone(1);
     box(phG, PW + 0.18, 0.14, PW + 0.18, 0, PH + 0.2, 0, M.body);
     box(phG, PW + 0.06, 0.05, PW + 0.06, 0, PH + 0.3, 0, M.edge);
     box(phG, 0.5, 0.04, 0.5, 0, PH + 0.11, 0, M.light);
@@ -1250,7 +1371,10 @@
     const r = R.domElement.getBoundingClientRect();
     pt.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     rc.setFromCamera(pt, cam);
-    if (rc.intersectObject(walk, true).length) return -2;
+    const lampHit = lampRig ? rc.intersectObject(lampRig, true)[0] : null;
+    const walkHit = rc.intersectObject(walk, true)[0];
+    if (lampHit && (!walkHit || lampHit.distance < walkHit.distance)) return -8;
+    if (walkHit) return -2;
     if (camProp && rc.intersectObject(camProp, true).length) return -3;
     if (phG && rc.intersectObject(phG, true).length) return -4;
     if (flagG && rc.intersectObject(flagG, true).length) return -5;
@@ -1278,9 +1402,9 @@
     const i = hit(e);
     hov = i;
     R.domElement.style.cursor =
-      i >= 0 || i === -2 || i === -3 || i === -4 || i === -5 || i === -6 || i === -7 ? "pointer" : "grab";
-    tip.classList.toggle("v", i >= 0 || i === -3 || i === -4 || i === -5 || i === -6 || i === -7);
-    if (i >= 0 || i === -3 || i === -4 || i === -5 || i === -6 || i === -7) {
+      i === -8 ? "ns-resize" : i >= 0 || i === -2 || i === -3 || i === -4 || i === -5 || i === -6 || i === -7 ? "pointer" : "grab";
+    tip.classList.toggle("v", i >= 0 || i === -3 || i === -4 || i === -5 || i === -6 || i === -7 || i === -8);
+    if (i >= 0 || i === -3 || i === -4 || i === -5 || i === -6 || i === -7 || i === -8) {
       tip.querySelector("b").innerHTML =
         i === -3
           ? "<span>•</span>Selfie"
@@ -1292,19 +1416,23 @@
                 ? "<span>•</span>Reviews"
                 : i === -7
                   ? "<span>07</span>Interior"
-                  : "<span>0" + (i + 1) + "</span>" + ST[i].name;
+                  : i === -8
+                    ? "<span>•</span>Lamp"
+                    : "<span>0" + (i + 1) + "</span>" + ST[i].name;
       tip.querySelector("p").textContent =
         i === -3
               ? "Take a photo. It is saved in your album. Sign in first."
           : i === -4
-            ? "Join a private room with the access code for your signed-in account."
+            ? "The door stays open until a call comes in. It closes for the call, then opens again when the call is finished."
             : i === -5
               ? "See your order and its stage."
               : i === -6
                 ? "Read and leave a review. The blue mailbox stays open until you send one, then it closes."
                 : i === -7
                   ? "Open interior design or execution for this space."
-                  : ST[i].desc;
+                  : i === -8
+                    ? "Drag the light, pull the chain to lower it."
+                    : ST[i].desc;
       const r = app.getBoundingClientRect();
       tip.style.left = Math.min(r.width - 250, Math.max(10, e.clientX - r.left + 16)) + "px";
       tip.style.top = Math.max(10, Math.min(r.height - 95, e.clientY - r.top - 60)) + "px";
@@ -1330,6 +1458,38 @@
   R.domElement.addEventListener("pointerdown", (e) => {
     if (hit(e) === -3) camDown = true;
   });
+  let lampDrag = false,
+    lampY0 = 0,
+    lampT0 = 0;
+  R.domElement.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (e.button != null && e.button !== 0) return;
+      if (hit(e) !== -8) return;
+      lampDrag = true;
+      lampY0 = e.clientY;
+      lampT0 = lampT;
+      ctrl.enabled = false;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    true,
+  );
+  addEventListener("pointermove", (e) => {
+    if (!lampDrag) return;
+    setLamp(lampT0 + (e.clientY - lampY0) / 220);
+  });
+  addEventListener("pointerup", () => {
+    if (!lampDrag) return;
+    lampDrag = false;
+    ctrl.enabled = true;
+  });
+  addEventListener("pointercancel", () => {
+    if (!lampDrag) return;
+    lampDrag = false;
+    ctrl.enabled = true;
+  });
+  if (lampSlide) lampSlide.addEventListener("input", () => setLamp(Number(lampSlide.value) / 100));
   addEventListener("pointerup", () => {
     camDown = false;
   });
@@ -3126,6 +3286,8 @@
   // TELEPHONE. A 6-digit code is the Jitsi room name. No API key is required.
   const MT = { name: "", code: "", host: false, api: null, poll: 0, filled: "" };
   function endCall() {
+    phoneInCall = false;
+    syncPhoneDoor();
     if (MT.api) {
       try {
         MT.api.dispose();
@@ -3159,8 +3321,11 @@
   }
   async function pullInvite() {
     const saved = accGet() || {};
-    const codeEl = $("#mc");
-    if (!saved.token || !codeEl) return;
+    if (!saved.token) {
+      phoneIncoming = false;
+      syncPhoneDoor();
+      return;
+    }
     try {
       const res = await fetch("/api/admin", {
         method: "POST",
@@ -3168,7 +3333,10 @@
         body: JSON.stringify({ op: "my_invite", token: saved.token }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok || !data.pending || !data.access_code || !$("#mc")) return;
+      phoneIncoming = !!(res.ok && data.ok && data.pending && data.access_code);
+      syncPhoneDoor();
+      const codeEl = $("#mc");
+      if (!phoneIncoming || !codeEl) return;
       const mailEl = $("#meail");
       const nameEl = $("#mn");
       if (mailEl && data.email && !mailEl.value.trim()) mailEl.value = data.email;
@@ -3237,6 +3405,8 @@
     }
   }
   async function mtOpen(host, roomName, meta) {
+    phoneInCall = true;
+    syncPhoneDoor();
     stopInvitePoll();
     MT.host = host;
     const room = String(roomName || "").replace(/^https?:\/\/meet\.ffmuc\.net\//, "") || "LAYC-000000";
@@ -3270,6 +3440,13 @@
         },
       });
       $("#me").textContent = "";
+      const reopen = () => {
+        phoneInCall = false;
+        syncPhoneDoor();
+        pullInvite();
+      };
+      MT.api.addListener("videoConferenceLeft", reopen);
+      MT.api.addListener("readyToClose", reopen);
     } catch (e) {
       $("#me").textContent = (e && e.message) || "The video call could not open here. Use the button below.";
     }
@@ -3290,6 +3467,7 @@
     try {
       history.replaceState(null, "", location.pathname + location.search);
     } catch (e) {}
+    pullInvite();
   }
   function openTelephone() {
     if (closing) {
@@ -3309,6 +3487,12 @@
     } catch (e) {}
   }
   openMeet = openTelephone;
+  if (!MT.doorWatch) {
+    MT.doorWatch = setInterval(() => {
+      if (!MT.poll) pullInvite();
+    }, 5000);
+    pullInvite();
+  }
   const RV = { list: [], star: 0, busy: false };
   const rvEsc = (x) =>
     String(x).replace(
@@ -4240,18 +4424,6 @@
         $("#accset").disabled = false;
       }
     });
-  const darkBtn = $("#darkb");
-  function paintDark(on) {
-    document.documentElement.classList.toggle("dark", on);
-    if (darkBtn) darkBtn.setAttribute("aria-pressed", on ? "true" : "false");
-    try {
-      localStorage.setItem("lcdark", on ? "1" : "0");
-    } catch (e) {}
-  }
-  if (darkBtn) {
-    paintDark(document.documentElement.classList.contains("dark"));
-    darkBtn.addEventListener("click", () => paintDark(!document.documentElement.classList.contains("dark")));
-  }
   function toggleInsta() {
     const pop = $("#ipop");
     const btn = $("#minstapay");
@@ -7703,6 +7875,10 @@ const tot=sm.querySelector('.tot');if(tot)tot.insertAdjacentHTML('beforebegin',h
     if (mailDoor) {
       mailOpenNow += (mailOpenTarget - mailOpenNow) * Math.min(1, dt * 4);
       applyMail(mailOpenNow);
+    }
+    if (phoneDoor) {
+      phoneOpenNow += (phoneOpenTarget - phoneOpenNow) * Math.min(1, dt * 4);
+      applyPhone(phoneOpenNow);
     }
     ctrl.update();
     R.render(scene, cam);

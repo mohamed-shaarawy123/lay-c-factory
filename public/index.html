@@ -5,12 +5,7 @@
     <meta charset="utf8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="styles.css?v=live12" />
-    <script>
-      try {
-        if (localStorage.getItem("lcdark") === "1") document.documentElement.classList.add("dark");
-      } catch (e) {}
-    </script>
+    <link rel="stylesheet" href="styles.css?v=live13" />
   </head>
   <body>
     <div id="app">
@@ -19,6 +14,12 @@
         role="img"
         aria-label="Interactive 3D factory that makes gray beanies: Orders, Knitter, Dye vat, Embroidery Machine, Pom-pom and Checkout. Drag to rotate, scroll to zoom, or tap a station."
       ></div>
+      <div id="lampbar" class="lampbar">
+        <input id="lampslide" type="range" min="0" max="100" value="0" step="1" aria-label="Lower the lamp" />
+        <span class="lampmoon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 3.2A8.2 8.2 0 1 0 20.8 14 6.4 6.4 0 0 1 16 3.2z"/></svg>
+        </span>
+      </div>
       <header>
         <div class="id">
           <button id="menub" class="menub" type="button" aria-label="Open the menu" aria-expanded="false" aria-controls="menu">
@@ -28,9 +29,6 @@
           <b>Lay C Factory</b>
         </div>
         <div class="hdr-right">
-          <button type="button" id="darkb" class="iconb" aria-label="Dark mode" aria-pressed="false" title="Dark mode">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M16 3.2A8.2 8.2 0 1 0 20.8 14 6.4 6.4 0 0 1 16 3.2z"/></svg>
-          </button>
           <div id="status"><i></i><span id="st">Machine running</span></div>
         </div>
       </header>
@@ -173,6 +171,6 @@
     <section id="receipt" class="receipt" role="dialog" aria-label="Sales receipt" hidden>
       <article id="receiptcard" class="receipt-card"></article>
     </section>
-    <script src="factory.js?v=live44"></script>
+    <script src="factory.js?v=live46"></script>
   </body>
 </html>

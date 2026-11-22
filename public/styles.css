@@ -206,6 +206,65 @@ body {
   height: 100% !important;
   max-width: 100%;
 }
+.lampbar {
+  position: absolute;
+  z-index: 81;
+  top: max(6px, env(safe-area-inset-top, 0px));
+  left: 50%;
+  width: min(440px, calc(100% - 300px));
+  min-width: 140px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+.lampbar input[type="range"] {
+  flex: 1;
+  width: 100%;
+  height: 10px;
+  margin: 0;
+  appearance: none;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f6d78a 0%, #9aafdf 42%, #1b2b52 100%);
+  outline: none;
+  cursor: pointer;
+}
+.lampbar input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #3d6bff;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(15, 42, 138, 0.35);
+}
+.lampbar input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #3d6bff;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(15, 42, 138, 0.35);
+}
+.lampmoon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: #d5e2ff;
+  filter: drop-shadow(0 1px 2px rgba(12, 20, 48, 0.45));
+}
+.lampmoon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+@media (max-width: 900px) {
+  .lampbar {
+    top: max(52px, calc(env(safe-area-inset-top, 0px) + 46px));
+    width: min(280px, calc(100% - 24px));
+  }
+}
 header {
   position: absolute;
   top: max(var(--ui-pad-y), env(safe-area-inset-top, 0px));
