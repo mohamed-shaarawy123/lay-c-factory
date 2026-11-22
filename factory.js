@@ -4254,15 +4254,11 @@
   }
   function toggleInsta() {
     const pop = $("#ipop");
-    const btn = $("#instapay");
+    const btn = $("#minstapay");
     if (!pop) return;
     pop.hidden = !pop.hidden;
     if (btn) btn.setAttribute("aria-expanded", pop.hidden ? "false" : "true");
   }
-  if ($("#instapay")) $("#instapay").addEventListener("click", (e) => {
-    e.stopPropagation();
-    toggleInsta();
-  });
   if ($("#minstapay"))
     $("#minstapay").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -4271,9 +4267,9 @@
   document.addEventListener("click", (e) => {
     const pop = $("#ipop");
     if (!pop || pop.hidden) return;
-    if (e.target.closest("#ipop") || e.target.closest("#instapay") || e.target.closest("#minstapay")) return;
+    if (e.target.closest("#ipop") || e.target.closest("#minstapay")) return;
     pop.hidden = true;
-    if ($("#instapay")) $("#instapay").setAttribute("aria-expanded", "false");
+    if ($("#minstapay")) $("#minstapay").setAttribute("aria-expanded", "false");
   });
   function paintRain(on) {
     let layer = $("#rain");

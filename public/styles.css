@@ -3503,21 +3503,21 @@ header {
   background: var(--amber);
   color: var(--on);
 }
-.ipay {
-  position: relative;
-}
 .ipop {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 90;
-  min-width: 160px;
+  margin: 0;
   padding: 10px 12px;
   border-radius: 12px;
   background: #fff;
   color: #0f2a8a;
   border: 1px solid rgba(65, 105, 225, 0.28);
-  box-shadow: 0 12px 30px rgba(15, 42, 138, 0.18);
+  box-shadow: 0 8px 20px rgba(15, 42, 138, 0.12);
+  text-align: center;
+}
+.ipop:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
 .ipop b {
   display: block;
