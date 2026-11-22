@@ -637,6 +637,11 @@
         margin-left: 2px;
         font-size: 10px;
       }
+      .pwline { display: flex; gap: 8px; align-items: center; }
+      .pwline input { flex: 1; }
+      .pwline button { padding: 8px 10px; border: 1px solid #c5d0f0; border-radius: 8px; background: #fff; font-weight: 600; }
+      .rainb { display: inline-flex; align-items: center; gap: 6px; }
+      .rainb[aria-pressed="true"] { background: #4169e1; color: #fff; border-color: #4169e1; }
     </style>
   </head>
   <body>
@@ -645,7 +650,7 @@
         <h1>Lay C Admin</h1>
         <p>Sign in with an authorized admin account. There is no public registration for this panel.</p>
         <label>Email<input id="email" type="email" autocomplete="username" required /></label>
-        <label>Password<input id="pass" type="password" autocomplete="current-password" minlength="6" required /></label>
+        <label>Password<span class="pwline"><input id="pass" type="password" autocomplete="current-password" minlength="6" required /><button id="seePass" type="button">Show</button></span></label>
         <button type="submit" id="loginBtn">Sign in</button>
         <p class="note" id="gateNote"></p>
       </form>
@@ -678,6 +683,10 @@
           <div style="display: flex; gap: 8px; align-items: center; min-width: 0">
             <h2 id="title">Overview</h2>
           </div>
+          <button type="button" id="rainBtn" class="btn ghost rainb" aria-pressed="false" title="Rain on the website">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 15a5 5 0 0 1 1-9 6 6 0 0 1 11 2 4 4 0 0 1 0 7"/><path d="M8 19l-1 2M12 19l-1 2M16 19l-1 2"/></svg>
+            Rain
+          </button>
           <span id="statusLine" class="pill">Ready</span>
         </div>
         <div id="panel"></div>
@@ -2156,7 +2165,20 @@
         app.hidden = false;
         app.removeAttribute("hidden");
         $("#who").textContent = "Signed in as " + email;
+        syncRain();
         go("overview");
+      }
+
+      async function syncRain() {
+        const btn = $("#rainBtn");
+        if (!btn) return;
+        try {
+          const res = await fetch("/api/site");
+          const data = await res.json();
+          const on = !!data.rain;
+          btn.setAttribute("aria-pressed", on ? "true" : "false");
+          btn.title = on ? "Rain is on. Click to stop the drops." : "Rain is off. Click to show drops on the website.";
+        } catch (e) {}
       }
 
       function logout(msg) {
@@ -2173,7 +2195,7 @@
       $("#login").addEventListener("submit", async (e) => {
         e.preventDefault();
         note("#gateNote", "");
-        const btn = $("#login button");
+        const btn = $("#loginBtn");
         btn.disabled = true;
         try {
           const res = await fetch("/api/account", {
@@ -2208,6 +2230,35 @@
         if (b) go(b.dataset.sec);
       });
       $("#logout").onclick = () => logout("Signed out.");
+      const seePass = $("#seePass");
+      if (seePass)
+        seePass.onclick = () => {
+          const input = $("#pass");
+          const on = input.type === "password";
+          input.type = on ? "text" : "password";
+          seePass.textContent = on ? "Hide" : "Show";
+        };
+      const rainBtn = $("#rainBtn");
+      if (rainBtn)
+        rainBtn.onclick = async () => {
+          const next = rainBtn.getAttribute("aria-pressed") !== "true";
+          rainBtn.disabled = true;
+          try {
+            const res = await fetch("/api/site", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ token, rain: next }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.ok) throw new Error(data.error || "The rain setting was not saved.");
+            rainBtn.setAttribute("aria-pressed", data.rain ? "true" : "false");
+            setStatus(data.rain ? "Rain is falling on the website." : "Rain is off.");
+          } catch (err) {
+            setStatus(err.message || "The rain setting was not saved.");
+          } finally {
+            rainBtn.disabled = false;
+          }
+        };
 
       (async () => {
         const saved = JSON.parse(localStorage.getItem(ADMIN_KEY) || "null");

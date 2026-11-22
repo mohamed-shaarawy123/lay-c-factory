@@ -8,6 +8,7 @@ const album = require("./api/album");
 const customerAlbum = require("./api/customer-album");
 const admin = require("./api/admin");
 const reviews = require("./api/reviews");
+const site = require("./api/site");
 
 const root = path.join(__dirname, "public");
 const types = {
@@ -46,6 +47,10 @@ function handler(req, res) {
   }
   if (urlPath === "/api/reviews") {
     reviews(req, res);
+    return;
+  }
+  if (urlPath === "/api/site") {
+    site(req, res);
     return;
   }
   const rel = urlPath === "/" ? "index.html" : urlPath === "/admin" || urlPath === "/admin/" ? "admin.html" : urlPath.replace(/^\/+/, "");

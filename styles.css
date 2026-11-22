@@ -3485,3 +3485,295 @@ header {
   font-size: clamp(10px, 1.6vw, 11px);
   padding: clamp(6px, 1.2vh, 8px) clamp(8px, 1.5vw, 12px);
 }
+.iconb {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--amber);
+  border: 1px solid var(--line);
+}
+.iconb svg {
+  width: 18px;
+  height: 18px;
+}
+.iconb[aria-pressed="true"] {
+  background: var(--amber);
+  color: var(--on);
+}
+.ipay {
+  position: relative;
+}
+.ipop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 90;
+  min-width: 160px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff;
+  color: #0f2a8a;
+  border: 1px solid rgba(65, 105, 225, 0.28);
+  box-shadow: 0 12px 30px rgba(15, 42, 138, 0.18);
+}
+.ipop b {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ipop a {
+  color: #0f2a8a;
+  font: 700 16px ui-monospace, monospace;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.mico button {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  color: #7b3ff2;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+.mico button svg {
+  width: 28px;
+  height: 28px;
+}
+.pwline {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.pwline input {
+  flex: 1;
+  margin-top: 0;
+}
+.pwline button,
+.textbtn,
+#accsend,
+#accset {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--amber);
+  font-weight: 600;
+}
+.textbtn {
+  display: inline-block;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-decoration: underline;
+}
+#accreset {
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(65, 105, 225, 0.06);
+}
+#accreset button {
+  margin-top: 8px;
+}
+.ixguide {
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.ixguide b {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--amber);
+}
+.ixguide ol {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--fg);
+  line-height: 1.45;
+}
+.ixguide li + li {
+  margin-top: 6px;
+}
+#rain {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  overflow: hidden;
+}
+#rain i {
+  position: absolute;
+  top: -12%;
+  width: 2px;
+  height: 16px;
+  border-radius: 2px;
+  background: linear-gradient(to bottom, transparent, rgba(230, 240, 255, 0.9));
+  animation: raindrop linear infinite;
+}
+@keyframes raindrop {
+  to {
+    transform: translateY(115vh);
+  }
+}
+.receipt {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 24px 12px;
+  background: rgba(20, 36, 92, 0.45);
+  overflow: auto;
+}
+.receipt[hidden] {
+  display: none !important;
+}
+.receipt-card {
+  width: min(420px, 100%);
+  max-height: min(92dvh, 900px);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 28px 22px 22px;
+  background: #fff;
+  color: #1a1a1a;
+  border-radius: 2px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  position: relative;
+}
+.receipt-card h2 {
+  margin: 8px 0 14px;
+  text-align: center;
+  color: #1d4ed8;
+  font-size: 18px;
+}
+.receipt-card .rk {
+  margin: 0 0 10px;
+  letter-spacing: 0.14em;
+  font-size: 11px;
+  color: #667085;
+}
+.receipt-card dl {
+  margin: 0;
+}
+.receipt-card dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.receipt-card dt {
+  font-weight: 700;
+}
+.receipt-card dd {
+  margin: 0;
+  text-align: right;
+}
+.receipt-card ul {
+  list-style: none;
+  margin: 12px 0;
+  padding: 12px 0 0;
+  border-top: 1px dashed #d0d5dd;
+}
+.receipt-card li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+.receipt-card .rtot {
+  margin: 8px 0 16px;
+  padding-top: 8px;
+  border-top: 1px dashed #d0d5dd;
+  text-align: right;
+  font-weight: 800;
+}
+.receipt-card h3 {
+  margin: 0;
+  text-align: center;
+  letter-spacing: 0.08em;
+  font-size: 14px;
+}
+.receipt-card .rsent {
+  margin: 6px 0 14px;
+  text-align: center;
+  color: #1d4ed8;
+  font-weight: 700;
+  font-size: 13px;
+}
+.receipt-card h4 {
+  margin: 0 0 6px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: #667085;
+}
+.receipt-card ol {
+  margin: 0;
+  padding-left: 16px;
+  color: #667085;
+  font-size: 9px;
+  line-height: 1.35;
+}
+#receiptx {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  font-size: 22px;
+  color: #667085;
+}
+.rlogo {
+  width: 54px;
+  height: 54px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.rlogo i {
+  display: block;
+  border-radius: 6px;
+  background: #4169e1;
+}
+.rlogo i:last-child {
+  background: #0f2a8a;
+}
+html.dark {
+  color-scheme: dark;
+  --bg: #0c1430;
+  --fg: #e6edff;
+  --mut: #b7c6f5;
+  --panel: rgba(16, 24, 56, 0.94);
+  --line: rgba(183, 198, 245, 0.28);
+  --on: #f4f7ff;
+}
+html.dark body {
+  background: #070d22;
+  color: #e6edff;
+}
+html.dark .acc-card,
+html.dark .acc-mode button,
+html.dark .pwline button,
+html.dark #accsend,
+html.dark #accset,
+html.dark .acc-card input {
+  background: #121a36;
+  color: #e6edff;
+}
+html.dark .menu,
+html.dark #page,
+html.dark .ixguide {
+  color: #e6edff;
+}

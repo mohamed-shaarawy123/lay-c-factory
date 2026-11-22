@@ -1009,7 +1009,7 @@
     ctex(280, 540, (c, w, h) => {
       c.fillStyle = "#f4f1ea";
       c.fillRect(0, 0, w, h);
-      txt(c, "BEANIE CO.", 25, 52, 24, "#333d36", 650);
+      txt(c, "LAY C", 25, 52, 24, "#0f2a8a", 650);
       txt(c, "SALES RECEIPT", 32, 87, 19, "#566059");
       txt(c, "Gray beanie", 25, 154, 22, "#333d36");
       txt(c, "1 × 400 L.E", 25, 190, 21, "#333d36");
@@ -2692,6 +2692,10 @@
       submit.hidden = signedView;
       submit.textContent = accMode === "login" ? "Sign in" : "Sign up";
     }
+    const forgot = $("#accforgot");
+    if (forgot) forgot.hidden = signedView;
+    const reset = $("#accreset");
+    if (reset && signedView) reset.hidden = true;
   }
   function openAcc(then, mode) {
     pendingQuote = typeof then === "function" ? then : null;
@@ -4058,13 +4062,30 @@
       const submit = accForm.querySelector('button[type="submit"]');
       if (submit) submit.disabled = true;
       try {
-        const res = await fetch("/api/account", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.ok) throw new Error(data.error || "Could not save your email.");
+        let data = {};
+        let res = null;
+        let netErr = null;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 20000);
+            res = await fetch("/api/account", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+              signal: ctrl.signal,
+            });
+            clearTimeout(timer);
+            data = await res.json().catch(() => ({}));
+            netErr = null;
+            break;
+          } catch (ex) {
+            netErr = ex;
+            if (attempt === 0) await new Promise((r) => setTimeout(r, 700));
+          }
+        }
+        if (netErr) throw netErr;
+        if (!res || !res.ok || !data.ok) throw new Error((data && data.error) || "Could not save your email.");
         accDismissed = true;
         accSet({
           name: data.customer_name || body.customer_name,
@@ -4098,14 +4119,17 @@
         pendingQuote = null;
         if (next) next();
       } catch (ex) {
+        const verb = accMode === "login" ? "Sign in" : "Sign up";
         let msg = (ex && ex.message) || "Could not save your email.";
         if (location.protocol === "file:") {
           msg = "Open http://127.0.0.1:8765 in the browser. A page opened from a file cannot sign up.";
-        } else if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+        } else if ((ex && ex.name === "AbortError") || /failed to fetch|networkerror|load failed|aborted/i.test(msg)) {
           msg =
-            location.hostname === "127.0.0.1" || location.hostname === "localhost"
-              ? "Could not reach the local server. Refresh http://127.0.0.1:8765 and try Sign up again."
-              : "Could not reach the server. Refresh the page and try Sign up again.";
+            ex && ex.name === "AbortError"
+              ? "The server took too long to answer. Refresh the page and try " + verb + " again."
+              : location.hostname === "127.0.0.1" || location.hostname === "localhost"
+                ? "Could not reach the local server. Refresh http://127.0.0.1:8765 and try " + verb + " again."
+                : "Could not reach the server. Refresh the page and try " + verb + " again.";
         }
         if (/invalid api key/i.test(msg)) {
           msg = "The account was not saved. The live database key is not set, so sign up cannot be stored.";
@@ -4121,6 +4145,168 @@
         if (submit) submit.disabled = false;
       }
     });
+  function togglePass(input, button) {
+    if (!input || !button) return;
+    const on = input.type === "password";
+    input.type = on ? "text" : "password";
+    button.textContent = on ? "Hide" : "Show";
+    button.setAttribute("aria-pressed", on ? "true" : "false");
+    button.setAttribute("aria-label", on ? "Hide password" : "Show password");
+  }
+  if ($("#accsee")) $("#accsee").addEventListener("click", () => togglePass($("#accpass"), $("#accsee")));
+  if ($("#accseenew")) $("#accseenew").addEventListener("click", () => togglePass($("#accnew"), $("#accseenew")));
+  if ($("#accforgot"))
+    $("#accforgot").addEventListener("click", () => {
+      const box = $("#accreset");
+      if (!box) return;
+      box.hidden = !box.hidden;
+    });
+  async function accountPost(payload) {
+    const res = await fetch("/api/account", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error(data.error || "The request failed.");
+    return data;
+  }
+  if ($("#accsend"))
+    $("#accsend").addEventListener("click", async () => {
+      const err = $("#accerr");
+      const email = ($("#accemail") && $("#accemail").value.trim()) || "";
+      if (err) {
+        err.hidden = true;
+        err.textContent = "";
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        if (err) {
+          err.hidden = false;
+          err.textContent = "Enter the email on the account, then send the code.";
+        }
+        return;
+      }
+      $("#accsend").disabled = true;
+      try {
+        await accountPost({ mode: "forgot", customer_email: email });
+        if (err) {
+          err.hidden = false;
+          err.textContent = "If that email has an account, we sent a 6-digit code. It expires in 15 minutes.";
+        }
+      } catch (ex) {
+        if (err) {
+          err.hidden = false;
+          err.textContent = (ex && ex.message) || "The reset email could not be sent.";
+        }
+      } finally {
+        $("#accsend").disabled = false;
+      }
+    });
+  if ($("#accset"))
+    $("#accset").addEventListener("click", async () => {
+      const err = $("#accerr");
+      const email = ($("#accemail") && $("#accemail").value.trim()) || "";
+      const code = ($("#acccode") && $("#acccode").value.trim()) || "";
+      const next = ($("#accnew") && $("#accnew").value) || "";
+      if (err) {
+        err.hidden = true;
+        err.textContent = "";
+      }
+      if (!/^\d{6}$/.test(code) || next.length < 6) {
+        if (err) {
+          err.hidden = false;
+          err.textContent = "Enter the 6-digit code and a new password of at least 6 characters.";
+        }
+        return;
+      }
+      $("#accset").disabled = true;
+      try {
+        await accountPost({ mode: "reset", customer_email: email, code, password: next });
+        if ($("#accpass")) $("#accpass").value = "";
+        if ($("#accnew")) $("#accnew").value = "";
+        if ($("#acccode")) $("#acccode").value = "";
+        if ($("#accreset")) $("#accreset").hidden = true;
+        setAccMode("login");
+        if (err) {
+          err.hidden = false;
+          err.textContent = "Password updated. Sign in with the new password.";
+        }
+      } catch (ex) {
+        if (err) {
+          err.hidden = false;
+          err.textContent = (ex && ex.message) || "The new password was not saved.";
+        }
+      } finally {
+        $("#accset").disabled = false;
+      }
+    });
+  const darkBtn = $("#darkb");
+  function paintDark(on) {
+    document.documentElement.classList.toggle("dark", on);
+    if (darkBtn) darkBtn.setAttribute("aria-pressed", on ? "true" : "false");
+    try {
+      localStorage.setItem("lcdark", on ? "1" : "0");
+    } catch (e) {}
+  }
+  if (darkBtn) {
+    paintDark(document.documentElement.classList.contains("dark"));
+    darkBtn.addEventListener("click", () => paintDark(!document.documentElement.classList.contains("dark")));
+  }
+  function toggleInsta() {
+    const pop = $("#ipop");
+    const btn = $("#instapay");
+    if (!pop) return;
+    pop.hidden = !pop.hidden;
+    if (btn) btn.setAttribute("aria-expanded", pop.hidden ? "false" : "true");
+  }
+  if ($("#instapay")) $("#instapay").addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleInsta();
+  });
+  if ($("#minstapay"))
+    $("#minstapay").addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleInsta();
+    });
+  document.addEventListener("click", (e) => {
+    const pop = $("#ipop");
+    if (!pop || pop.hidden) return;
+    if (e.target.closest("#ipop") || e.target.closest("#instapay") || e.target.closest("#minstapay")) return;
+    pop.hidden = true;
+    if ($("#instapay")) $("#instapay").setAttribute("aria-expanded", "false");
+  });
+  function paintRain(on) {
+    let layer = $("#rain");
+    if (!layer) {
+      layer = document.createElement("div");
+      layer.id = "rain";
+      layer.setAttribute("aria-hidden", "true");
+      document.body.appendChild(layer);
+    }
+    layer.hidden = !on;
+    if (!on) {
+      layer.innerHTML = "";
+      return;
+    }
+    if (layer.childElementCount) return;
+    for (let i = 0; i < 56; i++) {
+      const drop = document.createElement("i");
+      drop.style.left = Math.random() * 100 + "%";
+      drop.style.animationDuration = 0.65 + Math.random() * 0.95 + "s";
+      drop.style.animationDelay = -Math.random() * 1.8 + "s";
+      drop.style.opacity = String(0.35 + Math.random() * 0.5);
+      layer.appendChild(drop);
+    }
+  }
+  async function pollRain() {
+    try {
+      const res = await fetch("/api/site");
+      const data = await res.json();
+      paintRain(!!data.rain);
+    } catch (e) {}
+  }
+  pollRain();
+  setInterval(pollRain, 8000);
   paintAcc();
   restoreAcc();
 
@@ -4974,49 +5160,145 @@
       total_price: pack.total,
     };
   }
+  const RECEIPT_TERMS = [
+    "A 50% deposit is due before we start. The balance is due before delivery or handover.",
+    "Prices shown as ?* are confirmed after we review your request. This receipt is the request until we confirm the final price.",
+    "Work starts after you approve the design, colours and quantities.",
+    "You approve designs, mockups and product details before production. Changes after approval can change the price and the date.",
+    "Small differences in colour, size or finish can happen between a screen preview and the finished item.",
+    "Check the order on delivery and tell us within 48 hours about any defect so we can fix it. Custom-made items are made for you.",
+    "The finalized receipt is sent on WhatsApp and by email.",
+  ];
+  function receiptNo() {
+    return "LC-" + Math.random().toString(36).slice(2, 8).toUpperCase();
+  }
+  function showReceipt(pack, meta) {
+    const host = $("#receipt");
+    const card = $("#receiptcard");
+    if (!host || !card || !pack) return;
+    const acc = accGet() || {};
+    const when = new Date().toLocaleString("en-US");
+    const no = (meta && meta.no) || pack.receiptNo || receiptNo();
+    pack.receiptNo = no;
+    const service = String(pack.title || "Request").replace(/ quote$/i, "");
+    const lines = (pack.rows || [])
+      .map((r) => "<li><span>- " + esc(r.item) + " (" + esc(r.q) + ")</span><b>" + esc(r.val) + "</b></li>")
+      .join("");
+    card.innerHTML =
+      '<button type="button" id="receiptx" aria-label="Close receipt">&times;</button>' +
+      '<div class="rlogo" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
+      '<h2>Lay C wishes you a happy life</h2>' +
+      '<p class="rk">SALES RECEIPT</p>' +
+      '<dl><div><dt>Receipt no.</dt><dd>' +
+      esc(no) +
+      "</dd></div><div><dt>Date</dt><dd>" +
+      esc(when) +
+      "</dd></div><div><dt>Service</dt><dd>" +
+      esc(service) +
+      "</dd></div>" +
+      (acc.name ? "<div><dt>Customer</dt><dd>" + esc(acc.name) + "</dd></div>" : "") +
+      "</dl><ul>" +
+      (lines || "<li><span>Request received</span><b>—</b></li>") +
+      '</ul><p class="rtot">' +
+      esc(pack.total || "Total: —") +
+      '</p><h3>ORDER RECEIVED</h3><p class="rsent">The finalized receipt will be sent to you on WhatsApp &amp; as an Email.</p><h4>TERMS AND CONDITIONS</h4><ol>' +
+      RECEIPT_TERMS.map((t) => "<li>" + esc(t) + "</li>").join("") +
+      "</ol>";
+    host.hidden = false;
+    const close = $("#receiptx");
+    if (close) close.onclick = () => {
+      host.hidden = true;
+    };
+    host.onclick = (e) => {
+      if (e.target === host) host.hidden = true;
+    };
+  }
   async function makeQuotePdf(pack) {
     await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js", () =>
       Boolean(window.jspdf && window.jspdf.jsPDF),
     );
     const JsPDF = window.jspdf.jsPDF;
     const doc = new JsPDF({ unit: "pt", format: "a4" });
-    const f = formatQuoteFields(pack);
-    const w = 515,
-      x = 48;
-    let y = 56;
+    const pageW = doc.internal.pageSize.getWidth();
+    const left = 48;
+    const right = pageW - 48;
+    let y = 54;
+    const blue = [65, 105, 225];
+    const navy = [15, 42, 138];
+    doc.setFillColor(...blue);
+    doc.rect(pageW / 2 - 16, y, 13, 13, "F");
+    doc.rect(pageW / 2 + 1, y, 13, 13, "F");
+    doc.rect(pageW / 2 - 16, y + 17, 13, 13, "F");
+    doc.setFillColor(...navy);
+    doc.rect(pageW / 2 + 1, y + 17, 13, 13, "F");
+    y += 48;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text("Lay C Factory", x, y);
+    doc.setFontSize(14);
+    doc.setTextColor(...blue);
+    doc.text("Lay C wishes you a happy life", pageW / 2, y, { align: "center" });
     y += 22;
-    doc.setFontSize(13);
-    doc.text(pack.title || "Quote", x, y);
-    y += 28;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("Order summary", x, y);
-    y += 16;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
-    const wrap = (label, body) => {
+    doc.setFontSize(9);
+    doc.setTextColor(90, 100, 120);
+    doc.text("SALES RECEIPT", left, y);
+    y += 16;
+    const pair = (k, v) => {
       doc.setFont("helvetica", "bold");
-      doc.text(label, x, y);
-      y += 16;
+      doc.setFontSize(11);
+      doc.setTextColor(20, 24, 40);
+      doc.text(k, left, y);
       doc.setFont("helvetica", "normal");
-      const text = doc.splitTextToSize(body || "—", w);
-      doc.text(text, x, y);
-      y += text.length * 14 + 14;
-      if (y > 760) {
+      doc.text(String(v || "—"), right, y, { align: "right" });
+      y += 16;
+    };
+    pair("Receipt no.", pack.receiptNo || receiptNo());
+    pair("Date", new Date().toLocaleString("en-US"));
+    pair("Service", String(pack.title || "Request").replace(/ quote$/i, ""));
+    y += 4;
+    doc.setDrawColor(197, 208, 240);
+    doc.line(left, y, right, y);
+    y += 16;
+    doc.setFontSize(10);
+    (pack.rows || []).forEach((r) => {
+      const text = doc.splitTextToSize("- " + r.item + " (" + r.q + "): " + r.val, right - left);
+      doc.text(text, left, y);
+      y += text.length * 13 + 4;
+      if (y > 740) {
         doc.addPage();
         y = 56;
       }
-    };
-    wrap("Products", f.products);
-    wrap("Quantities", f.quantities);
-    wrap("Total", f.total_price);
-    if (pack.extra) wrap("Notes", pack.extra.trim());
-    wrap("Full summary", f.order_summary);
+    });
+    y += 6;
+    doc.line(left, y, right, y);
+    y += 18;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text(pack.total || "Total: —", right, y, { align: "right" });
+    y += 28;
+    doc.setTextColor(...navy);
+    doc.text("ORDER RECEIVED", pageW / 2, y, { align: "center" });
+    y += 16;
+    doc.setFontSize(10);
+    doc.setTextColor(...blue);
+    const sent = doc.splitTextToSize("The finalized receipt will be sent to you on WhatsApp & as an Email.", right - left);
+    doc.text(sent, pageW / 2, y, { align: "center" });
+    y += sent.length * 13 + 14;
+    doc.setFontSize(8);
+    doc.setTextColor(90, 100, 120);
+    doc.text("TERMS AND CONDITIONS", left, y);
+    y += 12;
+    doc.setFont("helvetica", "normal");
+    RECEIPT_TERMS.forEach((term, i) => {
+      const text = doc.splitTextToSize(i + 1 + ". " + term, right - left);
+      if (y + text.length * 10 > 800) {
+        doc.addPage();
+        y = 56;
+      }
+      doc.text(text, left, y);
+      y += text.length * 10 + 3;
+    });
     const blob = doc.output("blob");
-    return new File([blob], "Lay C-quote.pdf", { type: "application/pdf" });
+    return new File([blob], "Lay C-receipt.pdf", { type: "application/pdf" });
   }
   function offerPdfDownload(file) {
     const out = pg.querySelector("#out") || $("#out");
@@ -5199,6 +5481,8 @@
     const acc = accGet() || {};
     quotePack.extra = [extra || "", customerBlock(acc)].filter(Boolean).join("\n");
     const fields = formatQuoteFields(quotePack);
+    if (!quotePack.receiptNo) quotePack.receiptNo = receiptNo();
+    showReceipt(quotePack);
     const s = SV[cur] || {};
     const idempotency_key =
       (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()) + Math.random();
@@ -6100,7 +6384,7 @@ document.body.appendChild(pa);window.addEventListener('afterprint',()=>pa.remove
 ixRP.sig=c=>c.wall+'|'+(c.wc||[]).join(',');ixRP.chk=()=>{if(!box||PL.room<0||!DD())return;const c=DD().cfg;if(c.wsig&&c.wsig!==ixRP.sig(c))ixRP.wdone()};setInterval(()=>{try{ixRP.chk()}catch(e){}},500);ixRP.go=report}
 
 const ixKeep={};
-const _s2=show;show=function(i){const prev=cur>=0&&SV[cur]&&SV[cur].slug;if(prev==='interior-design'||prev==='interior-execution')ixKeep[prev]={ans:ans.map(function(a){return a.slice()}),oth:oth.slice()};const slug=SV[i]&&SV[i].slug,g=slug==='interior-design';kill();if(g){PL.room=-1;PL.sel=-1;box=null}_s2(i);const keep=(slug==='interior-design'||slug==='interior-execution')&&ixKeep[slug];if(keep){ans=keep.ans.map(function(a){return a.slice()});oth=keep.oth.slice();ans.forEach(function(a,j){a.forEach(function(k){const inp=pg.querySelector('input[name="q'+j+'"][value="'+k+'"]');if(inp)inp.checked=true})});oth.forEach(function(v,j){const ot=pg.querySelector('.ot[data-j="'+j+'"]');if(ot&&v){ot.value=v;ot.hidden=false}})}if(g){mount();calc()}else if(keep)calc()};
+const _s2=show;show=function(i){const prev=cur>=0&&SV[cur]&&SV[cur].slug;if(prev==='interior-design'||prev==='interior-execution')ixKeep[prev]={ans:ans.map(function(a){return a.slice()}),oth:oth.slice()};const slug=SV[i]&&SV[i].slug,g=slug==='interior-design';kill();if(g){PL.room=-1;PL.sel=-1;box=null}_s2(i);const keep=(slug==='interior-design'||slug==='interior-execution')&&ixKeep[slug];if(keep){ans=keep.ans.map(function(a){return a.slice()});oth=keep.oth.slice();ans.forEach(function(a,j){a.forEach(function(k){const inp=pg.querySelector('input[name="q'+j+'"][value="'+k+'"]');if(inp)inp.checked=true})});oth.forEach(function(v,j){const ot=pg.querySelector('.ot[data-j="'+j+'"]');if(ot&&v){ot.value=v;ot.hidden=false}})}if(g){mount();calc()}else if(keep)calc();if(slug==='interior-design'){const hd=pg.querySelector('.hd');if(hd&&!pg.querySelector('#ixguide')){const el=document.createElement('aside');el.id='ixguide';el.className='ixguide';el.innerHTML='<b>Interior design guideline</b><ol><li>Name the room by how people use it, then measure length, width and ceiling height.</li><li>Keep a clear path of about 90 cm through halls and 75 cm around a dining table.</li><li>Leave 40 to 60 cm of free space in front of cabinets, desks and the bed.</li><li>Put the brightest light where people sit or work, and a softer light for the rest of the room.</li><li>Choose one main colour and one wood or metal finish, then repeat them so the room feels calm.</li><li>Note doors, windows and columns before placing furniture in the 3D plan.</li><li>Send photos of the empty room with this request so the plan matches the real space.</li></ol>';hd.after(el)}}};
 const _cx=calc;calc=function(){_cx();const s=SV[cur];if(!s||s.slug!=='interior-design')return;const sm=$('#sum');if(!sm)return;let h='',t='';
 Object.keys(D).forEach(r=>{const S=stats(r);if(!S.n)return;const dd=D[r],cnt={};dd.items.forEach(o=>{if(!o.fr){const n=F[o.k][0];cnt[n]=(cnt[n]||0)+1}});const lst=Object.keys(cnt).map(n=>n+(cnt[n]>1?' x'+cnt[n]:'')).join(', '),c=dd.cfg;
 h+='<div class="r"><span>'+esc(RM[r][0])+': '+esc(lst)+'<small>3D design ('+S.n+' pieces)</small></span><b>'+star(S.stars)+'</b></div>';t+='\n3D room: '+RM[r][0]+' '+c.w+' x '+c.d+' x '+c.h+' m, walls '+c.wall+', floor '+c.ft+' '+c.floor+'. Pieces: '+lst+'. Rating '+S.stars+'/5, '+fm(S.cost)+' of '+fm(S.b)+' game coins'});
@@ -7024,8 +7308,9 @@ const tot=sm.querySelector('.tot');if(tot)tot.insertAdjacentHTML('beforebegin',h
   const walk = new THREE.Group();
   scene.add(walk);
   const MAN_H = 1.5,
+    MAN_WH = 564 / 1417,
     ST_ON = 1;
-  const manTex = new THREE.TextureLoader().load("man.png");
+  const manTex = new THREE.TextureLoader().load("man.png?v=sin");
   manTex.encoding = THREE.sRGBEncoding;
   manTex.anisotropy = 4;
   const man = new THREE.Sprite(
@@ -7037,7 +7322,7 @@ const tot=sm.querySelector('.tot');if(tot)tot.insertAdjacentHTML('beforebegin',h
     }),
   );
   man.center.set(0.5, 0);
-  man.scale.set((MAN_H * 285) / 720, MAN_H, 1);
+  man.scale.set(MAN_H * MAN_WH, MAN_H, 1);
   walk.add(man);
   const hitbox = new THREE.Mesh(
     new THREE.BoxGeometry(0.7, MAN_H, 0.5),
@@ -7128,7 +7413,7 @@ const tot=sm.querySelector('.tot');if(tot)tot.insertAdjacentHTML('beforebegin',h
     RRX = 2.55,
     RRZ = 1.1;
   const caster = new THREE.Mesh(
-    new THREE.PlaneGeometry((MAN_H * 285) / 720, MAN_H),
+    new THREE.PlaneGeometry(MAN_H * MAN_WH, MAN_H),
     new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, colorWrite: false, depthWrite: false }),
   );
   caster.customDepthMaterial = new THREE.MeshDepthMaterial({
@@ -7142,6 +7427,23 @@ const tot=sm.querySelector('.tot');if(tot)tot.insertAdjacentHTML('beforebegin',h
   caster.castShadow = true;
   caster.renderOrder = -1;
   walk.add(caster);
+  const shade = new THREE.Mesh(
+    new THREE.PlaneGeometry(MAN_H * MAN_WH, MAN_H),
+    new THREE.MeshBasicMaterial({
+      map: manTex,
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.42,
+      alphaTest: 0.2,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  shade.rotation.order = "YXZ";
+  shade.visible = false;
+  shade.renderOrder = 2;
+  walk.add(shade);
+  man.material.depthWrite = false;
   const wk = {
       si: 1,
       th: A0 + STEP - 0.7,
@@ -7237,11 +7539,31 @@ const tot=sm.querySelector('.tot');if(tot)tot.insertAdjacentHTML('beforebegin',h
     }
     if (Math.abs(pv2.x - pv.x) > 1e-4) wk.fl = pv2.x > pv.x ? 1 : -1;
     man.scale.set(
-      ((MAN_H * 285) / 720) * wk.fl,
+      (MAN_H * MAN_WH) * wk.fl,
       MAN_H * (1 + (calm ? 0 : Math.sin(wk.t * 1.8) * 0.007)),
       1,
     );
     caster.scale.x = wk.fl;
+    const gx = cam.position.x - walk.position.x,
+      gz = cam.position.z - walk.position.z,
+      gy = cam.position.y - walk.position.y,
+      steep = gy > Math.hypot(gx, gz) * 1.8;
+    man.material.depthTest = !steep;
+    man.renderOrder = steep ? 12 : 0;
+    caster.castShadow = !steep;
+    shade.visible = steep;
+    if (steep) {
+      const llen = Math.hypot(key.position.x, key.position.z) || 1,
+        sc = walk.scale.y || 1;
+      shade.position.set(
+        ((-key.position.x / llen) * 0.72) / sc,
+        (-0.4 - walk.position.y) / sc,
+        ((-key.position.z / llen) * 0.72) / sc,
+      );
+      shade.rotation.y = Math.atan2(gx, gz);
+      shade.rotation.x = -Math.PI / 2;
+      shade.scale.x = wk.fl;
+    }
     pv.set(x, walk.position.y + MAN_H * sz * 1.03, z);
     pv.project(cam);
     wk.on = Math.abs(pv.x) < 1 && Math.abs(pv.y) < 1 && pv.z < 1;

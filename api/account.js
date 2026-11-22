@@ -40,6 +40,40 @@ function text(v, max) {
     .slice(0, max);
 }
 
+async function mailReset(email, name, code) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        service_id: "service_7cpdfst",
+        template_id: "template_w9j36v9",
+        user_id: "mJF5b2OR8PYShW5wd",
+        template_params: {
+          to_email: email,
+          service: "Password reset",
+          order_summary: "Your Lay C password reset code is " + code + ". It expires in 15 minutes.",
+          products: "Password reset",
+          quantities: "Code " + code,
+          total_price: "Reset",
+          customer_details: "Reset code: " + code + ". Enter it on the sign-in form with a new password.",
+          customer_name: name || "",
+          customer_email: email,
+          client_email: email,
+        },
+      }),
+      signal: ctrl.signal,
+    });
+    return res.ok;
+  } catch (e) {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function supabaseAdmin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -58,7 +92,16 @@ module.exports = async function handler(req, res) {
   const payload = await readPayload(req);
   if (!payload) return json(res, 400, { ok: false, error: "The account is missing." });
 
-  const mode = payload.mode === "login" ? "login" : payload.mode === "session" ? "session" : "signup";
+  const mode =
+    payload.mode === "login"
+      ? "login"
+      : payload.mode === "session"
+        ? "session"
+        : payload.mode === "forgot"
+          ? "forgot"
+          : payload.mode === "reset"
+            ? "reset"
+            : "signup";
   let supabase;
   try {
     supabase = supabaseAdmin();
@@ -94,7 +137,7 @@ module.exports = async function handler(req, res) {
     return json(res, 400, { ok: false, error: "Enter a valid email address." });
   }
   const password = String(payload.password || "");
-  if (password.length < 6) {
+  if (mode !== "forgot" && password.length < 6) {
     return json(res, 400, { ok: false, error: "Choose a password of at least 6 characters." });
   }
   if (mode === "signup") {
@@ -114,6 +157,48 @@ module.exports = async function handler(req, res) {
 
   const prev = (existing.data && existing.data.items) || {};
   const hasPass = Boolean(prev.pass && prev.salt);
+  if (mode === "forgot") {
+    if (existing.data && hasPass) {
+      const code = String(crypto.randomInt(100000, 1000000));
+      const reset_salt = crypto.randomBytes(8).toString("hex");
+      const reset_hash = crypto.createHash("sha256").update(reset_salt + ":" + code).digest("hex");
+      const patched = await supabase
+        .from("orders")
+        .update({
+          items: Object.assign({}, prev, { reset_hash, reset_salt, reset_exp: Date.now() + 15 * 60 * 1000 }),
+        })
+        .eq("id", existing.data.id);
+      if (patched.error) {
+        return json(res, 502, { ok: false, error: "The reset code was not saved. Try again." });
+      }
+      const sent = await mailReset(customer_email, existing.data.customer_name || "", code);
+      if (!sent) {
+        return json(res, 502, { ok: false, error: "The reset email could not be sent. Try again in a moment." });
+      }
+    }
+    return json(res, 200, { ok: true, sent: true });
+  }
+  if (mode === "reset") {
+    const code = text(payload.code, 8);
+    const expired = !prev.reset_hash || !prev.reset_salt || Date.now() > Number(prev.reset_exp || 0);
+    const check = !expired
+      ? crypto.createHash("sha256").update(prev.reset_salt + ":" + code).digest("hex")
+      : "";
+    if (!existing.data || !hasPass || expired || check !== prev.reset_hash) {
+      return json(res, 400, { ok: false, error: "That code is not valid or it has expired. Send a new code." });
+    }
+    const salt = crypto.randomBytes(16).toString("hex");
+    const pass = crypto.scryptSync(password, salt, 32).toString("hex");
+    const next = Object.assign({}, prev, { salt, pass });
+    delete next.reset_hash;
+    delete next.reset_salt;
+    delete next.reset_exp;
+    const patched = await supabase.from("orders").update({ items: next }).eq("id", existing.data.id);
+    if (patched.error) {
+      return json(res, 502, { ok: false, error: "The new password was not saved. Try again." });
+    }
+    return json(res, 200, { ok: true, reset: true });
+  }
   if (mode === "login") {
     if (!existing.data || !hasPass) {
       return json(res, 404, {
