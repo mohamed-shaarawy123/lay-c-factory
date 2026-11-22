@@ -261,8 +261,9 @@ body {
 }
 @media (max-width: 900px) {
   .lampbar {
-    top: max(52px, calc(env(safe-area-inset-top, 0px) + 46px));
-    width: min(280px, calc(100% - 24px));
+    top: auto;
+    bottom: max(132px, calc(env(safe-area-inset-bottom, 0px) + 118px));
+    width: min(260px, calc(100% - 20px));
   }
 }
 header {
@@ -369,6 +370,110 @@ header .id {
   color: var(--amber);
   font-size: 13px;
   letter-spacing: 2px;
+}
+.mood {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.85fr);
+  gap: 8px;
+  width: 100%;
+}
+.moodc {
+  min-width: 0;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg);
+  color: var(--amber);
+  text-align: center;
+}
+.moodc i {
+  font: 700 11px ui-monospace, monospace;
+  font-style: normal;
+}
+.moodc b,
+.moodc small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.moodc b {
+  font-size: clamp(13px, 3.4vw, 15px);
+}
+.moodc small {
+  font-size: 12px;
+  font-weight: 600;
+}
+.moodc[aria-pressed="true"] {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: var(--on);
+}
+.langwrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+.langb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--amber);
+  font-weight: 700;
+}
+.langb svg {
+  width: 16px;
+  height: 16px;
+}
+.langpop {
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 6;
+  min-width: 148px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 10px 24px rgba(15, 42, 138, 0.16);
+}
+.langpop[hidden] {
+  display: none;
+}
+.langpop button {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  text-align: start;
+  font-weight: 600;
+  color: var(--fg);
+}
+.langpop button[aria-pressed="true"] {
+  color: var(--amber);
+}
+html[dir="rtl"] .menu {
+  left: auto;
+  right: 0;
+  transform: translateX(105%);
+}
+html[dir="rtl"] .menu.on {
+  transform: none;
+}
+html[dir="rtl"] .msr input {
+  padding: 11px 36px 11px 12px;
+  background-position: right 12px center;
+}
+html[dir="rtl"] .id,
+html[dir="rtl"] header {
+  direction: rtl;
 }
 .msr input {
   display: block;
@@ -3478,7 +3583,32 @@ header {
     font-size: 9px;
   }
   .id b {
-    max-width: 38vw;
+    max-width: 34vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .menu {
+    width: 100%;
+    max-width: 100%;
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+  }
+  .mood {
+    grid-template-columns: minmax(0, 1fr) minmax(72px, 0.72fr);
+  }
+  #status span {
+    max-width: 26vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #ctl {
+    bottom: max(28px, calc(env(safe-area-inset-bottom, 0px) + 18px));
+  }
+  #modes,
+  #cams {
+    width: min(100%, 440px);
   }
   .tot b {
     font-size: 22px;
@@ -3835,4 +3965,19 @@ html.dark .menu,
 html.dark #page,
 html.dark .ixguide {
   color: #e6edff;
+}
+html.dark .moodc,
+html.dark .langb,
+html.dark .langpop,
+html.dark .menu .ml button,
+html.dark .msr input {
+  background: #121a36;
+  color: #e6edff;
+}
+html.dark .moodc {
+  color: #d5e2ff;
+}
+html.dark .moodc[aria-pressed="true"] {
+  background: var(--amber);
+  color: var(--on);
 }

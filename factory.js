@@ -224,7 +224,7 @@
     else scene.background = skyNow.copy(skyDay).lerp(skyNight, lampT);
     if (lampSlide && document.activeElement !== lampSlide) lampSlide.value = String(Math.round(lampT * 100));
   }
-  setLamp(0);
+  setLamp(document.documentElement.classList.contains("dark") ? 0.82 : 0);
   // plate
   box(machine, 13.6, 0.38, 8.9, 0, -0.09, 0, M.base);
   box(machine, 13.4, 0.06, 8.7, 0, 0.13, 0, M.edge);
@@ -1315,6 +1315,109 @@
     sel = i;
     return setCam("station");
   }
+  const UI = {
+    en: {
+      dark: "Dark mode",
+      auto: "Auto",
+      on: "On",
+      off: "Off",
+      services: "Services",
+      search: "Search services, prices, options",
+      help: "Help from DOD",
+      help2: "Ask anything, get advice or send a photo",
+      signin: "Sign in",
+      signup: "Sign up",
+      logout: "Log out",
+      guest: "Not signed in",
+      running: "Machine running",
+      stopped: "Machine stopped",
+      assembled: "Assembled",
+      stations: "Stations",
+      beanie: "One beanie",
+      view: "VIEW",
+      overview: "Overview",
+      side: "Side",
+      top: "Top",
+      station: "Station",
+      flight: "Flight",
+      openmenu: "Open the menu",
+      closemenu: "Close the menu",
+      nomatch: "No match for",
+      youremail: "Your email",
+      notein: "This email is saved in this browser. Close the page and open it again, and you stay signed in. Log out if this is not your account.",
+      notelogin: "Enter the email and password you created. Once it is saved, closing the page will not sign you out.",
+      notesign: "Create a password the first time. Anything you do after this, including orders and photos, stays connected to this email.",
+    },
+    ar: {
+      dark: "الوضع الداكن",
+      auto: "تلقائي",
+      on: "تشغيل",
+      off: "إيقاف",
+      services: "الخدمات",
+      search: "ابحث عن الخدمات والأسعار",
+      help: "مساعدة من DOD",
+      help2: "اسأل أي شيء أو أرسل صورة",
+      signin: "تسجيل الدخول",
+      signup: "إنشاء حساب",
+      logout: "تسجيل الخروج",
+      guest: "لم تسجل الدخول",
+      running: "الماكينة تعمل",
+      stopped: "الماكينة متوقفة",
+      assembled: "مجمّع",
+      stations: "المحطات",
+      beanie: "قبعة واحدة",
+      view: "العرض",
+      overview: "عام",
+      side: "جانب",
+      top: "أعلى",
+      station: "محطة",
+      flight: "تحليق",
+      openmenu: "افتح القائمة",
+      closemenu: "أغلق القائمة",
+      nomatch: "لا توجد نتيجة لـ",
+      youremail: "بريدك",
+      notein: "هذا البريد محفوظ في المتصفح. أغلق الصفحة وافتحها وستبقى داخل الحساب. سجّل الخروج إن لم يكن حسابك.",
+      notelogin: "أدخل البريد وكلمة المرور التي أنشأتها. بعد الحفظ، إغلاق الصفحة لا يخرجك من الحساب.",
+      notesign: "أنشئ كلمة مرور في أول مرة. كل ما تفعله بعد ذلك، بما فيه الطلبات والصور، يبقى مرتبطاً بهذا البريد.",
+    },
+  };
+  const SVC_AR = {
+    Designing: "التصميم",
+    "Clothing manufacturing": "تصنيع الملابس",
+    "Photo shoots": "جلسات التصوير",
+    "Web developing": "تطوير المواقع",
+    Marketing: "التسويق",
+    "Seniors uniform": "يونيفورم الخريجين",
+    Interior: "التصميم الداخلي",
+    "Interior design": "تصميم داخلي",
+    Execution: "التنفيذ",
+    "Book a shoot": "احجز جلسة",
+    "Book a studio": "احجز استوديو",
+    Rooms: "الغرف",
+    "Media buying": "شراء الإعلانات",
+    UGC: "محتوى المستخدم",
+  };
+  let lang = "en";
+  try {
+    lang = localStorage.getItem("lclang") === "ar" ? "ar" : "en";
+  } catch (e) {}
+  function ui(k) {
+    return (UI[lang] && UI[lang][k]) || UI.en[k] || k;
+  }
+  function svcName(n) {
+    return lang === "ar" && SVC_AR[n] ? SVC_AR[n] : n;
+  }
+  function nightNow() {
+    const h = new Date().getHours();
+    return h >= 18 || h < 6;
+  }
+  function readAuto() {
+    try {
+      return localStorage.getItem("lcauto") === "1";
+    } catch (e) {
+      return false;
+    }
+  }
   function play() {
     playing = true;
     sp();
@@ -1328,7 +1431,7 @@
     b.textContent = playing ? "❚❚" : "▶";
     b.setAttribute("aria-label", playing ? "Pause the animation" : "Resume the animation");
     $("#status").classList.toggle("p", !playing);
-    $("#st").textContent = playing ? "Machine running" : "Machine stopped";
+    $("#st").textContent = playing ? ui("running") : ui("stopped");
     return true;
   }
   window.__machine = {
@@ -2764,11 +2867,11 @@
   function paintAcc() {
     const a = accGet();
     const on = signedIn();
-    const label = on ? a.email : "Sign in";
+    const label = on ? a.email : ui("signin");
     const btn = $("#accbtn");
     if (btn) btn.textContent = label;
     const mail = $("#menuemail");
-    if (mail) mail.textContent = on ? a.email : "Not signed in";
+    if (mail) mail.textContent = on ? a.email : ui("guest");
     ["mlogin", "msignup"].forEach((id) => {
       const el = $("#" + id);
       if (el) el.hidden = on;
@@ -2840,17 +2943,17 @@
     const note = $("#accnote");
     if (note) {
       note.textContent = signedView
-        ? "This email is saved in this browser. Close the page and open it again, and you stay signed in. Log out if this is not your account."
+        ? ui("notein")
         : accMode === "login"
-          ? "Enter the email and password you created. Once it is saved, closing the page will not sign you out."
-          : "Create a password the first time. Anything you do after this, including orders and photos, stays connected to this email.";
+          ? ui("notelogin")
+          : ui("notesign");
     }
     const title = document.querySelector("#accform .acc-h b");
-    if (title) title.textContent = signedView ? "Your email" : accMode === "login" ? "Sign in" : "Sign up";
+    if (title) title.textContent = signedView ? ui("youremail") : accMode === "login" ? ui("signin") : ui("signup");
     const submit = accForm && accForm.querySelector('button[type="submit"]');
     if (submit) {
       submit.hidden = signedView;
-      submit.textContent = accMode === "login" ? "Sign in" : "Sign up";
+      submit.textContent = accMode === "login" ? ui("signin") : ui("signup");
     }
     const forgot = $("#accforgot");
     if (forgot) forgot.hidden = signedView;
@@ -4120,6 +4223,8 @@
     h: (
       x.n +
       " " +
+      (SVC_AR[x.n] || "") +
+      " " +
       (x.s || "") +
       " " +
       (x.q || [])
@@ -4134,7 +4239,7 @@
     const mark = document.createElement("i");
     mark.textContent = icon;
     const label = document.createElement("span");
-    label.textContent = SV[i].n;
+    label.textContent = svcName(SV[i].n);
     b.appendChild(mark);
     b.appendChild(label);
     return b;
@@ -4154,7 +4259,7 @@
     if (!hits.length) {
       const empty = document.createElement("p");
       empty.className = "mno";
-      empty.textContent = "No match for \u201c" + (menuSearch ? menuSearch.value.trim() : q) + "\u201d.";
+      empty.textContent = ui("nomatch") + " \u201c" + (menuSearch ? menuSearch.value.trim() : q) + "\u201d.";
       menuListEl.appendChild(empty);
     }
   }
@@ -4173,13 +4278,123 @@
     if (app) app.classList.toggle("menu-open", on);
     if (btn) {
       btn.setAttribute("aria-expanded", on ? "true" : "false");
-      btn.setAttribute("aria-label", on ? "Close the menu" : "Open the menu");
+      btn.setAttribute("aria-label", on ? ui("closemenu") : ui("openmenu"));
     }
     if (on && menuSearch) {
       menuSearch.value = "";
       menuList("");
     }
   }
+  function paintMood() {
+    const dark = document.documentElement.classList.contains("dark");
+    const auto = readAuto();
+    const d = $("#darkmode");
+    const a = $("#automode");
+    if (d) {
+      d.setAttribute("aria-pressed", dark ? "true" : "false");
+      const b = d.querySelector("b");
+      const s = $("#darkstate");
+      if (b) b.textContent = ui("dark");
+      if (s) s.textContent = ui(dark ? "on" : "off");
+    }
+    if (a) {
+      a.setAttribute("aria-pressed", auto ? "true" : "false");
+      const b = a.querySelector("b");
+      const s = $("#autostate");
+      if (b) b.textContent = ui("auto");
+      if (s) s.textContent = ui(auto ? "on" : "off");
+    }
+  }
+  function applyMood(dark) {
+    document.documentElement.classList.toggle("dark", !!dark);
+    try {
+      localStorage.setItem("lcdark", dark ? "1" : "0");
+    } catch (e) {}
+    setLamp(dark ? 0.82 : 0);
+    paintMood();
+  }
+  function applyChrome() {
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+    try {
+      localStorage.setItem("lclang", lang);
+    } catch (e) {}
+    const set = (sel, key) => {
+      const el = document.querySelector(sel);
+      if (el) el.textContent = ui(key);
+    };
+    set(".svc", "services");
+    set("#mdod b", "help");
+    set("#mdod small", "help2");
+    set("#mlogin", "signin");
+    set("#msignup", "signup");
+    set("#mlogout", "logout");
+    set("#accsignup", "signup");
+    set("#acclogin", "signin");
+    if (menuSearch) menuSearch.placeholder = ui("search");
+    const modes = { assembled: "assembled", stations: "stations", order: "beanie" };
+    document.querySelectorAll("[data-mode]").forEach((b) => {
+      if (modes[b.dataset.mode]) b.textContent = ui(modes[b.dataset.mode]);
+    });
+    const cams = { overview: "overview", side: "side", top: "top", station: "station", flight: "flight" };
+    document.querySelectorAll("[data-cam]").forEach((b) => {
+      if (cams[b.dataset.cam]) b.textContent = ui(cams[b.dataset.cam]);
+    });
+    const cap = document.querySelector("#cams .cap");
+    if (cap) cap.textContent = ui("view");
+    const ln = $("#langname");
+    if (ln) ln.textContent = lang === "ar" ? "العربية" : "English";
+    document.querySelectorAll("#langpop button").forEach((b) => {
+      b.setAttribute("aria-pressed", b.dataset.lang === lang ? "true" : "false");
+    });
+    paintMood();
+    paintAcc();
+    if ($("#account") && !$("#account").hidden) setAccMode(accMode);
+    sp();
+    menuList(menuSearch ? menuSearch.value : "");
+  }
+  if ($("#darkmode"))
+    $("#darkmode").addEventListener("click", () => {
+      try {
+        localStorage.setItem("lcauto", "0");
+      } catch (e) {}
+      applyMood(!document.documentElement.classList.contains("dark"));
+    });
+  if ($("#automode"))
+    $("#automode").addEventListener("click", () => {
+      const on = !readAuto();
+      try {
+        localStorage.setItem("lcauto", on ? "1" : "0");
+      } catch (e) {}
+      if (on) applyMood(nightNow());
+      else paintMood();
+    });
+  if ($("#langb"))
+    $("#langb").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const pop = $("#langpop");
+      if (!pop) return;
+      pop.hidden = !pop.hidden;
+      $("#langb").setAttribute("aria-expanded", pop.hidden ? "false" : "true");
+    });
+  document.querySelectorAll("#langpop button").forEach((b) => {
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      lang = b.dataset.lang === "ar" ? "ar" : "en";
+      const pop = $("#langpop");
+      if (pop) pop.hidden = true;
+      if ($("#langb")) $("#langb").setAttribute("aria-expanded", "false");
+      applyChrome();
+    });
+  });
+  document.addEventListener("click", (e) => {
+    const pop = $("#langpop");
+    if (!pop || pop.hidden) return;
+    if (e.target.closest("#langpop") || e.target.closest("#langb")) return;
+    pop.hidden = true;
+    if ($("#langb")) $("#langb").setAttribute("aria-expanded", "false");
+  });
+  applyChrome();
   if ($("#menub")) $("#menub").addEventListener("click", () => menuSet(!$("#menu").classList.contains("on")));
   if ($("#mscrim")) $("#mscrim").addEventListener("click", () => menuSet(false));
   if ($("#mlogin"))
