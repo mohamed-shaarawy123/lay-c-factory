@@ -5,7 +5,7 @@
     <meta charset="utf8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="styles.css?v=live14" />
+    <link rel="stylesheet" href="styles.css?v=live15" />
     <script>
       try {
         var lang = localStorage.getItem("lclang") === "ar" ? "ar" : "en";
@@ -26,12 +26,6 @@
         role="img"
         aria-label="Interactive 3D factory that makes gray beanies: Orders, Knitter, Dye vat, Embroidery Machine, Pom-pom and Checkout. Drag to rotate, scroll to zoom, or tap a station."
       ></div>
-      <div id="lampbar" class="lampbar">
-        <input id="lampslide" type="range" min="0" max="100" value="0" step="1" aria-label="Lower the lamp" />
-        <span class="lampmoon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 3.2A8.2 8.2 0 1 0 20.8 14 6.4 6.4 0 0 1 16 3.2z"/></svg>
-        </span>
-      </div>
       <header>
         <div class="id">
           <button id="menub" class="menub" type="button" aria-label="Open the menu" aria-expanded="false" aria-controls="menu">
@@ -42,6 +36,9 @@
         </div>
         <div class="hdr-right">
           <div id="status"><i></i><span id="st">Machine running</span></div>
+          <button type="button" id="lampb" class="iconb" aria-pressed="false" aria-label="Lower the lamp" title="Lower the lamp">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M8 14a6 6 0 1 1 8 0c-.7.7-1.2 1.6-1.4 2.6H9.4C9.2 15.6 8.7 14.7 8 14z"/></svg>
+          </button>
         </div>
       </header>
       <div id="mscrim" class="mscrim" hidden></div>
@@ -202,6 +199,6 @@
     <section id="receipt" class="receipt" role="dialog" aria-label="Sales receipt" hidden>
       <article id="receiptcard" class="receipt-card"></article>
     </section>
-    <script src="factory.js?v=live48"></script>
+    <script src="factory.js?v=live49"></script>
   </body>
 </html>

@@ -194,7 +194,8 @@
     keyDay = new THREE.Color(0xffffff),
     keyNight = new THREE.Color(0xffe2b8);
   let lampT = 0;
-  const lampSlide = $("#lampslide");
+  let lampAnim = 0;
+  const lampBtn = $("#lampb");
   function setLamp(t) {
     lampT = Math.max(0, Math.min(1, t));
     const y = LAMP_HI + (LAMP_LO - LAMP_HI) * lampT,
@@ -222,7 +223,28 @@
     R.toneMappingExposure = 0.76 + 0.34 * k;
     if (lampT < 0.02) scene.background = null;
     else scene.background = skyNow.copy(skyDay).lerp(skyNight, lampT);
-    if (lampSlide && document.activeElement !== lampSlide) lampSlide.value = String(Math.round(lampT * 100));
+    if (lampBtn) {
+      const down = lampT > 0.45;
+      lampBtn.setAttribute("aria-pressed", down ? "true" : "false");
+      lampBtn.setAttribute("aria-label", down ? "Raise the lamp" : "Lower the lamp");
+      lampBtn.title = down ? "Raise the lamp" : "Lower the lamp";
+    }
+  }
+  function moveLamp(to) {
+    if (lampAnim) cancelAnimationFrame(lampAnim);
+    const from = lampT;
+    const dest = Math.max(0, Math.min(1, to));
+    const t0 = performance.now();
+    const step = (now) => {
+      if (lampDrag) {
+        lampAnim = 0;
+        return;
+      }
+      const u = Math.min(1, (now - t0) / 700);
+      setLamp(from + (dest - from) * (1 - Math.pow(1 - u, 3)));
+      lampAnim = u < 1 ? requestAnimationFrame(step) : 0;
+    };
+    lampAnim = requestAnimationFrame(step);
   }
   setLamp(document.documentElement.classList.contains("dark") ? 0.82 : 0);
   // plate
@@ -1569,6 +1591,8 @@
     (e) => {
       if (e.button != null && e.button !== 0) return;
       if (hit(e) !== -8) return;
+      if (lampAnim) cancelAnimationFrame(lampAnim);
+      lampAnim = 0;
       lampDrag = true;
       lampY0 = e.clientY;
       lampT0 = lampT;
@@ -1592,7 +1616,10 @@
     lampDrag = false;
     ctrl.enabled = true;
   });
-  if (lampSlide) lampSlide.addEventListener("input", () => setLamp(Number(lampSlide.value) / 100));
+  if (lampBtn)
+    lampBtn.addEventListener("click", () => {
+      moveLamp(lampT > 0.45 ? 0 : 0.82);
+    });
   addEventListener("pointerup", () => {
     camDown = false;
   });
@@ -4310,7 +4337,7 @@
     try {
       localStorage.setItem("lcdark", dark ? "1" : "0");
     } catch (e) {}
-    setLamp(dark ? 0.82 : 0);
+    moveLamp(dark ? 0.82 : 0);
     paintMood();
   }
   function applyChrome() {
