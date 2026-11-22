@@ -7696,19 +7696,16 @@ const tot=sm.querySelector('.tot');if(tot)tot.insertAdjacentHTML('beforebegin',h
   const manTex = new THREE.TextureLoader().load("man.png?v=sin");
   manTex.encoding = THREE.sRGBEncoding;
   manTex.anisotropy = 4;
-  const man = new THREE.Mesh(
-    new THREE.PlaneGeometry(MAN_H * MAN_WH, MAN_H),
-    new THREE.MeshBasicMaterial({
+  const man = new THREE.Sprite(
+    new THREE.SpriteMaterial({
       map: manTex,
       transparent: true,
       alphaTest: 0.05,
-      side: THREE.DoubleSide,
       toneMapped: false,
-      depthWrite: false,
     }),
   );
-  man.position.y = MAN_H / 2;
-  man.rotation.order = "YXZ";
+  man.center.set(0.5, 0);
+  man.scale.set(MAN_H * MAN_WH, MAN_H, 1);
   walk.add(man);
   const hitbox = new THREE.Mesh(
     new THREE.BoxGeometry(0.7, MAN_H, 0.5),
@@ -7813,6 +7810,23 @@ const tot=sm.querySelector('.tot');if(tot)tot.insertAdjacentHTML('beforebegin',h
   caster.castShadow = true;
   caster.renderOrder = -1;
   walk.add(caster);
+  const manShade = new THREE.Mesh(
+    new THREE.PlaneGeometry(MAN_H * MAN_WH, MAN_H),
+    new THREE.MeshBasicMaterial({
+      map: manTex,
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.42,
+      alphaTest: 0.2,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  manShade.rotation.order = "YXZ";
+  manShade.visible = false;
+  manShade.renderOrder = 2;
+  walk.add(manShade);
+  man.material.depthWrite = false;
   const wk = {
       si: 1,
       th: A0 + STEP - 0.7,
@@ -7907,10 +7921,32 @@ const tot=sm.querySelector('.tot');if(tot)tot.insertAdjacentHTML('beforebegin',h
       pv2.set(x + (tx / tl) * 0.3, YP, z + (tz / tl) * 0.3).project(cam);
     }
     if (Math.abs(pv2.x - pv.x) > 1e-4) wk.fl = pv2.x > pv.x ? 1 : -1;
-    man.scale.set(wk.fl, 1 + (calm ? 0 : Math.sin(wk.t * 1.8) * 0.007), 1);
-    man.rotation.y = Math.atan2(cam.position.x - x, cam.position.z - z);
+    man.scale.set(
+      MAN_H * MAN_WH * wk.fl,
+      MAN_H * (1 + (calm ? 0 : Math.sin(wk.t * 1.8) * 0.007)),
+      1,
+    );
     caster.scale.x = wk.fl;
-    caster.rotation.y = man.rotation.y;
+    const gx = cam.position.x - walk.position.x,
+      gz = cam.position.z - walk.position.z,
+      gy = cam.position.y - walk.position.y,
+      steep = gy > Math.hypot(gx, gz) * 1.8;
+    man.material.depthTest = !steep;
+    man.renderOrder = steep ? 12 : 0;
+    caster.castShadow = !steep;
+    manShade.visible = steep;
+    if (steep) {
+      const llen = Math.hypot(key.position.x, key.position.z) || 1,
+        sc = walk.scale.y || 1;
+      manShade.position.set(
+        ((-key.position.x / llen) * 0.72) / sc,
+        (-0.4 - walk.position.y) / sc,
+        ((-key.position.z / llen) * 0.72) / sc,
+      );
+      manShade.rotation.y = Math.atan2(gx, gz);
+      manShade.rotation.x = -Math.PI / 2;
+      manShade.scale.x = wk.fl;
+    }
     pv.set(x, walk.position.y + MAN_H * sz * 1.03, z);
     pv.project(cam);
     wk.on = Math.abs(pv.x) < 1 && Math.abs(pv.y) < 1 && pv.z < 1;
